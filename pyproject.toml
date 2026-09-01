@@ -1,0 +1,10 @@
+[project]
+name = "careertracker"
+version = "0.1.0"
+description = "CareerTracker"
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
