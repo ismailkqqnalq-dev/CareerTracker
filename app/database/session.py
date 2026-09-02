@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base
 
 database_url="sqlite:///careertracker.db"
 engine= create_engine(
@@ -12,3 +13,12 @@ SessionLocal= sessionmaker(
     autoflush=False,
     expire_on_commit=False
 )
+
+Base= declarative_base()
+
+def get_db():
+    db=SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
