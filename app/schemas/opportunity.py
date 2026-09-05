@@ -18,11 +18,11 @@ class OpportunityCreate(OpportunityBase):
     pass
 class OpportunityResponse(OpportunityBase):
     id:int
-    class ConfigDict:
+    class  Config:
         from_attributes = True
     
 class OpportunityUpdate(BaseModel):
-    class OpportunityUpdate(BaseModel):
+    
         company : Optional[str] = None,
         position : Optional[str] = None,
         type : Optional[str] = None,
