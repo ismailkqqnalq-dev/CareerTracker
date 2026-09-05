@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from datetime import date
+from typing import Optional
 class OpportunityBase(BaseModel):
      
         company:str
@@ -17,5 +18,19 @@ class OpportunityCreate(OpportunityBase):
     pass
 class OpportunityResponse(OpportunityBase):
     id:int
-    class Config:
+    class  Config:
         from_attributes = True
+    
+class OpportunityUpdate(BaseModel):
+    
+        company : Optional[str] = None,
+        position : Optional[str] = None,
+        type : Optional[str] = None,
+        application_date : Optional[date] = None,
+        job_link : Optional[str] = None,
+        salary : Optional[int] = None,
+        location : Optional[str] = None,
+        status : Optional[str] = None,
+        notes : Optional[str] = None,
+        next_action : Optional[str] = None,
+        last_contact_date : Optional[date] = None

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models import opportunity
 from app.services import opportunity_service as service
-from app.schemas.opportunity import OpportunityCreate, OpportunityResponse
+from app.schemas.opportunity import OpportunityCreate, OpportunityResponse, OpportunityUpdate
 
 router=APIRouter()
 @router.post("/opportunities",response_model=OpportunityResponse)
@@ -23,7 +23,7 @@ def get_opportunity(opportunity_id:int, db:Session=Depends(get_db)):
     return opportunity
 
 @router.patch("/opportunities/{opportunity_id}",response_model=OpportunityResponse)
-def update_opportunity(opportunity_id:int, update_data:OpportunityCreate, db:Session=Depends(get_db)):
+def update_opportunity(opportunity_id:int, update_data:OpportunityUpdate, db:Session=Depends(get_db)):
     updated_opportunity = service.update_opportunity(
         db, opportunity_id, update_data.model_dump(exclude_unset=True)
     )
