@@ -18,7 +18,7 @@ class OpportunityCreate(OpportunityBase):
     pass
 class OpportunityResponse(OpportunityBase):
     id:int
-    class  Config:
+    class ConfigDict:
         from_attributes = True
     
 class OpportunityUpdate(BaseModel):
