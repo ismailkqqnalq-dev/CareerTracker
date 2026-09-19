@@ -5,7 +5,8 @@ app.include_router(opportunity_router)
 from app.routes.contact_routes import router as contact_router
 from app.routes.activity_routes import router as activity_router
 app.include_router(activity_router)
-
+from app.routes.task_routes import router as task_router
+app.include_router(task_router)
 app.include_router(contact_router)
 @app.get("/")
 def read_root() -> dict[str, str]:
