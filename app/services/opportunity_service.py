@@ -14,3 +14,6 @@ def update_opportunity(db, opportunity_id, update_data):
 
 def delete_opportunity(db, opportunity_id):
     return op.delete_opportunity(db, opportunity_id)
+
+def get_dashboard_stats(db):
+    return op.get_dashboard_stats(db)

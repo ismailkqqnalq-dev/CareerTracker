@@ -56,3 +56,7 @@ def delete_opportunity(opportunity_id:int, db:Session=Depends(get_db)):
     else:
         raise HTTPException(status_code=404, detail="Opportunity not found")
     
+@router.get("/dashboard")
+def get_dashboard_stats(db: Session = Depends(get_db)):
+    return service.get_dashboard_stats(db)
+    
