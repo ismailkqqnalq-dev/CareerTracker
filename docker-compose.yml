@@ -7,3 +7,19 @@ services:
       - .env
     volumes:
       - .:/app
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: careertracker
+      POSTGRES_PASSWORD: careertracker
+      POSTGRES_DB: careertracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
