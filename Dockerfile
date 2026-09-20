@@ -1,14 +1,12 @@
 FROM python:3.11-slim
-
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-COPY pyproject.toml /app/
-RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir fastapi uvicorn[standard] sqlalchemy pydantic python-dotenv
-
 COPY . /app
+
+RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -e .
 
 EXPOSE 8000
 
