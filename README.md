@@ -3,7 +3,11 @@
 [![Tests](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml)
 
 İş, staj ve freelance başvurularını tek yerde takip etmek için geliştirilen kişisel bir kariyer CRM'inin REST API'si. FastAPI ve SQLAlchemy ile yazılmıştır; SQLite ile yerel, PostgreSQL ile Docker ortamında çalışabilir.
+## Vizyon
 
+CareerTracker, başvuru takibinden öteye geçmeyi hedefliyor: **Career Tracker AI**. Farklı platformlardan (LinkedIn, Indeed, Upwork, Fiverr) gelen iş ve freelance fırsatlarını tek yerde toplayıp ilanlardan yapılandırılmış veri çıkaran, kullanıcının becerileriyle karşılaştıran ve zamanla piyasa trendlerini analiz eden bir kariyer istihbarat platformu.
+
+Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ bileşeni için önce basit bir baseline, ardından gelişmiş yöntem ve ölçülebilir karşılaştırma.
 ## Özellikler
 
 - Fırsat/başvuru kayıtları için CRUD işlemleri
@@ -46,30 +50,30 @@ Uygulama çalışırken interaktif dokümantasyon: [http://127.0.0.1:8000/docs](
 
 Python 3.11 veya üzeri gerekir.
 
-```powershell
+```bash
 git clone https://github.com/ismailkqqnalq-dev/CareerTracker.git
 cd CareerTracker
-
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+```
+
+Sanal ortamı etkinleştir:
+
+- **Windows (PowerShell):** `.\.venv\Scripts\Activate.ps1`
+- **macOS / Linux:** `source .venv/bin/activate`
+
+Bağımlılıkları kur ve çalıştır:
+
+```bash
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+```
 
-Copy-Item .env.example .env
+`.env.example` dosyasını `.env` olarak kopyala (Windows: `Copy-Item .env.example .env`, macOS/Linux: `cp .env.example .env`), sonra:
+
+```bash
 alembic upgrade head
 python -m uvicorn app.main:app --reload
 ```
-
-PowerShell script çalıştırma ilkesi sanal ortamı etkinleştirmeyi engellerse, geçerli terminal oturumu için şu komutu kullanabilirsin:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
-
-API şu adreste çalışır: [http://127.0.0.1:8000](http://127.0.0.1:8000). Swagger arayüzü: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
-
-Varsayılan `.env.example`, yerel SQLite veritabanını kullanır. Tabloları oluşturmak veya güncellemek için `alembic upgrade head` komutu kullanılır.
 
 ## Docker ile PostgreSQL
 
@@ -130,10 +134,26 @@ migrations/        # Alembic migration dosyaları
 tests/             # pytest testleri
 ```
 
+## Yol Haritası
+
+- [x] **Faz 1 - Temel uygulama:** Fırsat, kişi, aktivite ve görev CRUD'ları, testler
+- [x] **Faz 2 - Altyapı:** Dashboard, CSV dışa aktarma, PostgreSQL + Docker, Alembic, CI
+- [ ] **Faz 2.5 - Skill modeli:** Normalize edilmiş beceri veritabanı, kullanıcı skill profili
+- [ ] **Faz 3 - OCR:** İlan ekran görüntüsünden metin çıkarma (image preprocessing ile)
+- [ ] **Faz 4 - NLP:** İlan metninden beceri, rol ve gereksinim çıkarımı (precision/recall/F1 ile ölçülecek)
+- [ ] **Faz 5 - Skill normalization:** "Postgres" ve "PostgreSQL" gibi yazım farklarını birleştirme
+- [ ] **Faz 6 - Kural tabanlı matching:** İlan ile kullanıcı profili karşılaştırması, skill gap analizi
+- [ ] **Faz 7 - Veri analizi:** Market ve freelance analitiği (Pandas)
+- [ ] **Faz 8 - Semantic similarity:** Embedding tabanlı eşleştirme
+- [ ] **Faz 9 - Makine öğrenmesi:** Sınıflandırma ve model değerlendirme
+- [ ] **Faz 10 - Deep learning / Computer Vision:** Belge anlama denemeleri
+- [ ] **Faz 11 - Production:** Kimlik doğrulama, arayüz, deployment
+
+> Eşleşme skorları gibi çıktılar bilimsel bir doğruluk ölçüsü değil, açıklanabilir bir hesaplamanın sonucudur.
+
 ## Durum
 
-Fırsatlar, kişiler, aktiviteler ve görevler için temel CRUD akışları; dashboard, CSV dışa aktarma, PostgreSQL/Docker ve migration altyapısı projede bulunmaktadır. Kimlik doğrulama ve kullanıcı arayüzü henüz kapsamda değildir.
-
+Faz 1 ve 2 tamamlandı. Kimlik doğrulama ve kullanıcı arayüzü henüz kapsamda değil.
 ## Lisans
 
-Bu proje kişisel portföy ve öğrenme amacıyla geliştirilmektedir.
+[MIT](LICENSE)
