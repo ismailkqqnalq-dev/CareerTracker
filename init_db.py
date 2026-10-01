@@ -4,4 +4,6 @@ from app.models.opportunity import Opportunity
 from app.models.contacts import Contact
 from app.models.activities import Activity
 from app.models.tasks import Task
+from app.models.skills import Skill, SkillAliases
+from app.models.opportunity_skills import OpportunitySkill
 Base.metadata.create_all(bind=engine)
