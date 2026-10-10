@@ -11,7 +11,9 @@ from app.database import session
     ("nODE.JS", "node.js"),
     ("machine          Learning", "machine learning"),
     ("", ""),
-    (" ", "")
+    (" ", ""),
+    ("Fastapı", "fastapi"),
+    ("FASTAPİ", "fastapi")
 ])
 def test_normalize_text(input_text, expected):    
     assert normalize_text(input_text) == expected
