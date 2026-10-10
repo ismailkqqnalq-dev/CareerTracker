@@ -3,6 +3,7 @@ from app.models.skills import Skill, SkillAliases
 
 
 def normalize_text(text: str)-> str:
+    text = text.replace("İ", "i").replace("ı", "i")
     return " ".join(text.split()).lower()
 
 def find_skill(db, raw_text: str)-> Skill | None:
