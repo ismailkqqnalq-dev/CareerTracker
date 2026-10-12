@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:///ci_tests.db
 
     steps:
       - name: Checkout code
@@ -22,8 +24,49 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
-      - name: Create database tables
-        run: python init_db.py
+      - name: Create database tables through migrations
+        run: python -m alembic upgrade head
+
+      - name: Check migration and model parity
+        run: python -m alembic check
 
       - name: Run tests
         run: python -m pytest
+
+  postgres-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: careertracker
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: migration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U careertracker -d migration_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg2://careertracker:ci-only-password@localhost:5432/migration_test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Bootstrap empty PostgreSQL database
+        run: python -m alembic upgrade head
+      - name: Check migration and model parity
+        run: python -m alembic check
+      - name: Roll back disposable database
+        run: python -m alembic downgrade base
+      - name: Reapply migrations
+        run: python -m alembic upgrade head
+      - name: Recheck migration and model parity
+        run: python -m alembic check
