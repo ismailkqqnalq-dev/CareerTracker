@@ -50,7 +50,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://careertracker:ci-only-password@localhost:5432/migration_test
+      DATABASE_URL: postgresql+psycopg2://careertracker:ci-only-password@localhost:5432/migration_test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
