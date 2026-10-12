@@ -18,6 +18,8 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Fırsatları CSV olarak dışa aktarma (Türkçe karakter desteği)
 - Alembic veritabanı migration'ları
 - GitHub Actions ile otomatik test çalıştırma
+- Skill oluşturma, alias ekleme ve normalize edilmiş adla skill bulma
+- Fırsatlara skill bağlama ve bağlı skill'leri listeleme
 
 ## Teknoloji
 
@@ -45,6 +47,10 @@ Uygulama çalışırken interaktif dokümantasyon: [http://127.0.0.1:8000/docs](
 | Görev | `/tasks/{id}` — GET, PATCH, DELETE | Detay, güncelleme, silme |
 | Dashboard | `/dashboard` — GET | Başvuru istatistikleri |
 | CSV | `/opportunities/export` — GET | Fırsatları CSV olarak indir |
+| Skill | `/skills` — POST | Skill oluştur (201); tekrar eden ad için 409 |
+| Skill çözümleme | `/skills/resolve?name=postgres` — GET | Ad veya alias ile bul; bulunamazsa 404 |
+| Skill alias | `/skills/{skill_id}/aliases` — POST | Skill'e alternatif ad ekle |
+| Fırsat skill'leri | `/opportunities/{opportunity_id}/skills` — POST, GET | Skill bağla veya bağlı skill'leri listele |
 
 ## Yerel kurulum
 
@@ -111,6 +117,22 @@ GitHub Actions, `main` branch'ine yapılan push ve Pull Request'lerde testleri o
 
 ## Migration oluşturma
 
+Boş bir veritabanını kurmak için `alembic upgrade head` yeterlidir. İlk migration
+fırsat, kişi, aktivite ve görev tablolarını; sonraki migration skill tablolarını
+oluşturur. `init_db.py`, Alembic geçmişini kaydetmediği için normal kurulum adımı değildir.
+
+İlk migration önceden boştu ve bu bootstrap düzeltmesiyle tamamlandı. Mevcut
+tabloları doğru olan ve `d0fe616da34f` veya `b3b24fd6d532` revision'ında kayıtlı
+veritabanlarında ilk migration tekrar çalışmaz. Bu durumdaki veriler korunur.
+Eski boş migration ile kurulmuş, temel tabloları eksik bir veritabanı bu değişiklikle
+otomatik onarılmaz. `init_db.py` ile kurulmuş fakat Alembic revision'ı olmayan
+veritabanlarında da önce yedek alınmalı ve şema/revision eşleşmesi incelenmelidir;
+körlemesine `stamp head` uygulanmamalıdır.
+
+`alembic downgrade base` artık temel tabloları da siler; yalnızca atılabilir test
+veritabanlarında kullanılmalıdır. CI, SQLite ve PostgreSQL'de temiz kurulumu ve
+model/şema uyumunu; ayrıca PostgreSQL'de geri alma ve tekrar kurulumu kontrol eder.
+
 Model değişikliğinden sonra yeni migration üretip gözden geçir:
 
 ```powershell
@@ -138,11 +160,11 @@ tests/             # pytest testleri
 
 - [x] **Faz 1 - Temel uygulama:** Fırsat, kişi, aktivite ve görev CRUD'ları, testler
 - [x] **Faz 2 - Altyapı:** Dashboard, CSV dışa aktarma, PostgreSQL + Docker, Alembic, CI
-- [ ] **Faz 2.5 - Skill modeli:** Normalize edilmiş beceri veritabanı, kullanıcı skill profili
+- [x] **Faz 2.5 - Skill temeli:** Skill/alias modelleri, temel normalization, skill API'si, fırsat-skill bağlama ve listeleme, API testleri
 - [ ] **Faz 3 - OCR:** İlan ekran görüntüsünden metin çıkarma (image preprocessing ile)
 - [ ] **Faz 4 - NLP:** İlan metninden beceri, rol ve gereksinim çıkarımı (precision/recall/F1 ile ölçülecek)
 - [ ] **Faz 5 - Skill normalization:** "Postgres" ve "PostgreSQL" gibi yazım farklarını birleştirme
-- [ ] **Faz 6 - Kural tabanlı matching:** İlan ile kullanıcı profili karşılaştırması, skill gap analizi
+- [ ] **Faz 6 - Kural tabanlı matching:** Kullanıcı skill profili, ilan ile profil karşılaştırması, skill gap analizi
 - [ ] **Faz 7 - Veri analizi:** Market ve freelance analitiği (Pandas)
 - [ ] **Faz 8 - Semantic similarity:** Embedding tabanlı eşleştirme
 - [ ] **Faz 9 - Makine öğrenmesi:** Sınıflandırma ve model değerlendirme
@@ -153,7 +175,10 @@ tests/             # pytest testleri
 
 ## Durum
 
-Faz 1 ve 2 tamamlandı. Kimlik doğrulama ve kullanıcı arayüzü henüz kapsamda değil.
+Faz 1–2 özellikleri ve Faz 2.5 skill temeli uygulandı. Skill ilişkisinden çıkarma
+işlemi henüz uygulanmadı. Kullanıcı skill profili Faz 6'ya, kimlik doğrulama ve
+arayüz Faz 11'e ayrıldı. Sıradaki hedef Faz 3 OCR baseline; geçiş öncesinde
+migration bootstrap düzeltmesinin CI kontrolleri tamamlanmalıdır.
 ## Lisans
 
 [MIT](LICENSE)
