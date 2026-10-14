@@ -1,8 +1,7 @@
-from fastapi.testclient import TestClient
-from app.main import app
 from app.schemas.opportunity import OpportunityCreate, OpportunityResponse, OpportunityUpdate
-def test_create_opportunity():
-    client = TestClient(app)
+
+def test_create_opportunity(authenticated_client):
+    client = authenticated_client
     response=client.post("/opportunities", json={
     "company": "Test Şirketi",
     "position": "Test Pozisyon",
@@ -19,14 +18,14 @@ def test_create_opportunity():
     assert response.status_code == 200
     assert response.json()["company"] == "Test Şirketi"
 
-def test_opportunities():
-    client = TestClient(app)
+def test_opportunities(authenticated_client):
+    client = authenticated_client
     response = client.get("/opportunities")
     assert response.status_code == 200
-    assert len(response.json())>=1
+    assert response.json() == []
     
-def test_get_opportunity_by_id():
-    client = TestClient(app)
+def test_get_opportunity_by_id(authenticated_client):
+    client = authenticated_client
     create_response = client.post("/opportunities", json={
         "company": "Test Şirketi2",
         "position": "Test Pozisyon2",
@@ -45,13 +44,13 @@ def test_get_opportunity_by_id():
     assert response.status_code == 200
     assert response.json()["id"] == opportunity_id
 
-def test_get_opportunity_not_found():
-    client = TestClient(app)
+def test_get_opportunity_not_found(authenticated_client):
+    client = authenticated_client
     response = client.get("/opportunities/999999")
     assert response.status_code == 404
 
-def test_update_opportunity():
-    client = TestClient(app)
+def test_update_opportunity(authenticated_client):
+    client = authenticated_client
     create_response = client.post("/opportunities", json={
         "company": "Test Şirketi1",
         "position": "Test Pozisyon1",
@@ -73,8 +72,8 @@ def test_update_opportunity():
     assert update_response.status_code == 200
     assert update_response.json()["company"] ==("Güncellenmiş Test Şirketi")
 
-def test_delete_opportunity():
-    client = TestClient(app)
+def test_delete_opportunity(authenticated_client):
+    client = authenticated_client
     create_response= client.post("/opportunities", json={
         "company": "Silinecek Şirket",
         "position": "Test Pozisyon",

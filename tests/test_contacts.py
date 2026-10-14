@@ -1,10 +1,7 @@
-from http import client
 
-from fastapi.testclient import TestClient
-from app.main import app
 
-def test_create_contact():
-    client = TestClient(app)
+def test_create_contact(authenticated_client):
+    client = authenticated_client
      
     opp_response = client.post("/opportunities", json={
         "company": "Test Şirketi",
@@ -31,13 +28,13 @@ def test_create_contact():
     assert response.status_code == 200
     assert response.json()["name"] == "Test Kişi"
 
-def test_get_all_contacts():
-    client = TestClient(app)
+def test_get_all_contacts(authenticated_client):
+    client = authenticated_client
     response = client.get("/contacts")
     assert response.status_code == 200
 
-def test_get_contact_by_id():
-    client= TestClient(app)
+def test_get_contact_by_id(authenticated_client):
+    client= authenticated_client
     opp_response = client.post("/opportunities", json={
         "company": "Test Şirketi2",
         "position": "Test Pozisyon2",
@@ -65,13 +62,13 @@ def test_get_contact_by_id():
     assert response.status_code == 200
     assert response.json()["id"] == contact_id
                                       
-def test_get_contact_not_found():
-    client = TestClient(app)
+def test_get_contact_not_found(authenticated_client):
+    client = authenticated_client
     response = client.get("/contacts/999999")
     assert response.status_code == 404
 
-def test_update_contact():
-    client= TestClient(app)
+def test_update_contact(authenticated_client):
+    client= authenticated_client
     opp_response = client.post("/opportunities", json={
            "company": "Test Şirketi3",
            "position": "Test Pozisyon3",
@@ -99,8 +96,8 @@ def test_update_contact():
     assert update_response.status_code == 200
     assert update_response.json()["role"] == "Güncellenmiş Rol"
     
-def test_delete_contact():
-    client= TestClient(app)
+def test_delete_contact(authenticated_client):
+    client= authenticated_client
     response = client.post("/opportunities", json={
         "company": "Silinecek Şirket",
         "position": "Test Pozisyon",

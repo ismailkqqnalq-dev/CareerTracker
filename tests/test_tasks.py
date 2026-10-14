@@ -1,8 +1,7 @@
-from fastapi.testclient import TestClient
-from app.main import app
 
-def test_create_task():
-    client = TestClient(app)
+
+def test_create_task(authenticated_client):
+    client = authenticated_client
     
     opp_response = client.post("/opportunities", json={
         "company": "Test Şirketi",
@@ -27,14 +26,15 @@ def test_create_task():
     assert response.status_code == 200
     assert response.json()["description"] == "Takip e-postası gönder"
     
-def test_get_all_tasks():
-    client = TestClient(app)
+def test_get_all_tasks(authenticated_client):
+    client = authenticated_client
     response = client.get("/tasks")
+
     assert response.status_code == 200
-    assert len(response.json()) >= 1
+    assert response.json() == []
     
-def test_get_task_by_id():
-    client = TestClient(app)
+def test_get_task_by_id(authenticated_client):
+    client = authenticated_client
     opp_response = client.post("/opportunities", json={
         "company": "Test Şirketi2",
         "position": "Test Pozisyon2",
@@ -61,13 +61,13 @@ def test_get_task_by_id():
     assert response.status_code == 200
     assert response.json()["id"] == task_id
     
-def test_get_task_not_found():
-    client = TestClient(app)
+def test_get_task_not_found(authenticated_client):
+    client = authenticated_client
     response = client.get("/tasks/999999")
     assert response.status_code == 404
 
-def test_update_task():
-    client = TestClient(app)
+def test_update_task(authenticated_client):
+    client = authenticated_client
     opp_response = client.post("/opportunities", json={
         "company": "Test Şirketi3",
         "position": "Test Pozisyon3",
@@ -97,8 +97,8 @@ def test_update_task():
     assert update_response.status_code == 200
     assert update_response.json()["is_completed"] == True
     
-def test_delete_task():
-    client = TestClient(app)
+def test_delete_task(authenticated_client):
+    client = authenticated_client
     opp_response = client.post("/opportunities", json={
         "company": "Silinecek Şirket",
         "position": "Test Pozisyon",

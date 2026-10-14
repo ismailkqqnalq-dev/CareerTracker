@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date
 from typing import Optional
 
@@ -15,8 +15,7 @@ class ActivityCreate(ActivityBase):
 class ActivityResponse(ActivityBase):
     id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ActivityUpdate(BaseModel):
     opportunity_id:Optional[int]=None

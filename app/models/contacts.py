@@ -4,6 +4,12 @@ from sqlalchemy import Column, ForeignKey, Integer, String, DateTime
 class Contact(Base):
     __tablename__="contacts"
     id=Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+    Integer,
+    ForeignKey("users.id", ondelete="CASCADE"),
+    nullable=True,
+    index=True,
+    )
     name=Column(String)
     role=Column(String)
     email=Column(String)

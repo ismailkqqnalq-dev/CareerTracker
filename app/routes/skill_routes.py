@@ -13,10 +13,18 @@ from app.schemas.skills import (
     SkillResponse,
 )
 from app.services import opportunity_skill_service
+from app.auth import get_current_user
+from app.models.users import User
+
 router = APIRouter()
 
 
-@router.post("/skills", response_model=SkillResponse, status_code=201)
+@router.post(
+    "/skills",
+    response_model=SkillResponse,
+    status_code=201,
+    dependencies=[Depends(get_current_user)],
+)
 def create_skill(skill_data: SkillCreate, db: Session = Depends(get_db)):
     try:
         return service.create_skill(
@@ -39,7 +47,12 @@ def resolve_skill(
         raise HTTPException(status_code=404, detail=f"Skill not found: {name}")
     return skill
 
-@router.post("/skills/{skill_id}/aliases", response_model=AliasResponse, status_code=201)
+@router.post(
+    "/skills/{skill_id}/aliases",
+    response_model=AliasResponse,
+    status_code=201,
+    dependencies=[Depends(get_current_user)],
+)
 def add_alias(skill_id: int, data: AliasCreate, db: Session = Depends(get_db)):
     try:
         return service.add_alias(db, skill_id, data.alias)
@@ -54,18 +67,39 @@ def add_alias(skill_id: int, data: AliasCreate, db: Session = Depends(get_db)):
     response_model=SkillResponse,
     status_code=201,
 )
-def attach_skill(opportunity_id: int, data: OpportunitySkillAdd, db: Session = Depends(get_db)):
+def attach_skill(
+    opportunity_id: int,
+    data: OpportunitySkillAdd,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
-        return opportunity_skill_service.attach_skill(db, opportunity_id, data.skill)
+        return opportunity_skill_service.attach_skill(
+            db,
+            opportunity_id,
+            data.skill,
+            user_id=current_user.id,
+        )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
 
 
-@router.get("/opportunities/{opportunity_id}/skills", response_model=list[SkillResponse])
-def list_opportunity_skills(opportunity_id: int, db: Session = Depends(get_db)):
+@router.get(
+    "/opportunities/{opportunity_id}/skills",
+    response_model=list[SkillResponse],
+)
+def list_opportunity_skills(
+    opportunity_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
-        return opportunity_skill_service.list_skills(db, opportunity_id)
+        return opportunity_skill_service.list_skills(
+            db,
+            opportunity_id,
+            user_id=current_user.id,
+        )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))

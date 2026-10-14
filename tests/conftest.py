@@ -1,5 +1,10 @@
 from sqlalchemy import StaticPool, create_engine
 from sqlalchemy.orm import sessionmaker
+import os
+import secrets
+
+# Ephemeral test-only key; never use the application's real secret in tests.
+os.environ["JWT_SECRET_KEY"] = secrets.token_hex(32)
 from app.database.session import Base, get_db
 import pytest
 from app.main import app
@@ -29,3 +34,26 @@ def client():
     yield test_client
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
+    
+@pytest.fixture()
+def authenticated_client(client):
+    client.post(
+        "/auth/register",
+        json={
+            "email": "owner@example.com",
+            "password": "StrongPass123",
+        }
+    )
+
+    login_response = client.post(
+        "/auth/token",
+        data={
+            "username": "owner@example.com",
+            "password": "StrongPass123",
+        },
+    )
+    assert login_response.status_code == 200
+
+    token = login_response.json()["access_token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    return client

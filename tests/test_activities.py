@@ -1,8 +1,5 @@
-from fastapi.testclient import TestClient
-from app.main import app
-
-def test_create_activity():
-    client = TestClient(app)
+def test_create_activity(authenticated_client):
+    client = authenticated_client
 
     opp_response = client.post("/opportunities", json={
         "company": "Test Şirketi",
@@ -29,14 +26,15 @@ def test_create_activity():
     assert response.status_code == 200
     assert response.json()["activity_type"] == "Telefon görüşmesi"
     
-def test_get_all_activities():
-    client= TestClient(app)
+def test_get_all_activities(authenticated_client):
+    client = authenticated_client
     response = client.get("/activities")
+
     assert response.status_code == 200
-    assert len(response.json()) >= 1  
+    assert response.json() == []
     
-def test_get_activity_by_id():
-    client= TestClient(app)
+def test_get_activity_by_id(authenticated_client):
+    client= authenticated_client
     opp_response = client.post("/opportunities", json={
         "company": "Test Şirketi2",
         "position": "Test Pozisyon2",
@@ -63,13 +61,13 @@ def test_get_activity_by_id():
     assert response.status_code == 200
     assert response.json()["id"] == activity_id
     
-def test_get_activity_not_found():
-    client= TestClient(app)
+def test_get_activity_not_found(authenticated_client):
+    client= authenticated_client
     response = client.get("/activities/9999999")
     assert response.status_code == 404
 
-def test_update_activity():
-    client= TestClient(app)
+def test_update_activity(authenticated_client):
+    client= authenticated_client
     opp_response = client.post("/opportunities", json={
         "company": "Test Şirketi3",
         "position": "Test Pozisyon3",
@@ -99,8 +97,8 @@ def test_update_activity():
     assert response.status_code == 200
     assert response.json()["notes"] == "Güncellenmiş not"
 
-def test_delete_activity():
-    client= TestClient(app)
+def test_delete_activity(authenticated_client):
+    client= authenticated_client
     opp_response = client.post("/opportunities", json={
         "company": "Silinecek Şirket",
         "position": "Test Pozisyon",
