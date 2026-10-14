@@ -16,12 +16,17 @@ dependencies = [
   "pydantic>=2.8.0",
   "python-dotenv>=1.0.1",
   "psycopg2-binary>=2.9.9",
-  "alembic>=1.13.0"
+  "alembic>=1.13.0",
+  "PyJWT",
+  "pwdlib[argon2]",
+  "python-multipart",
+  "email-validator",
 ]
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0.0",
-  "httpx>=0.27.0"
+  "httpx>=0.27.0",
+  "httpx2>=2.13.1,<3"
 ]
 [tool.setuptools.packages.find]
 include = ["app*"]

@@ -4,6 +4,12 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, column
 class Opportunity(Base):
     __tablename__="opportunities"
     id=Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+    Integer,
+    ForeignKey("users.id", ondelete="CASCADE"),
+    nullable=True,
+    index=True,
+    )
     company=Column(String)
     position=Column(String)
     type=Column(String)

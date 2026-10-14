@@ -14,6 +14,11 @@ app.include_router(contact_router)
 from app.routes.skill_routes import router as skill_router
 app.include_router(skill_router)
 
+from app.routes.auth_routes import router as auth_router
+
+app.include_router(auth_router)
+
+
 @app.get("/")
 def read_root() -> dict[str, str]:
     return {"message": "CareerTracker is running."}

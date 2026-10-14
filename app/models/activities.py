@@ -5,6 +5,12 @@ class Activity(Base):
     __tablename__= "activities"
     
     id =Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+    Integer,
+    ForeignKey("users.id", ondelete="CASCADE"),
+    nullable=True,
+    index=True,
+    )
     opportunity_id= Column(Integer, ForeignKey("opportunities.id"), nullable=False)
     contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=True)
     activity_type = Column(String)
