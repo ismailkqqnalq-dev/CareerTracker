@@ -16,6 +16,9 @@ from app.services import opportunity_skill_service
 from app.auth import get_current_user
 from app.models.users import User
 
+from app.services import user_skill_service
+from app.schemas.skills import UserSkillCreate, UserSkillResponse
+
 router = APIRouter()
 
 
@@ -103,3 +106,40 @@ def list_opportunity_skills(
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))
+    
+@router.post(
+    "/users/me/skills",
+    response_model=UserSkillResponse,
+    status_code=201,
+)
+def add_profile_skill(
+    data: UserSkillCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return user_skill_service.add_skill(
+            db,
+            user_id=current_user.id,
+            skill_id=data.skill_id,
+            proficiency_level=data.proficiency_level,
+            years_experience=data.years_experience,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+
+
+@router.get(
+    "/users/me/skills",
+    response_model=list[UserSkillResponse],
+)
+def list_profile_skills(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return user_skill_service.list_skills(
+        db,
+        user_id=current_user.id,
+    )
