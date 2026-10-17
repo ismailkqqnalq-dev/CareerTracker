@@ -48,3 +48,58 @@ def list_skills(db: Session, user_id: int) -> list[UserSkill]:
         .order_by(UserSkill.id)
         .all()
     )
+    
+def update_skill(
+    db: Session,
+    user_id: int,
+    user_skill_id: int,
+    update_data: dict,
+) -> UserSkill:
+    user_skill = (
+        db.query(UserSkill)
+        .filter(
+            UserSkill.id == user_skill_id,
+            UserSkill.user_id == user_id,
+        )
+        .first()
+    )
+    if user_skill is None:
+        raise LookupError(f"Profile skill not found: {user_skill_id}")
+
+    if not update_data:
+        raise ValueError("At least one field must be provided")
+
+    try:
+        for key, value in update_data.items():
+            setattr(user_skill, key, value)
+
+        db.commit()
+        db.refresh(user_skill)
+        return user_skill
+    except Exception:
+        db.rollback()
+        raise
+
+
+def delete_skill(
+    db: Session,
+    user_id: int,
+    user_skill_id: int,
+) -> None:
+    user_skill = (
+        db.query(UserSkill)
+        .filter(
+            UserSkill.id == user_skill_id,
+            UserSkill.user_id == user_id,
+        )
+        .first()
+    )
+    if user_skill is None:
+        raise LookupError(f"Profile skill not found: {user_skill_id}")
+
+    try:
+        db.delete(user_skill)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise

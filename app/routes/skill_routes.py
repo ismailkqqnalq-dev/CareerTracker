@@ -11,6 +11,7 @@ from app.schemas.skills import (
     OpportunitySkillAdd,
     SkillCreate,
     SkillResponse,
+    UserSkillUpdate,
 )
 from app.services import opportunity_skill_service
 from app.auth import get_current_user
@@ -143,3 +144,42 @@ def list_profile_skills(
         db,
         user_id=current_user.id,
     )
+    
+@router.patch(
+    "/users/me/skills/{user_skill_id}",
+    response_model=UserSkillResponse,
+)
+def update_profile_skill(
+    user_skill_id: int,
+    data: UserSkillUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return user_skill_service.update_skill(
+            db,
+            user_id=current_user.id,
+            user_skill_id=user_skill_id,
+            update_data=data.model_dump(exclude_unset=True),
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+
+
+@router.delete("/users/me/skills/{user_skill_id}")
+def delete_profile_skill(
+    user_skill_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        user_skill_service.delete_skill(
+            db,
+            user_id=current_user.id,
+            user_skill_id=user_skill_id,
+        )
+        return {"message": "Profile skill deleted successfully"}
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
