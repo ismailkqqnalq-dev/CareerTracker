@@ -80,7 +80,6 @@ def update_skill(
         db.rollback()
         raise
 
-
 def delete_skill(
     db: Session,
     user_id: int,
