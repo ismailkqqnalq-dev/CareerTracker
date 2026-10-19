@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated, Optional, Literal
 from pydantic import BaseModel, ConfigDict, StringConstraints, Field, field_validator
 
@@ -86,3 +87,25 @@ class SkillMatchResponse(BaseModel):
     match_percentage: float
     matched_skills: list[SkillResponse]
     missing_skills: list[SkillResponse]
+
+
+class SkillSuggestionCreate(BaseModel):
+    skill: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=120),
+    ]
+
+
+class SkillSuggestionResponse(BaseModel):
+    id: int
+    raw_name: str
+    normalized_name: str
+    resolved_skill_id: int | None
+    status: Literal["pending", "accepted", "rejected"]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SkillSuggestionResolve(BaseModel):
+    skill_id: int = Field(gt=0)

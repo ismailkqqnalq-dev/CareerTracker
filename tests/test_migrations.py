@@ -15,7 +15,7 @@ from app.models.activities import Activity
 from app.models.contacts import Contact
 from app.models.opportunity import Opportunity
 from app.models.opportunity_skills import OpportunitySkill
-from app.models.skills import Skill, SkillAliases, UserSkill
+from app.models.skills import Skill, SkillAliases, UserSkill, SkillSuggestion
 from app.models.tasks import Task
 from app.models.users import User
 
@@ -23,12 +23,12 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE_TABLES = {"opportunities", "contacts", "activities", "tasks"}
 SKILL_TABLES = {"skills", "skill_aliases", "opportunity_skills"}
 PRE_USER_TABLES = BASE_TABLES | SKILL_TABLES
-ALL_TABLES = PRE_USER_TABLES | {"users", "user_skills"}
+ALL_TABLES = PRE_USER_TABLES | {"users", "user_skills", "skill_suggestions"}
 
 
 INITIAL = "d0fe616da34f"
 PRE_USER_HEAD = "b3b24fd6d532"
-HEAD = "64aa267fb63d"
+HEAD = "6ab28fa3c91d"
 
 def _alembic(url, *args):
     env = os.environ.copy()

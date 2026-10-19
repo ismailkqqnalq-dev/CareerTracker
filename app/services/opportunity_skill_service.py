@@ -2,6 +2,7 @@ from app.models.opportunity import Opportunity
 from app.models.opportunity_skills import OpportunitySkill
 from app.models.skills import Skill
 from app.services.skill_normalizer import find_skill
+from app.services.skill_suggestion_service import submit_suggestion
 
 
 def _get_opportunity(db, opportunity_id: int, user_id: int) -> Opportunity:
@@ -26,9 +27,12 @@ def attach_skill(
 ) -> Skill:
     _get_opportunity(db, opportunity_id, user_id)
 
-    skill = find_skill(db, raw_skill)
+    skill = find_skill(db, raw_skill, user_id=user_id)
     if skill is None:
-        raise LookupError(f"Unknown skill: {raw_skill}")
+        submit_suggestion(db, user_id=user_id, raw_name=raw_skill)
+        raise LookupError(
+            f"Unknown skill: {raw_skill}. A suggestion was saved for review."
+        )
 
     if db.get(OpportunitySkill, (opportunity_id, skill.id)) is not None:
         raise ValueError(f"Skill already attached: {skill.name}")
