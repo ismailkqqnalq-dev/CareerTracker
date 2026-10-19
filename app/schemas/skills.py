@@ -109,3 +109,10 @@ class SkillSuggestionResponse(BaseModel):
 
 class SkillSuggestionResolve(BaseModel):
     skill_id: int = Field(gt=0)
+
+
+class SkillSuggestionCandidate(BaseModel):
+    id: int
+    name: str
+    category: str | None
+    score: float = Field(ge=0, le=1)
