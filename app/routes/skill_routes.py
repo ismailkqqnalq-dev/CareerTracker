@@ -2,9 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-
+from app.services import skill_match_service
 from app.services import skill_service as service
 from app.services.skill_normalizer import find_skill
+from app.services import opportunity_skill_service
+from app.services import user_skill_service
+
 from app.schemas.skills import (
     AliasCreate,
     AliasResponse,
@@ -12,12 +15,12 @@ from app.schemas.skills import (
     SkillCreate,
     SkillResponse,
     UserSkillUpdate,
+    SkillMatchResponse,
 )
-from app.services import opportunity_skill_service
+
 from app.auth import get_current_user
 from app.models.users import User
 
-from app.services import user_skill_service
 from app.schemas.skills import UserSkillCreate, UserSkillResponse
 
 router = APIRouter()
@@ -181,5 +184,23 @@ def delete_profile_skill(
             user_skill_id=user_skill_id,
         )
         return {"message": "Profile skill deleted successfully"}
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    
+@router.get(
+    "/opportunities/{opportunity_id}/skill-match",
+    response_model=SkillMatchResponse,
+)
+def get_opportunity_skill_match(
+    opportunity_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return skill_match_service.get_opportunity_skill_match(
+            db,
+            opportunity_id=opportunity_id,
+            user_id=current_user.id,
+        )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))

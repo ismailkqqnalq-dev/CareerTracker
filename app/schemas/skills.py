@@ -78,3 +78,11 @@ class UserSkillUpdate(BaseModel):
         if value is None:
             raise ValueError("Field cannot be null")
         return value
+    
+class SkillMatchResponse(BaseModel):
+    opportunity_id: int
+    required_skill_count: int
+    matched_skill_count: int
+    match_percentage: float
+    matched_skills: list[SkillResponse]
+    missing_skills: list[SkillResponse]
