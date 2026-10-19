@@ -21,6 +21,7 @@ from app.schemas.skills import (
     SkillSuggestionCreate,
     SkillSuggestionResponse,
     SkillSuggestionResolve,
+    SkillSuggestionCandidate,
 )
 
 from app.auth import get_current_user, get_optional_current_user
@@ -96,6 +97,39 @@ def resolve_skill_suggestion(
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))
+
+
+@router.get(
+    "/skills/suggestions/{suggestion_id}/candidates",
+    response_model=list[SkillSuggestionCandidate],
+)
+def get_skill_suggestion_candidates(
+    suggestion_id: int,
+    limit: int = Query(default=5, ge=1, le=10),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        candidates = skill_suggestion_service.rank_skill_candidates(
+            db,
+            user_id=current_user.id,
+            suggestion_id=suggestion_id,
+            limit=limit,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+
+    return [
+        SkillSuggestionCandidate(
+            id=skill.id,
+            name=skill.name,
+            category=skill.category,
+            score=score,
+        )
+        for skill, score in candidates
+    ]
 
 
 @router.post(

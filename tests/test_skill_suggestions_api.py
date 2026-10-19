@@ -177,6 +177,77 @@ def test_skill_catalog_can_be_listed_for_mapping_picker(authenticated_client):
     assert [skill["name"] for skill in response.json()] == ["Python", "React"]
 
 
+def test_candidates_rank_similar_catalog_skill_first(authenticated_client):
+    client = authenticated_client
+    python = client.post("/skills", json={"name": "Python"}).json()
+    client.post("/skills", json={"name": "JavaScript"})
+    suggestion = client.post(
+        "/skills/suggestions",
+        json={"skill": "Pythno"},
+    ).json()
+
+    response = client.get(
+        f"/skills/suggestions/{suggestion['id']}/candidates"
+    )
+
+    assert response.status_code == 200
+    assert response.json()[0]["id"] == python["id"]
+    assert response.json()[0]["name"] == "Python"
+    assert 0.25 <= response.json()[0]["score"] <= 1
+
+
+def test_candidate_search_does_not_show_irrelevant_skills(authenticated_client):
+    client = authenticated_client
+    client.post("/skills", json={"name": "Python"})
+    suggestion = client.post(
+        "/skills/suggestions",
+        json={"skill": "zzqqvv-unrelated"},
+    ).json()
+
+    response = client.get(
+        f"/skills/suggestions/{suggestion['id']}/candidates"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_candidate_search_is_private_and_requires_pending_suggestion(
+    authenticated_client,
+):
+    client = authenticated_client
+    skill = client.post("/skills", json={"name": "Python"}).json()
+    suggestion = client.post(
+        "/skills/suggestions",
+        json={"skill": "Pythno"},
+    ).json()
+    assert client.patch(
+        f"/skills/suggestions/{suggestion['id']}",
+        json={"skill_id": skill["id"]},
+    ).status_code == 200
+
+    response = client.get(
+        f"/skills/suggestions/{suggestion['id']}/candidates"
+    )
+
+    assert response.status_code == 409
+
+
+def test_candidate_limit_must_be_between_one_and_ten(authenticated_client):
+    client = authenticated_client
+    suggestion = client.post(
+        "/skills/suggestions",
+        json={"skill": "SomeUnknownSkill"},
+    ).json()
+
+    response = client.get(
+        f"/skills/suggestions/{suggestion['id']}/candidates",
+        params={"limit": 11},
+    )
+
+    assert response.status_code == 422
+
+
 def test_skill_suggestions_require_authentication(client):
     response = client.get("/skills/suggestions")
 
