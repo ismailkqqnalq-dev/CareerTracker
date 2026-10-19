@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
+from app.models.skills import Skill
 from app.services import skill_match_service
 from app.services import skill_service as service
 from app.services.skill_normalizer import find_skill
 from app.services import opportunity_skill_service
 from app.services import user_skill_service
+from app.services import skill_suggestion_service
 
 from app.schemas.skills import (
     AliasCreate,
@@ -16,14 +18,84 @@ from app.schemas.skills import (
     SkillResponse,
     UserSkillUpdate,
     SkillMatchResponse,
+    SkillSuggestionCreate,
+    SkillSuggestionResponse,
+    SkillSuggestionResolve,
 )
 
-from app.auth import get_current_user
+from app.auth import get_current_user, get_optional_current_user
 from app.models.users import User
 
 from app.schemas.skills import UserSkillCreate, UserSkillResponse
 
 router = APIRouter()
+
+
+@router.get("/skills", response_model=list[SkillResponse])
+def list_skills(db: Session = Depends(get_db)):
+    return db.query(Skill).order_by(Skill.name).all()
+
+
+@router.post(
+    "/skills/suggestions",
+    response_model=SkillSuggestionResponse,
+    status_code=201,
+)
+def submit_skill_suggestion(
+    data: SkillSuggestionCreate,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        suggestion, created = skill_suggestion_service.submit_suggestion(
+            db,
+            user_id=current_user.id,
+            raw_name=data.skill,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    if not created:
+        # Returning an existing suggestion makes repeated submissions safe.
+        response.status_code = 200
+    return suggestion
+
+
+@router.get(
+    "/skills/suggestions",
+    response_model=list[SkillSuggestionResponse],
+)
+def list_skill_suggestions(
+    status: str | None = Query(default=None, pattern="^(pending|accepted|rejected)$"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return skill_suggestion_service.list_suggestions(
+        db,
+        user_id=current_user.id,
+        status=status,
+    )
+
+
+@router.patch(
+    "/skills/suggestions/{suggestion_id}",
+    response_model=SkillSuggestionResponse,
+)
+def resolve_skill_suggestion(
+    suggestion_id: int,
+    data: SkillSuggestionResolve,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return skill_suggestion_service.resolve_suggestion(
+            db,
+            user_id=current_user.id,
+            suggestion_id=suggestion_id,
+            skill_id=data.skill_id,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
 
 
 @router.post(
@@ -47,8 +119,13 @@ def create_skill(skill_data: SkillCreate, db: Session = Depends(get_db)):
 def resolve_skill(
     name: str = Query(min_length=1),
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
-    skill = find_skill(db, name)
+    skill = find_skill(
+        db,
+        name,
+        user_id=current_user.id if current_user is not None else None,
+    )
     
     if skill is None:
         raise HTTPException(status_code=404, detail=f"Skill not found: {name}")
