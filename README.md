@@ -20,6 +20,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - GitHub Actions ile otomatik test çalıştırma
 - Skill oluşturma, alias ekleme ve normalize edilmiş adla skill bulma
 - Fırsatlara skill bağlama ve bağlı skill'leri listeleme
+- Kullanıcıya özel bekleyen beceri önerilerini gözden geçirip mevcut katalogla eşleştirme (`frontend/` MVP arayüzü)
 
 ## Teknoloji
 
@@ -103,6 +104,18 @@ docker compose exec app alembic upgrade head
 ```
 
 API: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). Servisleri durdurmak için `docker compose down` kullan. Veritabanı verileri `postgres_data` volume'unda saklanır.
+
+## Beceri öneri arayüzü (MVP)
+
+API'yi çalışır durumda bıraktıktan sonra ikinci terminalde React arayüzünü başlat:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Vite'ın gösterdiği yerel adresi aç. Arayüz, `/api` isteklerini `http://127.0.0.1:8000` adresindeki FastAPI uygulamasına proxy eder. Eşleştirme kullanıcı tarafından onaylanır ve yalnızca o kullanıcıya kaydedilir; genel skill kataloğuna otomatik alias eklenmez. Ayrıntılar için [`frontend/README.md`](frontend/README.md) dosyasına bak.
 
 ## Testler
 
