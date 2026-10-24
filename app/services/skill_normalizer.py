@@ -1,5 +1,6 @@
 
-from app.models.skills import Skill, SkillAliases, SkillSuggestion
+from app.models.skills import Skill, SkillAliases, SkillSuggestion, PersonalSkillAlias
+from app.services.skill_access import get_visible_skill
 
 
 def normalize_text(text: str)-> str:
@@ -21,9 +22,16 @@ def find_skill(db, raw_text: str, user_id: int | None = None) -> Skill | None:
             .first()
         )
         if user_suggestion is not None:
-            return db.get(Skill, user_suggestion.resolved_skill_id)
+            return get_visible_skill(db, user_suggestion.resolved_skill_id, user_id)
+
+        personal = db.query(PersonalSkillAlias).filter(
+            PersonalSkillAlias.user_id == user_id,
+            PersonalSkillAlias.alias == normalized_text,
+        ).first()
+        if personal is not None:
+            return get_visible_skill(db, personal.skill_id, user_id)
 
     alias_row = db.query(SkillAliases).filter(SkillAliases.alias == normalized_text).first()
     if  alias_row is None:
         return None
-    return db.get(Skill, alias_row.skill_id)
+    return get_visible_skill(db, alias_row.skill_id, user_id)

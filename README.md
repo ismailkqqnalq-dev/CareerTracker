@@ -107,6 +107,27 @@ API: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). Servisleri durdur
 
 ## Beceri öneri arayüzü (MVP)
 
+### Kişisel katalog yazımları
+
+`POST /skills` giriş yapan kullanıcıya özel bir beceri oluşturur.
+`POST /skills/{skill_id}/aliases` yalnızca o kullanıcıya ait alternatif isim ekler;
+ortak `SkillAliases` kayıtlarını değiştirmez. Hedef beceri ortak katalogdan veya
+kullanıcının kendi becerilerinden olmalıdır; başka kullanıcıya ait ID için 404 döner.
+`GET /skills` ve `/skills/resolve`, token ile ortak katalog + kendi kayıtlarını,
+tokensız yalnızca ortak kataloğu kullanır. Aday sıralaması, profil ekleme ve
+öneri eşleştirmesi de aynı görünürlük sınırını korur.
+
+Kişisel öneri eşleştirmeleri (`SkillSuggestion.resolved_skill_id`) ayrı kalır.
+Çözümlemede önce kabul edilmiş kişisel eşleştirme, sonra kişisel alias, sonra
+ortak alias kullanılır. Ortak isimle çakışan kişisel alias yalnızca sahibini etkiler.
+Kabul edilmiş kişisel eşleştirmeyle aynı isimde alias ekleme 409 döner.
+
+Ortak katalog yalnızca sunucu tarafındaki seed işlemiyle yönetilir. Seed, kişisel
+kayıtları sahiplenmez veya değiştirmez. Önceden oluşturulan kayıtların sahibi
+saklanmadığı için `a91e73c208bf` migration'ı bunları ortak kayıt olarak korur;
+geçmiş yazımları geriye dönük kişiselleştirmez. Yeni kişisel beceri/alias varken
+downgrade durdurulur; kişisel veriyi silmez veya ortak veriye dönüştürmez.
+
 API'yi çalışır durumda bıraktıktan sonra ikinci terminalde React arayüzünü başlat:
 
 ```powershell

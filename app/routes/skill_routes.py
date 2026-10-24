@@ -9,6 +9,7 @@ from app.services.skill_normalizer import find_skill
 from app.services import opportunity_skill_service
 from app.services import user_skill_service
 from app.services import skill_suggestion_service
+from app.services.skill_access import visible_skills
 
 from app.schemas.skills import (
     AliasCreate,
@@ -33,8 +34,8 @@ router = APIRouter()
 
 
 @router.get("/skills", response_model=list[SkillResponse])
-def list_skills(db: Session = Depends(get_db)):
-    return db.query(Skill).order_by(Skill.name).all()
+def list_skills(db: Session = Depends(get_db), current_user: User | None = Depends(get_optional_current_user)):
+    return visible_skills(db, current_user.id if current_user else None).order_by(Skill.name, Skill.id).all()
 
 
 @router.post(
@@ -136,14 +137,14 @@ def get_skill_suggestion_candidates(
     "/skills",
     response_model=SkillResponse,
     status_code=201,
-    dependencies=[Depends(get_current_user)],
 )
-def create_skill(skill_data: SkillCreate, db: Session = Depends(get_db)):
+def create_skill(skill_data: SkillCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
         return service.create_skill(
             db,
             name=skill_data.name,
             category=skill_data.category,
+            user_id=current_user.id,
         )
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
@@ -169,11 +170,10 @@ def resolve_skill(
     "/skills/{skill_id}/aliases",
     response_model=AliasResponse,
     status_code=201,
-    dependencies=[Depends(get_current_user)],
 )
-def add_alias(skill_id: int, data: AliasCreate, db: Session = Depends(get_db)):
+def add_alias(skill_id: int, data: AliasCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
-        return service.add_alias(db, skill_id, data.alias)
+        return service.add_alias(db, skill_id, data.alias, user_id=current_user.id)
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))
     except ValueError as error:

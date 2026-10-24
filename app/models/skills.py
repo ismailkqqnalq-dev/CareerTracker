@@ -6,6 +6,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Index,
     String,
     UniqueConstraint,
     func,
@@ -14,14 +15,31 @@ from sqlalchemy import (
 class Skill(Base):
     __tablename__ = "skills"
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
     category = Column(String)
+    owner_user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    __table_args__ = (
+        UniqueConstraint('owner_user_id', 'name', name='uq_skills_owner_name'),
+        Index('uq_skills_shared_name', name, unique=True,
+              sqlite_where=owner_user_id.is_(None), postgresql_where=owner_user_id.is_(None)),
+    )
 
 class SkillAliases(Base):
     __tablename__ = "skill_aliases"
     id = Column(Integer, primary_key= True, index= True)
     alias = Column(String, unique = True, nullable = False)
     skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable= False)
+
+
+class PersonalSkillAlias(Base):
+    __tablename__ = 'personal_skill_aliases'
+    __table_args__ = (
+        UniqueConstraint('user_id', 'alias', name='uq_personal_skill_aliases_user_alias'),
+    )
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    alias = Column(String, nullable=False)
+    skill_id = Column(Integer, ForeignKey('skills.id', ondelete='CASCADE'), nullable=False, index=True)
 
 class UserSkill(Base):
     __tablename__ = "user_skills"
