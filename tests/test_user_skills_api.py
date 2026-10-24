@@ -103,6 +103,17 @@ def test_profile_skills_require_login(client):
 def test_profile_skills_are_private(authenticated_client, skill_id):
     client = authenticated_client
 
+    # Sharing a catalog skill is valid for shared seed entries, not private POST entries.
+    from app.main import app
+    from app.database.session import get_db
+    from app.services.skill_catalog_service import seed_skill_catalog
+    from app.services.skill_normalizer import find_skill
+    generator = app.dependency_overrides[get_db]()
+    db = next(generator)
+    seed_skill_catalog(db)
+    skill_id = find_skill(db, 'Python').id
+    generator.close()
+
     owner_response = client.post(
         "/users/me/skills",
         json={"skill_id": skill_id},

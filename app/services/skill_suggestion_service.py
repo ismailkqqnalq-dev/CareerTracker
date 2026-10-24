@@ -4,7 +4,8 @@ from difflib import SequenceMatcher
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.skills import Skill, SkillAliases, SkillSuggestion
+from app.models.skills import Skill, SkillAliases, SkillSuggestion, PersonalSkillAlias
+from app.services.skill_access import get_visible_skill, visible_skills
 from app.services.skill_normalizer import find_skill, normalize_text
 
 
@@ -88,7 +89,7 @@ def resolve_suggestion(
     if suggestion is None:
         raise LookupError(f"Skill suggestion not found: {suggestion_id}")
 
-    skill = db.get(Skill, skill_id)
+    skill = get_visible_skill(db, skill_id, user_id)
     if skill is None:
         raise LookupError(f"Skill not found: {skill_id}")
 
@@ -127,9 +128,11 @@ def rank_skill_candidates(
     aliases_by_skill: dict[int, list[str]] = {}
     for alias in db.query(SkillAliases).all():
         aliases_by_skill.setdefault(alias.skill_id, []).append(alias.alias)
+    for alias in db.query(PersonalSkillAlias).filter(PersonalSkillAlias.user_id == user_id).all():
+        aliases_by_skill.setdefault(alias.skill_id, []).append(alias.alias)
 
     ranked: list[tuple[Skill, float]] = []
-    for skill in db.query(Skill).all():
+    for skill in visible_skills(db, user_id).all():
         known_names = [skill.name, *aliases_by_skill.get(skill.id, [])]
         best_score = max(
             (_similarity(query_text, query_compact, name) for name in known_names),

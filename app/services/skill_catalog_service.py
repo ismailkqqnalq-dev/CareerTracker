@@ -17,7 +17,7 @@ def seed_skill_catalog(db: Session) -> dict[str, int]:
             # Önce kanonik adı, sonra mevcut alias kayıtlarını kontrol et.
             skill = (
                 db.query(Skill)
-                .filter(Skill.name == name)
+                .filter(Skill.name == name, Skill.owner_user_id.is_(None))
                 .first()
             )
             if skill is None:

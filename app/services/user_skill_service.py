@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.skills import Skill, UserSkill
+from app.services.skill_access import get_visible_skill
 
 
 def add_skill(
@@ -10,7 +11,7 @@ def add_skill(
     proficiency_level: str = "beginner",
     years_experience: float = 0.0,
 ) -> UserSkill:
-    skill = db.get(Skill, skill_id)
+    skill = get_visible_skill(db, skill_id, user_id)
     if skill is None:
         raise LookupError(f"Skill not found: {skill_id}")
 
