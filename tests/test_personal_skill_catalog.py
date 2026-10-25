@@ -1,6 +1,7 @@
 from app.main import app
 from app.database.session import get_db
-from app.models.skills import Skill, SkillAliases
+from app.models.skills import Skill, SkillAliases, SkillSuggestion
+from app.models.opportunity_skills import OpportunitySkill
 from app.services.skill_catalog_service import seed_skill_catalog
 from app.services.skill_normalizer import find_skill
 from tests.test_skills_api import _create_opportunity
@@ -125,3 +126,34 @@ def test_opportunity_private_skill_attachment_is_scoped(authenticated_client):
     assert response.status_code == 404
     assert client.get(f'/opportunities/{their_opportunity}/skills').json() == []
     assert client.get('/skills/suggestions').json()[0]['status'] == 'pending'
+
+
+def test_opportunity_reads_hide_injected_other_users_private_skill(authenticated_client):
+    client = authenticated_client
+    other = second_headers(client)
+    private = client.post('/skills', json={'name': 'Owner A private skill'}).json()
+    their_private = client.post(
+        '/skills',
+        json={'name': 'Owner B private skill'},
+        headers=other,
+    ).json()
+    opportunity_id = _create_opportunity(client)
+
+    # Simulate a stale or incorrectly written association in the database.
+    generator = app.dependency_overrides[get_db]()
+    db = next(generator)
+    db.add(OpportunitySkill(
+        opportunity_id=opportunity_id,
+        skill_id=their_private['id'],
+    ))
+    db.commit()
+    generator.close()
+
+    listed = client.get(f'/opportunities/{opportunity_id}/skills')
+    matched = client.get(f'/opportunities/{opportunity_id}/skill-match')
+
+    assert listed.status_code == 200
+    assert [skill['id'] for skill in listed.json()] == []
+    assert matched.status_code == 200
+    assert matched.json()['required_skill_count'] == 0
+    assert matched.json()['missing_skills'] == []
