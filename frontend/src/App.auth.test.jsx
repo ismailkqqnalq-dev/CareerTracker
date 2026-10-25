@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import App from "./App.jsx";
 
 function jsonResponse(status, body) {
@@ -27,6 +27,38 @@ describe("authenticated API requests", () => {
     expect(await screen.findByRole("heading", { name: "Hesabına giriş yap" })).toBeTruthy();
     expect(sessionStorage.getItem("careertracker_token")).toBeNull();
     expect(screen.queryByText("this wording has no auth clue")).toBeNull();
+  });
+
+  it("keeps the login screen and shows a Turkish message for invalid credentials", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      jsonResponse(401, { detail: "Invalid credentials" }),
+    ));
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText("E-posta"), { target: { value: "person@example.com" } });
+    fireEvent.change(screen.getByLabelText("Şifre"), { target: { value: "WrongPass123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Giriş yap" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("E-posta veya şifre geçersiz");
+    expect(screen.getByRole("heading", { name: "Hesabına giriş yap" })).toBeTruthy();
+    expect(sessionStorage.getItem("careertracker_token")).toBeNull();
+  });
+
+  it("shows an email-in-use message when registration returns HTTP 409", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(409, { detail: "email already exists" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Kayıt ol" }));
+    fireEvent.change(screen.getByLabelText("E-posta"), { target: { value: "taken@example.com" } });
+    fireEvent.change(screen.getByLabelText("Şifre"), { target: { value: "StrongPass123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Kayıt ol" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("Bu e-posta ile bir hesap zaten bulunuyor");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem("careertracker_token")).toBeNull();
   });
 
   it("shows candidate request failures instead of treating them as empty results", async () => {
