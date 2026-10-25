@@ -3,6 +3,7 @@ from app.models.opportunity_skills import OpportunitySkill
 from app.models.skills import Skill
 from app.services.skill_normalizer import find_skill
 from app.services.skill_suggestion_service import submit_suggestion
+from app.services.skill_access import visible_skills
 
 
 def _get_opportunity(db, opportunity_id: int, user_id: int) -> Opportunity:
@@ -55,7 +56,7 @@ def list_skills(db, opportunity_id: int, user_id: int) -> list[Skill]:
     _get_opportunity(db, opportunity_id, user_id)
 
     return (
-        db.query(Skill)
+        visible_skills(db, user_id)
         .join(OpportunitySkill, OpportunitySkill.skill_id == Skill.id)
         .filter(OpportunitySkill.opportunity_id == opportunity_id)
         .order_by(Skill.name)

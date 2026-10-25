@@ -131,7 +131,6 @@ def test_opportunity_private_skill_attachment_is_scoped(authenticated_client):
 def test_opportunity_reads_hide_injected_other_users_private_skill(authenticated_client):
     client = authenticated_client
     other = second_headers(client)
-    private = client.post('/skills', json={'name': 'Owner A private skill'}).json()
     their_private = client.post(
         '/skills',
         json={'name': 'Owner B private skill'},
