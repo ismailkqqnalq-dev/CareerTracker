@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml)
 
-İş, staj ve freelance başvurularını tek yerde takip etmek için geliştirilen kişisel bir kariyer CRM'inin REST API'si. FastAPI ve SQLAlchemy ile yazılmıştır; SQLite ile yerel, PostgreSQL ile Docker ortamında çalışabilir.
+İş, staj ve freelance fırsatlarını takip etmek için geliştirilen bir kariyer CRM'idir. FastAPI ve SQLAlchemy REST API'si, SQLite ile yerel ve PostgreSQL ile Docker ortamında çalışabilir. `frontend/` dizininde beceri önerileri için sınırlı bir React MVP'si bulunur; tam CRM arayüzü değildir.
 ## Vizyon
 
 CareerTracker, başvuru takibinden öteye geçmeyi hedefliyor: **Career Tracker AI**. Farklı platformlardan (LinkedIn, Indeed, Upwork, Fiverr) gelen iş ve freelance fırsatlarını tek yerde toplayıp ilanlardan yapılandırılmış veri çıkaran, kullanıcının becerileriyle karşılaştıran ve zamanla piyasa trendlerini analiz eden bir kariyer istihbarat platformu.
@@ -18,7 +18,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Fırsatları CSV olarak dışa aktarma (Türkçe karakter desteği)
 - Alembic veritabanı migration'ları
 - GitHub Actions ile otomatik test çalıştırma
-- Skill oluşturma, alias ekleme ve normalize edilmiş adla skill bulma
+- Ortak seed skill kataloğu, kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
 - Fırsatlara skill bağlama ve bağlı skill'leri listeleme
 - Kullanıcıya özel bekleyen beceri önerilerini gözden geçirip mevcut katalogla eşleştirme (`frontend/` MVP arayüzü)
 
@@ -36,22 +36,42 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 
 Uygulama çalışırken interaktif dokümantasyon: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-| Alan | Metot ve yol | Açıklama |
+Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gönder. “Opsiyonel” endpoint'ler tokensız ortak katalogla sınırlıdır.
+
+| Alan | Metot ve yol | Giriş | Açıklama |
+|---|---|---|---|
+| Hesap | `POST /auth/register` | Hayır | Hesap oluşturur |
+| Oturum | `POST /auth/token` | Hayır | E-posta (`username` alanında) ve parola ile JWT alır |
+| Oturum | `GET /auth/me` | Evet | Oturum açmış kullanıcıyı döndürür |
+| Skill kataloğu | `GET /skills` | Opsiyonel | Ortak katalogu; oturum varsa kullanıcının kendi skill'lerini de listeler |
+| Skill kataloğu | `POST /skills` | Evet | Yalnızca giriş yapan kullanıcıya özel skill oluşturur |
+| Skill çözümleme | `GET /skills/resolve?name=...` | Opsiyonel | Görünür skill'i ad veya alias ile bulur |
+| Skill alias | `POST /skills/{skill_id}/aliases` | Evet | Kişisel alias ekler; ortak alias kaydını değiştirmez |
+| Beceri önerileri | `POST /skills/suggestions` | Evet | Tanınmayan skill adı için öneri oluşturur veya mevcut öneriyi döndürür |
+| Beceri önerileri | `GET /skills/suggestions` | Evet | Kullanıcının önerilerini listeler; `status` ile süzülebilir |
+| Beceri önerisi | `PATCH /skills/suggestions/{suggestion_id}` | Evet | Öneriyi görünür bir skill ile kişisel olarak eşleştirir |
+| Adaylar | `GET /skills/suggestions/{suggestion_id}/candidates` | Evet | Bekleyen öneri için benzer adları sıralar |
+| Profil skill'leri | `GET, POST /users/me/skills` | Evet | Profil skill'lerini listeler veya ekler |
+| Profil skill'i | `PATCH, DELETE /users/me/skills/{user_skill_id}` | Evet | Profil kaydını günceller veya siler |
+| Fırsat skill'leri | `POST, GET /opportunities/{opportunity_id}/skills` | Evet | Fırsata skill bağlar veya bağlı skill'leri listeler |
+| Fırsat skill eşleşmesi | `GET /opportunities/{opportunity_id}/skill-match` | Evet | Profilde bulunan ve eksik skill'leri karşılaştırır |
+| Fırsatlar | `GET, POST /opportunities`; `GET, PATCH, DELETE /opportunities/{id}` | Evet | Kullanıcının fırsatlarını yönetir |
+| Kişiler | `GET, POST /contacts`; `GET, PATCH, DELETE /contacts/{id}` | Evet | Kullanıcının kişilerini yönetir |
+| Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
+| Görevler | `GET, POST /tasks`; `GET, PATCH, DELETE /tasks/{id}` | Evet | Kullanıcının görevlerini yönetir |
+| Dashboard | `GET /dashboard` | Evet | Kullanıcının fırsat istatistiklerini döndürür |
+| CSV | `GET /opportunities/export` | Evet | Kullanıcının fırsatlarını CSV olarak indirir |
+
+### Beceri API hata kodları
+
+JSON hata gövdesindeki sabit kodlar:
+
+| `error_code` | Endpoint | Anlamı |
 |---|---|---|
-| Fırsatlar | `/opportunities` — GET, POST | Fırsatları listele veya ekle |
-| Fırsat | `/opportunities/{id}` — GET, PATCH, DELETE | Detay, güncelleme, silme |
-| Kişiler | `/contacts` — GET, POST | Kişileri listele veya ekle |
-| Kişi | `/contacts/{id}` — GET, PATCH, DELETE | Detay, güncelleme, silme |
-| Aktiviteler | `/activities` — GET, POST | Aktiviteleri listele veya ekle |
-| Aktivite | `/activities/{id}` — GET, PATCH, DELETE | Detay, güncelleme, silme |
-| Görevler | `/tasks` — GET, POST | Görevleri listele veya ekle |
-| Görev | `/tasks/{id}` — GET, PATCH, DELETE | Detay, güncelleme, silme |
-| Dashboard | `/dashboard` — GET | Başvuru istatistikleri |
-| CSV | `/opportunities/export` — GET | Fırsatları CSV olarak indir |
-| Skill | `/skills` — POST | Skill oluştur (201); tekrar eden ad için 409 |
-| Skill çözümleme | `/skills/resolve?name=postgres` — GET | Ad veya alias ile bul; bulunamazsa 404 |
-| Skill alias | `/skills/{skill_id}/aliases` — POST | Skill'e alternatif ad ekle |
-| Fırsat skill'leri | `/opportunities/{opportunity_id}/skills` — POST, GET | Skill bağla veya bağlı skill'leri listele |
+| `skill_not_found` | `GET /skills/resolve` | Görünür katalogda bu adla skill bulunamadı (404) |
+| `skill_already_recognized` | `POST /skills/suggestions` | Skill zaten tanınıyor; öneri yerine katalogdaki skill kullanılmalı (409) |
+| `opportunity_not_found` | `POST, GET /opportunities/{opportunity_id}/skills`; `GET /opportunities/{opportunity_id}/skill-match` | Fırsat bulunamadı veya kullanıcıya ait değil (404) |
+| `unknown_skill` | `POST /opportunities/{opportunity_id}/skills` | Skill tanınmadı (404); öneri kaydedildiyse gövdede `suggestion_id` de bulunur |
 
 ## Yerel kurulum
 
@@ -78,7 +98,7 @@ python -m pip install -e ".[dev]"
 `.env.example` dosyasını `.env` olarak kopyala (Windows: `Copy-Item .env.example .env`, macOS/Linux: `cp .env.example .env`), sonra:
 
 ```bash
-alembic upgrade head
+python -m alembic upgrade head
 python -m uvicorn app.main:app --reload
 ```
 
@@ -107,51 +127,76 @@ API: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). Servisleri durdur
 
 ## Beceri öneri arayüzü (MVP)
 
-### Kişisel katalog yazımları
+Arayüz beceri önerisi akışının MVP'sidir: kayıt ve giriş, tanınmayan beceri önerisi
+gönderme, benzer adayları görüntüleme ve kullanıcı onayıyla eşleştirme. Fırsat,
+kişi, aktivite ve görevleri yönetmek için tam CRM arayüzü içermez.
 
-`POST /skills` giriş yapan kullanıcıya özel bir beceri oluşturur.
-`POST /skills/{skill_id}/aliases` yalnızca o kullanıcıya ait alternatif isim ekler;
-ortak `SkillAliases` kayıtlarını değiştirmez. Hedef beceri ortak katalogdan veya
-kullanıcının kendi becerilerinden olmalıdır; başka kullanıcıya ait ID için 404 döner.
-`GET /skills` ve `/skills/resolve`, token ile ortak katalog + kendi kayıtlarını,
-tokensız yalnızca ortak kataloğu kullanır. Aday sıralaması, profil ekleme ve
-öneri eşleştirmesi de aynı görünürlük sınırını korur.
+### Katalog ve kişisel eşleştirme
 
-Kişisel öneri eşleştirmeleri (`SkillSuggestion.resolved_skill_id`) ayrı kalır.
-Çözümlemede önce kabul edilmiş kişisel eşleştirme, sonra kişisel alias, sonra
-ortak alias kullanılır. Ortak isimle çakışan kişisel alias yalnızca sahibini etkiler.
-Kabul edilmiş kişisel eşleştirmeyle aynı isimde alias ekleme 409 döner.
+- Ortak katalog seed ile yönetilir ve uygulamanın kullanıcıya açık API'sinde salt
+  okunurdur. `POST /skills` ortak katalogu değiştirmez; giriş yapan kişiye özel bir
+  skill oluşturur.
+- `POST /skills/{skill_id}/aliases`, ayrı `PersonalSkillAlias` kaydı ekleyerek
+  yalnızca o kullanıcının çözümlemesini etkiler; ortak `SkillAliases` kayıtlarını
+  değiştirmez.
+- Tanınmayan beceri `POST /skills/suggestions` ile kullanıcıya özel öneri olur.
+  `PATCH /skills/suggestions/{suggestion_id}` ile verilen karar
+  `SkillSuggestion.resolved_skill_id` üzerinde kişisel olarak saklanır; genel
+  kataloğa alias eklenmez.
+- Giriş yapan kullanıcı ortak katalogu ve kendi skill/alias kayıtlarını görür.
+  Tokensız `GET /skills` ve `GET /skills/resolve` yalnızca ortak kayıtları gösterir.
+  Başka kullanıcının özel kayıtları çözümleme ve aday listelerinde görünmez.
 
-Ortak katalog yalnızca sunucu tarafındaki seed işlemiyle yönetilir. Seed, kişisel
-kayıtları sahiplenmez veya değiştirmez. Önceden oluşturulan kayıtların sahibi
-saklanmadığı için `a91e73c208bf` migration'ı bunları ortak kayıt olarak korur;
-geçmiş yazımları geriye dönük kişiselleştirmez. Yeni kişisel beceri/alias varken
-downgrade durdurulur; kişisel veriyi silmez veya ortak veriye dönüştürmez.
+### Aday sıralaması ve eşleştirme
 
-API'yi çalışır durumda bıraktıktan sonra ikinci terminalde React arayüzünü başlat:
+Aday sıralaması `difflib.SequenceMatcher` metin benzerliği ve token örtüşmesi kullanan
+kural tabanlı bir heuristiktir. Skor yazım/metin benzerliğini gösterir; ML sonucu,
+doğruluk olasılığı veya aynı beceri olduğuna dair güven ölçüsü değildir. `C#` ve
+`C++` gibi sembollü adlar için yazım eşlemeleri bulunsa da skor yine benzerliktir.
+`skill-match` endpoint'i de ML kullanmaz: fırsat becerilerini kullanıcının profil
+beceri ID'leriyle karşılaştırır ve eşleşen/eksik becerileri döndürür.
+
+### Yerel frontend
+
+Önce API'yi depo kökünden başlat:
+
+```powershell
+python -m uvicorn app.main:app --reload
+```
+
+Ardından ayrı terminalde frontend komutlarını çalıştır:
 
 ```powershell
 cd frontend
-npm install
+npm ci
+npm test
+npm run build
 npm run dev
 ```
 
-Vite'ın gösterdiği yerel adresi aç. Arayüz, `/api` isteklerini `http://127.0.0.1:8000` adresindeki FastAPI uygulamasına proxy eder. Eşleştirme kullanıcı tarafından onaylanır ve yalnızca o kullanıcıya kaydedilir; genel skill kataloğuna otomatik alias eklenmez. Ayrıntılar için [`frontend/README.md`](frontend/README.md) dosyasına bak.
+Vite'ın verdiği yerel adresi aç. Geliştirme proxy'si `/api` isteklerini varsayılan
+olarak `http://127.0.0.1:8000` adresine yönlendirir. Başka API adresi için Vite'ı
+başlatmadan önce `CAREERTRACKER_API_URL` ortam değişkenini ayarla.
 
 ## Testler
 
-Geliştirme bağımlılıklarını kurup testleri çalıştır:
+Backend testleri ve migration kontrolleri için:
 
 ```powershell
 python -m pip install -e ".[dev]"
+python -m alembic upgrade head
+python -m alembic check
 python -m pytest -q
 ```
 
-GitHub Actions, `main` branch'ine yapılan push ve Pull Request'lerde testleri otomatik çalıştırır.
+Frontend testleri Vitest ile çalışır. `cd frontend` sonrasında `npm ci`, `npm test`
+ve `npm run build` komutlarını çalıştır. GitHub Actions, Pull Request'lerde ve `main` push'larında
+backend testlerini, migration kontrollerini, frontend testlerini ve frontend build'ini
+çalıştırır.
 
 ## Migration oluşturma
 
-Boş bir veritabanını kurmak için `alembic upgrade head` yeterlidir. İlk migration
+Boş bir veritabanını kurmak için `python -m alembic upgrade head` yeterlidir. İlk migration
 fırsat, kişi, aktivite ve görev tablolarını; sonraki migration skill tablolarını
 oluşturur. `init_db.py`, Alembic geçmişini kaydetmediği için normal kurulum adımı değildir.
 
@@ -170,8 +215,8 @@ model/şema uyumunu; ayrıca PostgreSQL'de geri alma ve tekrar kurulumu kontrol 
 Model değişikliğinden sonra yeni migration üretip gözden geçir:
 
 ```powershell
-alembic revision --autogenerate -m "migration açıklaması"
-alembic upgrade head
+python -m alembic revision --autogenerate -m "migration açıklaması"
+python -m alembic upgrade head
 ```
 
 ## Proje yapısı
@@ -192,27 +237,33 @@ tests/             # pytest testleri
 
 ## Yol Haritası
 
-- [x] **Faz 1 - Temel uygulama:** Fırsat, kişi, aktivite ve görev CRUD'ları, testler
-- [x] **Faz 2 - Altyapı:** Dashboard, CSV dışa aktarma, PostgreSQL + Docker, Alembic, CI
-- [x] **Faz 2.5 - Skill temeli:** Skill/alias modelleri, temel normalization, skill API'si, fırsat-skill bağlama ve listeleme, API testleri
-- [ ] **Faz 3 - OCR:** İlan ekran görüntüsünden metin çıkarma (image preprocessing ile)
-- [ ] **Faz 4 - NLP:** İlan metninden beceri, rol ve gereksinim çıkarımı (precision/recall/F1 ile ölçülecek)
-- [ ] **Faz 5 - Skill normalization:** "Postgres" ve "PostgreSQL" gibi yazım farklarını birleştirme
-- [ ] **Faz 6 - Kural tabanlı matching:** Kullanıcı skill profili, ilan ile profil karşılaştırması, skill gap analizi
-- [ ] **Faz 7 - Veri analizi:** Market ve freelance analitiği (Pandas)
-- [ ] **Faz 8 - Semantic similarity:** Embedding tabanlı eşleştirme
-- [ ] **Faz 9 - Makine öğrenmesi:** Sınıflandırma ve model değerlendirme
-- [ ] **Faz 10 - Deep learning / Computer Vision:** Belge anlama denemeleri
-- [ ] **Faz 11 - Production:** Kimlik doğrulama, arayüz, deployment
+- **Tamamlandı — Faz 1:** Fırsat, kişi, aktivite ve görev backend CRUD'ları.
+- **Tamamlandı — Faz 2:** Dashboard, CSV dışa aktarma, PostgreSQL/Docker, Alembic ve CI.
+- **Tamamlandı — Faz 2.5:** Skill modelleri ve API'si, seed katalogu, kişisel skill/alias ve öneri eşleştirme temeli.
+- **Başlamadı — Faz 3:** OCR ile ilan görüntülerinden metin çıkarma.
+- **Planlandı — Faz 4:** İlan metninden yapılandırılmış bilgi çıkarımı ve ölçüm.
+- **Kısmi — Faz 5:** Normalizasyon, seed alias'ları, kişisel alias'lar ve metin benzerliğine dayalı aday sıralaması var; kapsamlı beceri normalizasyonu tamamlanmadı.
+- **Kısmi — Faz 6:** Kullanıcı skill profili ve fırsat skill-match/gap endpoint'i var; tam eşleştirme ürünü ve arayüzü tamamlanmadı.
+- **Planlandı — Faz 7–10:** Analitik, semantic similarity, makine öğrenmesi ve deep learning/computer vision çalışmaları.
+- **Kısmi — Faz 11:** JWT kimlik doğrulaması ve beceri önerileri için React MVP'si var; deployment ve tam CRM arayüzü tamamlanmadı.
 
-> Eşleşme skorları gibi çıktılar bilimsel bir doğruluk ölçüsü değil, açıklanabilir bir hesaplamanın sonucudur.
+Fazlar doğrusal ilerlemez. Faz 5, 6 ve 11'in bazı altyapı parçaları OCR/NLP başlamadan önce geliştirildi; bu fazlar tamamlandı anlamına gelmez.
 
 ## Durum
 
-Faz 1–2 özellikleri ve Faz 2.5 skill temeli uygulandı. Skill ilişkisinden çıkarma
-işlemi henüz uygulanmadı. Kullanıcı skill profili Faz 6'ya, kimlik doğrulama ve
-arayüz Faz 11'e ayrıldı. Sıradaki hedef Faz 3 OCR baseline; geçiş öncesinde
-migration bootstrap düzeltmesinin CI kontrolleri tamamlanmalıdır.
+Faz 1, 2 ve 2.5 tamamlandı. Faz 3 OCR henüz başlamadı. Faz 5, 6 ve 11'den bazı
+parçalar erken teslim edildi ancak bu fazların bütünü tamamlanmış değildir. Bugünkü
+arayüz beceri önerilerinin gözden geçirilmesi ve eşleştirilmesiyle sınırlıdır.
+
+## Bilinen sınırlar
+
+- Beceri önerisini reddetmek için endpoint veya arayüz akışı yoktur.
+- `PATCH /skills/suggestions/{suggestion_id}` kabul edilmiş öneriyi yeniden
+  eşleştirebilir.
+- Kabul edilmiş önerinin hedef skill'i silinirse foreign key `resolved_skill_id`'yi
+  boş bırakır; önerinin durumu `accepted` kalır. Bu davranış testle belgelenmiştir.
+- Aday sıralaması yazım/metin benzerliği heuristiğidir. Kısa veya sembollü adlarda
+  skorlar anlamsal doğruluk anlamına gelmez.
 ## Lisans
 
 [MIT](LICENSE)
