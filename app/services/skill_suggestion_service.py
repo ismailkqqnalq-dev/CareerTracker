@@ -9,6 +9,18 @@ from app.services.skill_access import get_visible_skill, visible_skills
 from app.services.skill_normalizer import find_skill, normalize_text
 
 
+_CANDIDATE_TEXT_ALIASES = {
+    "c#": "csharp",
+    "c sharp": "csharp",
+    "c-sharp": "csharp",
+    "csharp": "csharp",
+    "c++": "cpp",
+    "c plus plus": "cpp",
+    "cplusplus": "cpp",
+    "cpp": "cpp",
+}
+
+
 def submit_suggestion(
     db: Session,
     *,
@@ -121,8 +133,9 @@ def rank_skill_candidates(
         raise ValueError("Candidates are only available for pending suggestions")
 
     query_text = normalize_text(suggestion.raw_name)
-    query_compact = _compact(query_text)
-    if len(query_compact) < 2:
+    query_candidate_text = _candidate_text(query_text)
+    query_compact = _compact(query_candidate_text)
+    if not query_compact:
         return []
 
     aliases_by_skill: dict[int, list[str]] = {}
@@ -149,20 +162,30 @@ def _compact(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value)
 
 
-def _similarity(query_text: str, query_compact: str, known_name: str) -> float:
+def _candidate_text(value: str) -> str:
+    normalized = normalize_text(value)
+    return _CANDIDATE_TEXT_ALIASES.get(normalized, normalized)
+
+
+def _similarity(query_text: str, _query_compact: str, known_name: str) -> float:
     known_text = normalize_text(known_name)
-    known_compact = _compact(known_text)
+    query_candidate_text = _candidate_text(query_text)
+    known_candidate_text = _candidate_text(known_text)
+    query_compact = _compact(query_candidate_text)
+    known_compact = _compact(known_candidate_text)
     if not known_compact:
         return 0.0
-    if query_text == known_text or query_compact == known_compact:
+    if query_candidate_text == known_candidate_text:
         return 1.0
+    if len(query_compact) < 2:
+        return 0.0
 
     sequence_score = max(
-        SequenceMatcher(None, query_text, known_text).ratio(),
+        SequenceMatcher(None, query_candidate_text, known_candidate_text).ratio(),
         SequenceMatcher(None, query_compact, known_compact).ratio(),
     )
-    query_tokens = set(re.findall(r"[a-z0-9]+", query_text))
-    known_tokens = set(re.findall(r"[a-z0-9]+", known_text))
+    query_tokens = set(re.findall(r"[a-z0-9]+", query_candidate_text))
+    known_tokens = set(re.findall(r"[a-z0-9]+", known_candidate_text))
     shared_tokens = len(query_tokens & known_tokens)
     token_score = (
         2 * shared_tokens / (len(query_tokens) + len(known_tokens))
