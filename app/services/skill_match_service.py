@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.opportunity import Opportunity
 from app.models.opportunity_skills import OpportunitySkill
 from app.models.skills import Skill, UserSkill
+from app.services.skill_access import visible_skills
 
 
 def get_opportunity_skill_match(
@@ -22,7 +23,7 @@ def get_opportunity_skill_match(
         raise LookupError(f"Opportunity not found: {opportunity_id}")
 
     required_skills = (
-        db.query(Skill)
+        visible_skills(db, user_id)
         .join(OpportunitySkill, OpportunitySkill.skill_id == Skill.id)
         .filter(OpportunitySkill.opportunity_id == opportunity_id)
         .order_by(Skill.name)

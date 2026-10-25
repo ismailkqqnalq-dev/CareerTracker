@@ -1,24 +1,36 @@
-from sqlalchemy import StaticPool, create_engine
+from sqlalchemy import StaticPool
 from sqlalchemy.orm import sessionmaker
 import os
 import secrets
 
 # Ephemeral test-only key; never use the application's real secret in tests.
 os.environ["JWT_SECRET_KEY"] = secrets.token_hex(32)
-from app.database.session import Base, get_db
+from app.database.session import Base, create_database_engine, get_db
 import pytest
 from app.main import app
 from fastapi.testclient import TestClient
 
 database_url = "sqlite:///:memory:"
 
-engine = create_engine(database_url, connect_args={"check_same_thread": False},  poolclass=StaticPool)
+engine = create_database_engine(database_url, poolclass=StaticPool)
 
 TestingSessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,
     expire_on_commit=False
 )
+
+
+@pytest.fixture()
+def db_session():
+    Base.metadata.create_all(bind=engine)
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+        Base.metadata.drop_all(bind=engine)
+
 
 @pytest.fixture()
 def client():

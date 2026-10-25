@@ -1,6 +1,14 @@
 from app.main import app
 from app.database.session import get_db
-from app.models.skills import Skill, SkillAliases
+from app.models.opportunity import Opportunity
+from app.models.opportunity_skills import OpportunitySkill
+from app.models.skills import (
+    PersonalSkillAlias,
+    Skill,
+    SkillAliases,
+    UserSkill,
+)
+from app.models.users import User
 from app.services.skill_catalog_service import seed_skill_catalog
 from app.services.skill_normalizer import find_skill
 from tests.test_skills_api import _create_opportunity
@@ -31,6 +39,18 @@ def test_created_skill_is_private_and_names_can_repeat(authenticated_client):
     assert second.json()['id'] != first['id']
     assert client.get('/skills').json() == [first]
     assert client.get('/skills/resolve', params={'name': 'PRIVATE TOOL'}).json()['id'] == first['id']
+
+
+def test_create_skill_conflicting_with_shared_python_returns_409(authenticated_client):
+    client = authenticated_client
+    generator = app.dependency_overrides[get_db]()
+    db = next(generator)
+    seed_skill_catalog(db)
+    generator.close()
+
+    response = client.post('/skills', json={'name': 'Python'})
+
+    assert response.status_code == 409
 
 
 def test_alias_to_shared_skill_is_private(authenticated_client):
@@ -79,6 +99,29 @@ def test_seed_does_not_adopt_personal_skills_or_aliases(authenticated_client):
     generator.close()
 
 
+def test_alias_matching_pending_suggestion_keeps_it_pending(authenticated_client):
+    client = authenticated_client
+    skill = client.post('/skills', json={'name': 'Target Skill'}).json()
+    suggestion = client.post(
+        '/skills/suggestions',
+        json={'skill': 'My Pending Alias'},
+    ).json()
+
+    added_alias = client.post(
+        f"/skills/{skill['id']}/aliases",
+        json={'alias': 'My Pending Alias'},
+    )
+
+    assert added_alias.status_code == 201
+    assert client.get(
+        '/skills/resolve',
+        params={'name': 'My Pending Alias'},
+    ).json()['id'] == skill['id']
+    suggestions = client.get('/skills/suggestions').json()
+    matching = next(row for row in suggestions if row['id'] == suggestion['id'])
+    assert matching['status'] == 'pending'
+
+
 def test_personal_alias_does_not_influence_other_users_candidates(authenticated_client):
     client = authenticated_client
     generator = app.dependency_overrides[get_db]()
@@ -125,3 +168,71 @@ def test_opportunity_private_skill_attachment_is_scoped(authenticated_client):
     assert response.status_code == 404
     assert client.get(f'/opportunities/{their_opportunity}/skills').json() == []
     assert client.get('/skills/suggestions').json()[0]['status'] == 'pending'
+
+
+def test_opportunity_reads_hide_injected_other_users_private_skill(authenticated_client):
+    client = authenticated_client
+    other = second_headers(client)
+    their_private = client.post(
+        '/skills',
+        json={'name': 'Owner B private skill'},
+        headers=other,
+    ).json()
+    opportunity_id = _create_opportunity(client)
+
+    # Simulate a stale or incorrectly written association in the database.
+    generator = app.dependency_overrides[get_db]()
+    db = next(generator)
+    db.add(OpportunitySkill(
+        opportunity_id=opportunity_id,
+        skill_id=their_private['id'],
+    ))
+    db.commit()
+    generator.close()
+
+    listed = client.get(f'/opportunities/{opportunity_id}/skills')
+    matched = client.get(f'/opportunities/{opportunity_id}/skill-match')
+
+    assert listed.status_code == 200
+    assert [skill['id'] for skill in listed.json()] == []
+    assert matched.status_code == 200
+    assert matched.json()['required_skill_count'] == 0
+    assert matched.json()['missing_skills'] == []
+
+
+def test_deleting_user_cascades_private_skill_alias_and_links(db_session):
+    user = User(email='cascade@example.test', hashed_password='unused')
+    db_session.add(user)
+    db_session.commit()
+
+    skill = Skill(name='Private cascade skill', owner_user_id=user.id)
+    opportunity = Opportunity(user_id=user.id, company='Test', position='Test')
+    db_session.add_all([skill, opportunity])
+    db_session.commit()
+    db_session.add_all([
+        PersonalSkillAlias(
+            user_id=user.id,
+            alias='private cascade alias',
+            skill_id=skill.id,
+        ),
+        UserSkill(
+            user_id=user.id,
+            skill_id=skill.id,
+            proficiency_level='beginner',
+            years_experience=0,
+        ),
+        OpportunitySkill(
+            opportunity_id=opportunity.id,
+            skill_id=skill.id,
+        ),
+    ])
+    db_session.commit()
+
+    db_session.delete(user)
+    db_session.commit()
+
+    assert db_session.query(Skill).filter_by(name='Private cascade skill').count() == 0
+    assert db_session.query(PersonalSkillAlias).filter_by(alias='private cascade alias').count() == 0
+    assert db_session.query(UserSkill).count() == 0
+    assert db_session.query(OpportunitySkill).count() == 0
+    assert db_session.query(Opportunity).count() == 0
