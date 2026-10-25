@@ -6,6 +6,16 @@ from app.services.skill_suggestion_service import submit_suggestion
 from app.services.skill_access import visible_skills
 
 
+class OpportunityNotFoundError(LookupError):
+    pass
+
+
+class UnknownSkillError(LookupError):
+    def __init__(self, detail: str, suggestion_id: int):
+        super().__init__(detail)
+        self.suggestion_id = suggestion_id
+
+
 def _get_opportunity(db, opportunity_id: int, user_id: int) -> Opportunity:
     opportunity = (
         db.query(Opportunity)
@@ -16,7 +26,7 @@ def _get_opportunity(db, opportunity_id: int, user_id: int) -> Opportunity:
         .first()
     )
     if opportunity is None:
-        raise LookupError(f"Opportunity not found: {opportunity_id}")
+        raise OpportunityNotFoundError(f"Opportunity not found: {opportunity_id}")
     return opportunity
 
 
@@ -30,9 +40,12 @@ def attach_skill(
 
     skill = find_skill(db, raw_skill, user_id=user_id)
     if skill is None:
-        submit_suggestion(db, user_id=user_id, raw_name=raw_skill)
-        raise LookupError(
-            f"Unknown skill: {raw_skill}. A suggestion was saved for review."
+        suggestion, _created = submit_suggestion(
+            db, user_id=user_id, raw_name=raw_skill
+        )
+        raise UnknownSkillError(
+            f"Unknown skill: {raw_skill}. A suggestion was saved for review.",
+            suggestion_id=suggestion.id,
         )
 
     if db.get(OpportunitySkill, (opportunity_id, skill.id)) is not None:
