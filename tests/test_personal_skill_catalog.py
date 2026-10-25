@@ -6,6 +6,7 @@ from app.models.skills import (
     PersonalSkillAlias,
     Skill,
     SkillAliases,
+    SkillSuggestion,
     UserSkill,
 )
 from app.models.users import User
@@ -137,6 +138,38 @@ def test_personal_alias_does_not_influence_other_users_candidates(authenticated_
     assert candidates[0]['score'] == 1
     assert client.get(f'/skills/suggestions/{theirs}/candidates', headers=other).json() == []
     generator.close()
+
+
+def test_deleting_accepted_suggestion_target_keeps_accepted_row_with_null_target(
+    authenticated_client,
+):
+    client = authenticated_client
+    skill = client.post("/skills", json={"name": "Temporary target"}).json()
+    suggestion = client.post(
+        "/skills/suggestions", json={"skill": "Temporary target alias"}
+    ).json()
+    accepted = client.patch(
+        f"/skills/suggestions/{suggestion['id']}",
+        json={"skill_id": skill["id"]},
+    )
+    assert accepted.status_code == 200
+
+    generator = app.dependency_overrides[get_db]()
+    db = next(generator)
+    db.delete(db.get(Skill, skill["id"]))
+    db.commit()
+    row = db.get(SkillSuggestion, suggestion["id"])
+    assert row.status == "accepted"
+    assert row.resolved_skill_id is None
+    generator.close()
+
+    listed = client.get("/skills/suggestions")
+    assert listed.status_code == 200
+    assert listed.json()[0]["status"] == "accepted"
+    assert listed.json()[0]["resolved_skill_id"] is None
+    assert client.get(
+        "/skills/resolve", params={"name": "Temporary target alias"}
+    ).status_code == 404
 
 
 def test_personal_alias_can_override_shared_alias_only_for_owner(authenticated_client):

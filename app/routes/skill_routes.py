@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
@@ -197,6 +198,23 @@ def attach_skill(
             opportunity_id,
             data.skill,
             user_id=current_user.id,
+        )
+    except opportunity_skill_service.OpportunityNotFoundError as error:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": str(error),
+                "error_code": "opportunity_not_found",
+            },
+        )
+    except opportunity_skill_service.UnknownSkillError as error:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": str(error),
+                "error_code": "unknown_skill",
+                "suggestion_id": error.suggestion_id,
+            },
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))
