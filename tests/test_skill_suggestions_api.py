@@ -1,3 +1,9 @@
+from app.database.session import get_db
+from app.main import app
+from app.models.skills import PersonalSkillAlias, Skill
+from app.models.users import User
+
+
 def _create_opportunity(client):
     response = client.post(
         "/opportunities",
@@ -130,11 +136,100 @@ def test_suggestion_mapping_is_private_to_its_owner(client):
     ).json()["access_token"]
     client.headers.update({"Authorization": f"Bearer {second_token}"})
 
+    cannot_map_another_users_suggestion = client.patch(
+        f"/skills/suggestions/{suggestion_id}",
+        json={"skill_id": skill_id},
+    )
+    assert cannot_map_another_users_suggestion.status_code == 404
+
     assert client.get(
         "/skills/resolve",
         params={"name": "My Private Python Variant"},
     ).status_code == 404
     assert client.get("/skills/suggestions").json() == []
+
+
+def test_accepted_suggestion_can_be_remapped_by_its_owner(authenticated_client):
+    client = authenticated_client
+    first_skill = client.post("/skills", json={"name": "First target"}).json()
+    second_skill = client.post("/skills", json={"name": "Second target"}).json()
+    suggestion = client.post(
+        "/skills/suggestions",
+        json={"skill": "Unrecognized variant"},
+    ).json()
+
+    first_mapping = client.patch(
+        f"/skills/suggestions/{suggestion['id']}",
+        json={"skill_id": first_skill["id"]},
+    )
+    second_mapping = client.patch(
+        f"/skills/suggestions/{suggestion['id']}",
+        json={"skill_id": second_skill["id"]},
+    )
+
+    assert first_mapping.status_code == 200
+    assert first_mapping.json()["status"] == "accepted"
+    assert first_mapping.json()["resolved_skill_id"] == first_skill["id"]
+    assert second_mapping.status_code == 200
+    assert second_mapping.json()["status"] == "accepted"
+    assert second_mapping.json()["resolved_skill_id"] == second_skill["id"]
+
+
+def test_accepted_suggestion_takes_precedence_over_conflicting_personal_alias(
+    authenticated_client,
+):
+    client = authenticated_client
+    accepted_target = client.post(
+        "/skills", json={"name": "Accepted target"}
+    ).json()
+    alias_target = client.post(
+        "/skills", json={"name": "Alias target"}
+    ).json()
+    suggestion = client.post(
+        "/skills/suggestions", json={"skill": "Collision alias"}
+    ).json()
+    mapped = client.patch(
+        f"/skills/suggestions/{suggestion['id']}",
+        json={"skill_id": accepted_target["id"]},
+    )
+    assert mapped.status_code == 200
+
+    generator = app.dependency_overrides[get_db]()
+    db = next(generator)
+    user = db.query(User).filter_by(email="owner@example.com").one()
+    db.add(
+        PersonalSkillAlias(
+            user_id=user.id,
+            alias="collision alias",
+            skill_id=alias_target["id"],
+        )
+    )
+    db.commit()
+    generator.close()
+
+    resolved = client.get(
+        "/skills/resolve", params={"name": "Collision alias"}
+    )
+
+    assert resolved.status_code == 200
+    assert resolved.json()["id"] == accepted_target["id"]
+
+
+def test_suggestion_name_accepts_120_and_rejects_121_characters(
+    authenticated_client,
+):
+    client = authenticated_client
+
+    accepted = client.post(
+        "/skills/suggestions", json={"skill": "a" * 120}
+    )
+    rejected = client.post(
+        "/skills/suggestions", json={"skill": "b" * 121}
+    )
+
+    assert accepted.status_code == 201
+    assert len(accepted.json()["raw_name"]) == 120
+    assert rejected.status_code == 422
 
 
 def test_cannot_map_suggestion_to_unknown_skill(authenticated_client):
