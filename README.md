@@ -264,6 +264,8 @@ arayüz beceri önerilerinin gözden geçirilmesi ve eşleştirilmesiyle sınır
   boş bırakır; önerinin durumu `accepted` kalır. Bu davranış testle belgelenmiştir.
 - Aday sıralaması yazım/metin benzerliği heuristiğidir. Kısa veya sembollü adlarda
   skorlar anlamsal doğruluk anlamına gelmez.
+- Bir fırsata bağlanan skill'i kaldırmak için endpoint yoktur; yalnızca profil skill'i silinebilir.
+
 ## Lisans
 
 [MIT](LICENSE)
