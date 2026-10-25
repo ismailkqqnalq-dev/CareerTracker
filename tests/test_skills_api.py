@@ -225,6 +225,50 @@ def test_attach_skill_to_unknown_opportunity_returns_404(
     assert response.status_code == 404
 
 
+def test_unknown_opportunity_skill_returns_stable_error_code_and_suggestion_id(
+    authenticated_client,
+):
+    client = authenticated_client
+    opportunity_id = _create_opportunity(client)
+
+    response = client.post(
+        f"/opportunities/{opportunity_id}/skills",
+        json={"skill": "Structured Error Skill"},
+    )
+
+    assert response.status_code == 404
+    body = response.json()
+    assert body["detail"] == (
+        "Unknown skill: Structured Error Skill. A suggestion was saved for review."
+    )
+    assert body["error_code"] == "unknown_skill"
+    suggestion = next(
+        row
+        for row in client.get("/skills/suggestions").json()
+        if row["raw_name"] == "Structured Error Skill"
+    )
+    assert body["suggestion_id"] == suggestion["id"]
+
+
+def test_missing_opportunity_error_code_does_not_save_skill_suggestion(
+    authenticated_client,
+):
+    client = authenticated_client
+    before = client.get("/skills/suggestions").json()
+
+    response = client.post(
+        "/opportunities/999999/skills",
+        json={"skill": "Must Not Be Saved"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Opportunity not found: 999999",
+        "error_code": "opportunity_not_found",
+    }
+    assert client.get("/skills/suggestions").json() == before
+
+
 def test_create_skill_without_token_returns_401(client):
     response = client.post(
         "/skills",
