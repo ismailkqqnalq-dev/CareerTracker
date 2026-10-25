@@ -97,6 +97,10 @@ def test_skill_match_for_unknown_opportunity_returns_404(
     )
 
     assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Opportunity not found: 999999",
+        "error_code": "opportunity_not_found",
+    }
 
 
 def test_skill_match_requires_login(client):

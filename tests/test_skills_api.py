@@ -90,6 +90,19 @@ def test_resolve_unknown_skill_returns_404(client):
     assert response.status_code == 404
 
 
+def test_resolve_unknown_skill_returns_stable_error_code(client):
+    response = client.get(
+        "/skills/resolve",
+        params={"name": "no-such-skill"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Skill not found: no-such-skill",
+        "error_code": "skill_not_found",
+    }
+
+
 def test_turkish_dotless_i_matches_existing_skill(authenticated_client):
     client = authenticated_client
     assert _create_skill(client, "FastAPI", "framework").status_code == 201
@@ -223,6 +236,18 @@ def test_attach_skill_to_unknown_opportunity_returns_404(
     )
 
     assert response.status_code == 404
+
+
+def test_list_opportunity_skills_returns_stable_not_found_error_code(
+    authenticated_client,
+):
+    response = authenticated_client.get("/opportunities/999999/skills")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Opportunity not found: 999999",
+        "error_code": "opportunity_not_found",
+    }
 
 
 def test_unknown_opportunity_skill_returns_stable_error_code_and_suggestion_id(
