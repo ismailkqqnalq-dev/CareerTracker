@@ -57,7 +57,13 @@ def submit_skill_suggestion(
             raw_name=data.skill,
         )
     except ValueError as error:
-        raise HTTPException(status_code=409, detail=str(error))
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": str(error),
+                "error_code": "skill_already_recognized",
+            },
+        )
     if not created:
         # Returning an existing suggestion makes repeated submissions safe.
         response.status_code = 200
@@ -164,7 +170,13 @@ def resolve_skill(
     )
     
     if skill is None:
-        raise HTTPException(status_code=404, detail=f"Skill not found: {name}")
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": f"Skill not found: {name}",
+                "error_code": "skill_not_found",
+            },
+        )
     return skill
 
 @router.post(
@@ -236,6 +248,14 @@ def list_opportunity_skills(
             db,
             opportunity_id,
             user_id=current_user.id,
+        )
+    except opportunity_skill_service.OpportunityNotFoundError as error:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": str(error),
+                "error_code": "opportunity_not_found",
+            },
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))
@@ -332,4 +352,10 @@ def get_opportunity_skill_match(
             user_id=current_user.id,
         )
     except LookupError as error:
-        raise HTTPException(status_code=404, detail=str(error))
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": str(error),
+                "error_code": "opportunity_not_found",
+            },
+        )
