@@ -259,6 +259,10 @@ def test_known_skill_cannot_be_submitted_as_unknown_suggestion(
     )
 
     assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Skill is already recognized: REACT",
+        "error_code": "skill_already_recognized",
+    }
 
 
 def test_skill_catalog_can_be_listed_for_mapping_picker(authenticated_client):
@@ -326,6 +330,9 @@ def test_candidate_search_is_private_and_requires_pending_suggestion(
     )
 
     assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Candidates are only available for pending suggestions",
+    }
 
 
 def test_candidate_limit_must_be_between_one_and_ten(authenticated_client):
