@@ -1,26 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createApiClient } from "./api.js";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+const authApi = createApiClient();
 
-async function request(path, { token, ...options } = {}) {
-  const headers = new Headers(options.headers || {});
-  if (options.body && !(options.body instanceof URLSearchParams)) {
-    headers.set("Content-Type", "application/json");
+function errorMessage(error, context = "İstek") {
+  if (error.errorCode === "skill_already_recognized") {
+    return "Bu beceri zaten katalogda tanınıyor. Mevcut beceriyi kullanabilirsin.";
   }
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
-  const body = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) {
-    const detail = Array.isArray(body?.detail)
-      ? body.detail.map((item) => item.msg).join(" · ")
-      : body?.detail;
-    throw new Error(detail || `İstek başarısız oldu (${response.status}).`);
+  if (error.status === 401 && context === "Giriş") {
+    return "E-posta veya şifre geçersiz.";
   }
-  return body;
+  if (error.status === 409 && context === "Kayıt") {
+    return "Bu e-posta ile bir hesap zaten bulunuyor.";
+  }
+  return `${context} tamamlanamadı. Lütfen tekrar dene.`;
 }
 
 function AuthScreen({ onAuthenticated }) {
@@ -36,19 +29,19 @@ function AuthScreen({ onAuthenticated }) {
     setError("");
     try {
       if (mode === "register") {
-        await request("/auth/register", {
+        await authApi.request("/auth/register", {
           method: "POST",
           body: JSON.stringify({ email, password }),
         });
       }
       const form = new URLSearchParams({ username: email, password });
-      const result = await request("/auth/token", {
+      const result = await authApi.request("/auth/token", {
         method: "POST",
         body: form,
       });
       onAuthenticated(result.access_token);
     } catch (submitError) {
-      setError(submitError.message);
+      setError(errorMessage(submitError, mode === "login" ? "Giriş" : "Kayıt"));
     } finally {
       setBusy(false);
     }
@@ -98,6 +91,8 @@ function App() {
   const [resolving, setResolving] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [newSkill, setNewSkill] = useState("");
+  const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
 
   const logout = useCallback(() => {
     sessionStorage.removeItem("careertracker_token");
@@ -106,25 +101,23 @@ function App() {
     setSuggestions([]);
   }, []);
 
+  const api = useMemo(() => createApiClient({ onUnauthorized: logout }), [logout]);
+
   const load = useCallback(async (authToken) => {
     setLoading(true);
     setError("");
     try {
       const [me, pending, catalog] = await Promise.all([
-        request("/auth/me", { token: authToken }),
-        request("/skills/suggestions?status=pending", { token: authToken }),
-        request("/skills", { token: authToken }),
+        api.request("/auth/me", { token: authToken }),
+        api.request("/skills/suggestions?status=pending", { token: authToken }),
+        api.request("/skills", { token: authToken }),
       ]);
       setUser(me);
       setSuggestions(pending);
       setSkills(catalog);
       const ranked = await Promise.all(pending.map(async (suggestion) => {
-        try {
-          const options = await request(`/skills/suggestions/${suggestion.id}/candidates?limit=5`, { token: authToken });
-          return [suggestion.id, options];
-        } catch {
-          return [suggestion.id, []];
-        }
+        const options = await api.request(`/skills/suggestions/${suggestion.id}/candidates?limit=5`, { token: authToken });
+        return [suggestion.id, options];
       }));
       setCandidates(Object.fromEntries(ranked));
       setSelected((current) => {
@@ -132,15 +125,11 @@ function App() {
         return Object.fromEntries(Object.entries(current).filter(([id]) => valid.has(Number(id))));
       });
     } catch (loadError) {
-      if (loadError.message.toLowerCase().includes("credentials") || loadError.message.includes("401")) {
-        logout();
-      } else {
-        setError(loadError.message);
-      }
+      if (loadError.status !== 401) setError(errorMessage(loadError));
     } finally {
       setLoading(false);
     }
-  }, [logout]);
+  }, [api]);
 
   useEffect(() => {
     if (!token) return;
@@ -169,17 +158,54 @@ function App() {
     setError("");
     setNotice("");
     try {
-      await request(`/skills/suggestions/${suggestion.id}`, {
+      const result = await api.request(`/skills/suggestions/${suggestion.id}`, {
         method: "PATCH",
         token,
         body: JSON.stringify({ skill_id: Number(skillId) }),
       });
+      if (result.status !== "accepted") {
+        setError("Eşleştirme beklenen durumu döndürmedi. Öneri durumunu yenile.");
+        return;
+      }
       setNotice(`“${suggestion.raw_name}” becerisi eşleştirildi.`);
       await load(token);
     } catch (resolveError) {
-      setError(resolveError.message);
+      if (resolveError.status !== 401) setError(errorMessage(resolveError));
     } finally {
       setResolving(null);
+    }
+  }
+
+  async function submitSuggestion(event) {
+    event.preventDefault();
+    const skill = newSkill.trim();
+    if (!skill) return;
+    setSubmittingSuggestion(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await api.request("/skills/suggestions", {
+        method: "POST",
+        token,
+        body: JSON.stringify({ skill }),
+      });
+      if (result.status === "pending") {
+        setNewSkill("");
+        setNotice(`“${result.raw_name}” bekleyen önerilere eklendi.`);
+        await load(token);
+      } else if (result.status === "accepted" && result.resolved_skill_id == null) {
+        setNewSkill("");
+        setNotice("Bu öneri daha önce kabul edilmiş, ancak hedef beceri artık mevcut değil. Yeni bir eşleştirme gerekiyor.");
+      } else if (result.status === "accepted") {
+        setNewSkill("");
+        setNotice("Bu beceri önerisi daha önce kabul edilmiş ve eşleştirilmiş.");
+      } else {
+        setError("Beceri önerisi beklenmeyen bir durumla döndü. Tekrar deneyebilirsin.");
+      }
+    } catch (submitError) {
+      if (submitError.status !== 401) setError(errorMessage(submitError));
+    } finally {
+      setSubmittingSuggestion(false);
     }
   }
 
@@ -201,6 +227,22 @@ function App() {
           </div>
           <div className="count-card"><span className="count-number">{pendingCount}</span><span>bekleyen öneri</span></div>
         </div>
+
+        <section className="suggestion-input-card" aria-labelledby="suggestion-input-title">
+          <div>
+            <h2 id="suggestion-input-title">Listede olmayan bir beceri mi var?</h2>
+            <p className="muted">Beceri adını gönder; kişisel eşleştirme için önerilerine eklensin.</p>
+          </div>
+          <form className="suggestion-input-form" onSubmit={submitSuggestion}>
+            <label htmlFor="new-skill">Beceri adı</label>
+            <div className="suggestion-input-row">
+              <input id="new-skill" name="skill" maxLength={120} required value={newSkill} onChange={(event) => setNewSkill(event.target.value)} placeholder="Örn. React, PostgreSQL, Python" />
+              <button className="button button-primary" disabled={submittingSuggestion || !newSkill.trim()}>
+                {submittingSuggestion ? "Gönderiliyor…" : "Öneri gönder"}
+              </button>
+            </div>
+          </form>
+        </section>
 
         {notice && <div className="notice" role="status">{notice}</div>}
         {error && <div className="alert" role="alert"><span>{error}</span><button className="text-button" onClick={() => setError("")}>Kapat</button></div>}
