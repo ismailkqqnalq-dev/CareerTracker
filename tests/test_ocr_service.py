@@ -136,3 +136,25 @@ def test_engine_failure_does_not_expose_backend_details():
         ocr_service.extract_text(image_bytes(), engine=Broken())
     assert error.value.error_code == "ocr_engine_failed"
     assert "private" not in error.value.detail
+
+
+def test_invalid_motor_result_is_distinct_from_empty():
+    with pytest.raises(OcrError) as error:
+        ocr_service.extract_text(image_bytes(), engine=FakeEngine(None))
+    assert error.value.error_code == "invalid_ocr_result"
+
+
+def test_initialization_failure_has_own_code(monkeypatch):
+    def broken_factory(**kwargs):
+        raise RuntimeError("internal model path")
+    monkeypatch.setattr(ocr_engine, "_load_rapidocr", lambda: broken_factory)
+    with pytest.raises(OcrError) as error:
+        ocr_service.extract_text(image_bytes(), engine=RapidOCREngine())
+    assert error.value.error_code == "ocr_engine_initialization_failed"
+
+
+def test_exact_limits_are_accepted(monkeypatch):
+    data = image_bytes()
+    monkeypatch.setattr(ocr_service, "MAX_IMAGE_BYTES", len(data))
+    monkeypatch.setattr(ocr_service, "MAX_IMAGE_PIXELS", 16 * 16)
+    assert ocr_service.extract_text(data, engine=FakeEngine()).text
