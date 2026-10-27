@@ -1,0 +1,89 @@
+# OCR service baseline
+
+This slice provides an in-memory image validation service, an optional OCR adapter,
+and an offline synthetic evaluation CLI. It does not add routes, UI, tables or migrations.
+
+## Installation
+
+Existing installation commands remain valid:
+
+```sh
+python -m pip install -e .
+python -m pip install -e ".[dev]"
+```
+
+Both install Pillow for validation. Neither requests the `ocr` extra. The main CI
+job uses `pip install -e ".[dev]"`; fake-engine service tests always run there.
+Real-engine smoke tests skip with an explicit reason when either motor package
+is absent. A broken installed motor fails the smoke test rather than skipping.
+The separate `ocr-smoke` CI job installs `.[dev,ocr]` on Ubuntu/Python 3.11 and
+runs only the real-engine smoke test; it does not add motor dependencies to `test`.
+
+Opt in to the CPU motor:
+
+```sh
+python -m pip install -e ".[dev,ocr]"
+python -m pytest tests/test_ocr_real_engine.py -q -rs
+```
+
+The extra pins RapidOCR 3.10.0 and ONNX Runtime 1.31.0. The publisher's PyPI
+records list `rapidocr-3.10.0-py3-none-any.whl` (Python >=3.8,<4) and
+`onnxruntime-1.31.0-cp311-cp311-manylinux_2_28_x86_64.whl` (Python >=3.11).
+These cover CI's Python 3.11 and x86-64 Ubuntu/glibc >=2.28. A wheel listing is
+not a Linux runtime test. Alpine/musl and other architectures require separate validation.
+
+- https://pypi.org/project/rapidocr/3.10.0/#files
+- https://pypi.org/project/onnxruntime/1.31.0/#files
+- https://rapidai.github.io/RapidOCRDocs/main/en/model_licenses/
+
+RapidOCR's bundled default ONNX model artifacts have their own upstream
+PaddleOCR attribution under Apache-2.0; retain the applicable license and notices
+when redistributing. CareerTracker does not train these models.
+
+## Service contract
+
+`extract_text(data: bytes, engine=...)` accepts bytes only. No filename or path
+argument exists. It limits encoded bytes before opening, then checks format and
+header dimensions before verifying/decoding pixels. Accepted formats: PNG/JPEG;
+animated PNG is rejected. Limits are named constants: `MAX_IMAGE_BYTES` (10 MiB)
+and `MAX_IMAGE_PIXELS` (20 million). Images are never written to disk by the service.
+
+`OcrError` exposes `error_code`, `detail`, and `to_payload()` for the existing
+`{"detail": ..., "error_code": ...}` envelope. There is no HTTP mapping in this slice.
+Codes: `invalid_image_input`, `empty_image`, `image_too_large`,
+`image_pixel_limit_exceeded`, `unsupported_image_type`, `animated_image_unsupported`,
+`invalid_image`, `empty_ocr_result`, `invalid_ocr_result`, `ocr_engine_unavailable`,
+`ocr_engine_initialization_failed`, `ocr_engine_failed`.
+
+The default adapter is reused process-wide. It imports and creates the real motor
+only on first valid request; a small lock guards construction only. Inference
+concurrency, request scheduling, cancellation and timeouts are deferred to the API
+slice. The adapter is not advertised as safe for concurrent inference.
+
+## Synthetic evaluation
+
+Provide a local font supporting Turkish (e.g. Arial on Windows or DejaVu Sans on
+Linux). No font or user image is downloaded. The CLI requires an explicit font to
+avoid silently evaluating replacement glyphs. Use a font whose license permits your use.
+
+```sh
+python -m scripts.evaluate_ocr --engine rapidocr --font /path/to/font.ttf
+python -m scripts.evaluate_ocr --engine rapidocr --lang ch --font /path/to/font.ttf
+```
+
+It prints JSON to stdout; redirect it to a disposable location if needed. It
+generates at least 12 deterministic synthetic images in memory. `--engine
+module:factory` can supply another trusted local implementation of `OcrEngine`.
+Application modules do not import this development script.
+
+The report includes reference/output text, raw CER (NFC/whitespace normalized),
+folded CER using the existing `normalize_text`, aligned per-character confusion
+counts (including deletions and insertions), and Turkish special-character
+accuracy. Folding changes case and I/İ/ı as implemented by `normalize_text`; it
+does not remove all diacritics. CER is not semantic accuracy.
+
+First-call and repeated-call wall/CPU times are reported separately; process CPU
+time sums worker threads and may exceed wall time. RSS is approximate and includes
+Python/libraries/model memory. OS cache is not flushed. Font hash, dependency
+versions and image dimensions accompany results; this synthetic dataset does not
+establish accuracy on real screenshots.
