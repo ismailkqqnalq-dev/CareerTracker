@@ -7,6 +7,12 @@ function errorMessage(error, context = "İstek") {
   if (error.errorCode === "skill_already_recognized") {
     return "Bu beceri zaten katalogda tanınıyor. Mevcut beceriyi kullanabilirsin.";
   }
+  if (error.errorCode === "job_text_too_large") {
+    return "İlan metni 100 KB sınırını aşıyor. Daha kısa bir metin deneyin.";
+  }
+  if (error.errorCode === "invalid_job_text") {
+    return "İlan metni okunamadı. Metni kontrol edip tekrar deneyin.";
+  }
   if (error.status === 401 && context === "Giriş") {
     return "E-posta veya şifre geçersiz.";
   }
@@ -93,6 +99,9 @@ function App() {
   const [notice, setNotice] = useState("");
   const [newSkill, setNewSkill] = useState("");
   const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
+  const [jobText, setJobText] = useState("");
+  const [jobAnalysis, setJobAnalysis] = useState(null);
+  const [analyzingJob, setAnalyzingJob] = useState(false);
 
   const logout = useCallback(() => {
     sessionStorage.removeItem("careertracker_token");
@@ -209,6 +218,27 @@ function App() {
     }
   }
 
+  async function analyzeJobText(event) {
+    event.preventDefault();
+    if (!jobText.trim()) return;
+    setAnalyzingJob(true);
+    setJobAnalysis(null);
+    setError("");
+    setNotice("");
+    try {
+      const result = await api.request("/job-analysis", {
+        method: "POST",
+        token,
+        body: JSON.stringify({ text: jobText }),
+      });
+      setJobAnalysis(result);
+    } catch (analysisError) {
+      if (analysisError.status !== 401) setError(errorMessage(analysisError, "İlan metni analizi"));
+    } finally {
+      setAnalyzingJob(false);
+    }
+  }
+
   if (!token) return <AuthScreen onAuthenticated={setToken} />;
 
   return (
@@ -227,6 +257,49 @@ function App() {
           </div>
           <div className="count-card"><span className="count-number">{pendingCount}</span><span>bekleyen öneri</span></div>
         </div>
+
+        <section className="analysis-card" aria-labelledby="job-analysis-title">
+          <div className="analysis-heading">
+            <h2 id="job-analysis-title">İlan metnini analiz et</h2>
+            <p className="muted">İlan metnini yapıştır. Bulunan beceriler, yalnızca kendi katalog ve eşleştirmelerinle karşılaştırılır.</p>
+            <p className="analysis-privacy">Metin saklanmaz. Eşleştirme kural tabanlıdır; yapay zekâ veya doğruluk olasılığı değildir.</p>
+          </div>
+          <form className="analysis-form" onSubmit={analyzeJobText}>
+            <label htmlFor="job-text">İlan metni</label>
+            <textarea
+              id="job-text"
+              maxLength={100_000}
+              rows={6}
+              value={jobText}
+              onChange={(event) => setJobText(event.target.value)}
+              placeholder="OCR sonucunu veya ilan metnini buraya yapıştır…"
+            />
+            <button className="button button-primary" disabled={analyzingJob || !jobText.trim()}>
+              {analyzingJob ? "Analiz ediliyor…" : "Metni analiz et"}
+            </button>
+          </form>
+          {jobAnalysis && (
+            <section className="analysis-results" aria-live="polite">
+              <h3>Bulunan beceriler</h3>
+              {jobAnalysis.role && <p className="analysis-role">Açıkça belirtilen rol: <strong>{jobAnalysis.role}</strong></p>}
+              {jobAnalysis.skills.length ? (
+                <ul>
+                  {jobAnalysis.skills.map((skill) => (
+                    <li key={skill.skill_id}>
+                      <strong>{skill.name}</strong>
+                      <span>{skill.category || "Kategori belirtilmemiş"}</span>
+                      {skill.occurrences.map((occurrence, index) => (
+                        <small key={`${skill.skill_id}-${occurrence.line_number}-${index}`}>
+                          {occurrence.section === "required" ? "Zorunlu bölüm" : occurrence.section === "preferred" ? "Tercih bölümü" : "Belirtilmemiş bölüm"} · satır {occurrence.line_number}
+                        </small>
+                      ))}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p>Kişisel katalogda eşleşen beceri bulunamadı.</p>}
+            </section>
+          )}
+        </section>
 
         <section className="suggestion-input-card" aria-labelledby="suggestion-input-title">
           <div>

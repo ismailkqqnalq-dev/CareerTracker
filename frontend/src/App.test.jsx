@@ -234,3 +234,67 @@ describe("skill suggestion input", () => {
   });
 
 });
+
+describe("job text analysis", () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows rule-based skill matches returned by the authenticated API", async () => {
+    const fetchMock = setupLoggedInApp();
+    fetchMock.mockImplementation(async (url) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (url.endsWith("/job-analysis")) {
+        return jsonResponse(200, {
+          role: "Backend Engineer",
+          skills: [{
+            skill_id: 7,
+            name: "Python",
+            category: "language",
+            occurrences: [{ line_number: 2, matched_text: "Python", section: "required" }],
+          }],
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    fireEvent.change(await screen.findByLabelText("İlan metni"), {
+      target: { value: "Pozisyon: Backend Engineer\nPython" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Metni analiz et" }));
+
+    expect(await screen.findByRole("heading", { name: "Bulunan beceriler" })).toBeTruthy();
+    expect(screen.getByText("Backend Engineer")).toBeTruthy();
+    expect(screen.getByText("Python")).toBeTruthy();
+    expect(screen.getByText("Zorunlu bölüm · satır 2")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith("/api/job-analysis", expect.objectContaining({
+      method: "POST",
+      headers: expect.any(Headers),
+    }));
+  });
+
+  it("explains when the job text is larger than the API limit", async () => {
+    const fetchMock = setupLoggedInApp();
+    fetchMock.mockImplementation(async (url) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (url.endsWith("/job-analysis")) return jsonResponse(413, {
+        detail: "Job text exceeds the 100 KB limit.",
+        error_code: "job_text_too_large",
+      });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    fireEvent.change(await screen.findByLabelText("İlan metni"), {
+      target: { value: "Long job description" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Metni analiz et" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("100 KB");
+  });
+});
