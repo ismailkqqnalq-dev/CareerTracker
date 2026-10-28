@@ -24,6 +24,7 @@ import unicodedata
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from app.skill_catalog import SKILL_CATALOG
 from app.services.ocr_engine import OcrError, RapidOCREngine
 from app.services.ocr_service import extract_text
 
@@ -91,6 +92,22 @@ def character_metrics(reference, output):
     }
 
 
+def term_recall(output, terms):
+    """Count canonical catalog names present after the application's normalization."""
+    from app.services.skill_normalizer import normalize_text
+
+    normalized_output = normalize_text(output)
+    matched = [term for term in terms if normalize_text(term) in normalized_output]
+    expected = len(terms)
+    return {
+        "expected": expected,
+        "found": len(matched),
+        "recall": len(matched) / expected if expected else None,
+        "matched": matched,
+        "missing": [term for term in terms if term not in matched],
+    }
+
+
 def synthetic_cases(font_path=None):
     """Default Pillow font is for unit tests; the evaluation CLI requires a real font."""
     specifications = [
@@ -132,6 +149,18 @@ def synthetic_cases(font_path=None):
         image.close()
         cases.append({"id": name, "reference": text, "image": stream.getvalue(),
                       "width": width, "height": height, "font_px": size})
+
+    catalog_terms = tuple(entry["name"] for entry in SKILL_CATALOG)
+    text = "Aranan beceriler: " + ", ".join(catalog_terms) + "."
+    font = ImageFont.truetype(str(font_path), 28) if font_path else ImageFont.load_default(size=28)
+    width = max(700, int(font.getlength(text)) + 80)
+    image = Image.new("RGB", (width, 120), "white")
+    ImageDraw.Draw(image).text((28, 28), text, font=font, fill=(20, 20,  20))
+    stream = BytesIO()
+    image.save(stream, format="PNG")
+    image.close()
+    cases.append({"id": "tr-catalog-terms", "reference": text, "image": stream.getvalue(),
+                  "width": width, "height": 120, "font_px": 28, "skill_terms": catalog_terms})
     return cases
 
 
@@ -182,6 +211,7 @@ def evaluate_cases(engine, cases, repeats=1):
         rows.append({key: value for key, value in case.items() if key != "image"} | {
             "output": first_text, "error_code": first_error,
             "metrics": character_metrics(case["reference"], first_text),
+            "term_metrics": term_recall(first_text, case["skill_terms"]) if case.get("skill_terms") else None,
             "first_pass": measurements[0], "warm_runs": measurements[1:],
         })
     valid_memory = [sample for sample in samples if sample is not None]
@@ -195,6 +225,16 @@ def evaluate_cases(engine, cases, repeats=1):
     folded_total = sum(row["metrics"]["folded_reference_chars"] for row in rows)
     special_total = sum(row["metrics"]["turkish_total"] for row in rows)
     warm = [run for row in rows for run in row["warm_runs"]]
+    term_rows = [row["term_metrics"] for row in rows if row["term_metrics"] is not None]
+    expected_terms = sum(row["expected"] for row in term_rows)
+    found_terms = sum(row["found"] for row in term_rows)
+    top_confusions = [
+        {"expected": expected, "observed": observed, "count": count}
+        for expected, counts in aggregate.items()
+        for observed, count in counts.items()
+        if expected != observed
+    ]
+    top_confusions.sort(key=lambda item: (-item["count"], item["expected"], item["observed"]))
     return {
         "images": rows,
         "summary": {
@@ -202,7 +242,13 @@ def evaluate_cases(engine, cases, repeats=1):
             "folded_cer": sum(row["metrics"]["folded_edit_distance"] for row in rows) / max(1, folded_total),
             "turkish_accuracy": sum(row["metrics"]["turkish_correct"] for row in rows) / special_total if special_total else None,
             "confusions": {char: dict(counts) for char, counts in aggregate.items()},
+            "top_confusions": top_confusions[:10],
             "insertions": dict(insertions),
+            "term_recall": {
+                "expected": expected_terms,
+                "found": found_terms,
+                "recall": found_terms / expected_terms if expected_terms else None,
+            },
             "cold_first_call": rows[0]["first_pass"],
             "warm_wall_mean_s": statistics.mean(run["wall_s"] for run in warm),
             "warm_cpu_mean_s": statistics.mean(run["cpu_s"] for run in warm),
