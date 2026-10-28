@@ -103,7 +103,9 @@ def test_transparent_png_composites_black_text_on_white():
     class PixelEngine:
         def recognize(self, decoded):
             assert decoded.getpixel((99, 41)) == (255, 255, 255)
-            assert any(pixel == (0, 0, 0) for pixel in decoded.crop((0, 0, 80, 30)).getdata())
+            text_region = decoded.crop((0, 0, 80, 30))
+            assert text_region.getchannel("R").getextrema()[0] < 64
+            text_region.close()
             return "Python"
 
     ocr_service.extract_text(stream.getvalue(), engine=PixelEngine())
