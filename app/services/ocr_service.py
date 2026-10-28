@@ -44,7 +44,21 @@ def _decode_image(data: bytes) -> tuple[Image.Image, str]:
             # verify() invalidates the decoder. Reopen only after header limits pass.
             with Image.open(BytesIO(data)) as source:
                 source.load()
-                image = ImageOps.exif_transpose(source).convert("RGB")
+                oriented = ImageOps.exif_transpose(source)
+                try:
+                    has_transparency = "A" in oriented.getbands() or "transparency" in oriented.info
+                    if has_transparency:
+                        rgba = oriented.convert("RGBA")
+                        try:
+                            image = Image.new("RGB", rgba.size, "white")
+                            image.paste(rgba, mask=rgba.getchannel("A"))
+                        finally:
+                            rgba.close()
+                    else:
+                        image = oriented.convert("RGB")
+                finally:
+                    if oriented is not source:
+                        oriented.close()
     except (Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
         raise OcrError("image_pixel_limit_exceeded", "Image exceeds the safe pixel limit.") from exc
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as exc:
