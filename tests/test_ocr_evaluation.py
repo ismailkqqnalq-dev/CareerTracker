@@ -43,6 +43,8 @@ def test_dataset_is_deterministic_and_in_memory():
     assert all(isinstance(case["image"], bytes) for case in first)
     catalog_case = next(case for case in first if case["id"] == "tr-catalog-terms")
     assert catalog_case["skill_terms"] == tuple(item["name"] for item in SKILL_CATALOG)
+    assert catalog_case["reference"].count("\n") == 3
+    assert catalog_case["width"] < 1200
 
 
 def test_evaluation_with_fake_motor_reports_errors_timings_and_confusions():
