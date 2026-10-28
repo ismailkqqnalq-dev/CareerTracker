@@ -9,10 +9,17 @@ from PIL import Image
 class OcrError(Exception):
     """Transport-neutral error compatible with the API's existing error envelope."""
 
-    def __init__(self, error_code: str, detail: str):
+    def __init__(
+        self,
+        error_code: str,
+        detail: str,
+        *,
+        metadata: dict[str, object] | None = None,
+    ):
         super().__init__(detail)
         self.error_code = error_code
         self.detail = detail
+        self.metadata = metadata or {}
 
     def to_payload(self) -> dict[str, str]:
         return {"detail": self.detail, "error_code": self.error_code}

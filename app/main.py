@@ -18,6 +18,10 @@ from app.routes.auth_routes import router as auth_router
 
 app.include_router(auth_router)
 
+from app.routes.ocr_routes import router as ocr_router
+
+app.include_router(ocr_router)
+
 
 @app.get("/")
 def read_root() -> dict[str, str]:

@@ -55,6 +55,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Profil skill'i | `PATCH, DELETE /users/me/skills/{user_skill_id}` | Evet | Profil kaydını günceller veya siler |
 | Fırsat skill'leri | `POST, GET /opportunities/{opportunity_id}/skills` | Evet | Fırsata skill bağlar veya bağlı skill'leri listeler |
 | Fırsat skill eşleşmesi | `GET /opportunities/{opportunity_id}/skill-match` | Evet | Profilde bulunan ve eksik skill'leri karşılaştırır |
+| OCR | `POST /ocr/extract` | Evet | PNG/JPEG ham ikili gövdesini bellekte işler, metin ve görsel ölçülerini döndürür; sonuç saklanmaz |
 | Fırsatlar | `GET, POST /opportunities`; `GET, PATCH, DELETE /opportunities/{id}` | Evet | Kullanıcının fırsatlarını yönetir |
 | Kişiler | `GET, POST /contacts`; `GET, PATCH, DELETE /contacts/{id}` | Evet | Kullanıcının kişilerini yönetir |
 | Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
@@ -72,6 +73,43 @@ JSON hata gövdesindeki sabit kodlar:
 | `skill_already_recognized` | `POST /skills/suggestions` | Skill zaten tanınıyor; öneri yerine katalogdaki skill kullanılmalı (409) |
 | `opportunity_not_found` | `POST, GET /opportunities/{opportunity_id}/skills`; `GET /opportunities/{opportunity_id}/skill-match` | Fırsat bulunamadı veya kullanıcıya ait değil (404) |
 | `unknown_skill` | `POST /opportunities/{opportunity_id}/skills` | Skill tanınmadı (404); öneri kaydedildiyse gövdede `suggestion_id` de bulunur |
+
+### OCR API hata kodları
+
+`POST /ocr/extract` hataları aynı `{detail, error_code}` zarfını kullanır. İstek gövdesi
+`image/png` veya `image/jpeg` ham baytlarıdır; multipart kullanılmaz. `Content-Length`
+yalnızca erken ret için okunur, boyut sınırı akış sırasında da uygulanır. Endpoint
+görseli uygulama dosya sistemine veya veritabanına yazmaz; proxy ya da ASGI sunucusunun
+gövdeyi uygulamaya iletmeden önce tamponlayıp tamponlamadığı dağıtım ayarlarına bağlıdır.
+
+| `error_code` | HTTP | Anlamı |
+|---|---:|---|
+| `invalid_content_length` | 400 | Geçersiz uzunluk başlığı |
+| `request_body_timeout` | 408 | Görsel gövdesi 20 saniyelik okuma süresinde tamamlanmadı |
+| `image_too_large` | 413 | Gövde 10 MiB sınırını aşıyor |
+| `image_pixel_limit_exceeded` | 413 | Görsel piksel sınırını aşıyor |
+| `unsupported_image_type` | 415 | İçerik PNG/JPEG değil |
+| `animated_image_unsupported` | 415 | Animasyonlu görsel desteklenmiyor |
+| `invalid_image_input`, `empty_image`, `invalid_image` | 422 | Gövde boş, bozuk veya çözümlenemiyor |
+| `empty_ocr_result` | 200 | Görsel geçerli, okunabilir metin yok; `text` boş, ölçüler yine döner |
+| `invalid_ocr_result`, `ocr_engine_failed` | 502 | Motor geçersiz sonuç verdi veya çıkarım başarısız oldu |
+| `ocr_engine_unavailable`, `ocr_engine_initialization_failed`, `ocr_busy` | 503 | OCR bağımlılığı/motor yok, başlatılamadı, dört yükleme yuvası dolu veya OCR yuvası dolu |
+| `ocr_timeout` | 504 | OCR çıkarımı bekleme sınırını aştı; çalışan CPU çıkarımı durdurulamaz ve bitene kadar yuva tutulur |
+
+Süreç başına en fazla 4 gövde okuması eşzamanlı yürür; her biri 10 MiB ile
+sınırlandırıldığı için birikmiş istek gövdeleri için nominal üst sınır 40 MiB'dir.
+ASGI sunucusunun teslim ettiği tek bir büyük parça ve bayta dönüştürme sırasındaki
+geçici kopya ek bellek kullanabilir. Gövde okuması 20 saniyeyi aşarsa 408 döner ve
+okuma yuvası bırakılır. Yükleme tamamlanınca bu yuva OCR için serbest kalır.
+
+OCR eşzamanlılık sınırı süreç başına 1'dir. Gövde yuvaları veya OCR yuvası doluysa
+istek bekletilmeden `ocr_busy` / 503 döner. Birden fazla Uvicorn worker varsa her
+işçi kendi limitlerine sahiptir; host genelindeki limit worker sayısıyla çarpılır.
+OCR çıkarım beklemesi 30 saniyedir; zaman aşımı çalışan OCR işini durdurmaz ve yuva
+iş bitene kadar tutulur. OCR gövdesi ve çıkarılan metin uygulama loglarına yazılmaz. Swagger `/docs` sayfasında
+`POST /ocr/extract` için şemada PNG/JPEG ikili gövde tanımlıdır. Swagger UI'da
+**Try it out** ile dosya seçip **Execute**'a basarak tokenli isteği deneyebilirsin;
+canlı tarayıcıda bu kontrol bu değişiklikte tamamlanmadı.
 
 ## Yerel kurulum
 
@@ -240,7 +278,7 @@ tests/             # pytest testleri
 - **Tamamlandı — Faz 1:** Fırsat, kişi, aktivite ve görev backend CRUD'ları.
 - **Tamamlandı — Faz 2:** Dashboard, CSV dışa aktarma, PostgreSQL/Docker, Alembic ve CI.
 - **Tamamlandı — Faz 2.5:** Skill modelleri ve API'si, seed katalogu, kişisel skill/alias ve öneri eşleştirme temeli.
-- **Başlamadı — Faz 3:** OCR ile ilan görüntülerinden metin çıkarma.
+- **Kısmi — Faz 3:** Görsel doğrulama/OCR servis baseline'ı ve kimlik doğrulamalı ham metin çıkarma API'si var; kullanıcı arayüzü ve kalıcı ilan akışı bu kapsamda değil.
 - **Planlandı — Faz 4:** İlan metninden yapılandırılmış bilgi çıkarımı ve ölçüm.
 - **Kısmi — Faz 5:** Normalizasyon, seed alias'ları, kişisel alias'lar ve metin benzerliğine dayalı aday sıralaması var; kapsamlı beceri normalizasyonu tamamlanmadı.
 - **Kısmi — Faz 6:** Kullanıcı skill profili ve fırsat skill-match/gap endpoint'i var; tam eşleştirme ürünü ve arayüzü tamamlanmadı.
@@ -251,7 +289,8 @@ Fazlar doğrusal ilerlemez. Faz 5, 6 ve 11'in bazı altyapı parçaları OCR/NLP
 
 ## Durum
 
-Faz 1, 2 ve 2.5 tamamlandı. Faz 3 OCR henüz başlamadı. Faz 5, 6 ve 11'den bazı
+Faz 1, 2 ve 2.5 tamamlandı. Faz 3 OCR baseline aşamasında; görsel yükleme için
+kimlik doğrulamalı ve sonuç saklamayan API eklendi. Faz 5, 6 ve 11'den bazı
 parçalar erken teslim edildi ancak bu fazların bütünü tamamlanmış değildir. Bugünkü
 arayüz beceri önerilerinin gözden geçirilmesi ve eşleştirilmesiyle sınırlıdır.
 

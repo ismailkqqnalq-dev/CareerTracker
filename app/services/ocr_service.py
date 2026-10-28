@@ -79,7 +79,15 @@ def extract_text(data: bytes, *, engine: OcrEngine | None = None) -> OcrResult:
         if not isinstance(text, str):
             raise OcrError("invalid_ocr_result", "The OCR motor returned a non-text result.")
         if not text.strip():
-            raise OcrError("empty_ocr_result", "No readable text was found in the image.")
+            raise OcrError(
+                "empty_ocr_result",
+                "No readable text was found in the image.",
+                metadata={
+                    "width": image.width,
+                    "height": image.height,
+                    "image_format": fmt,
+                },
+            )
         return OcrResult(text=text, width=image.width, height=image.height, image_format=fmt)
     finally:
         image.close()
