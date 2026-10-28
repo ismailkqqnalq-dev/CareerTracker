@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from app.services import ocr_engine, ocr_service
 from app.services.ocr_engine import OcrError, RapidOCREngine
-from PIL import Image, PngImagePlugin
+from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 
 
 def image_bytes(fmt="PNG", size=(16, 16)):
@@ -79,6 +79,34 @@ def test_unsupported_format_uses_content():
     with pytest.raises(OcrError) as error:
         ocr_service.extract_text(image_bytes("BMP"), engine=FakeEngine())
     assert error.value.error_code == "unsupported_image_type"
+
+
+def test_mpo_jpeg_is_rejected_as_unsupported_content():
+    stream = BytesIO()
+    Image.new("RGB", (8, 8), "white").save(
+        stream,
+        format="MPO",
+        save_all=True,
+        append_images=[Image.new("RGB", (8, 8), "black")],
+    )
+    with pytest.raises(OcrError) as error:
+        ocr_service.extract_text(stream.getvalue(), engine=FakeEngine())
+    assert error.value.error_code == "unsupported_image_type"
+
+
+def test_transparent_png_composites_black_text_on_white():
+    image = Image.new("RGBA", (100, 42), (0, 0, 0, 0))
+    ImageDraw.Draw(image).text((5, 5), "Python", fill=(0, 0, 0, 255), font=ImageFont.load_default())
+    stream = BytesIO()
+    image.save(stream, format="PNG")
+
+    class PixelEngine:
+        def recognize(self, decoded):
+            assert decoded.getpixel((99, 41)) == (255, 255, 255)
+            assert any(pixel == (0, 0, 0) for pixel in decoded.crop((0, 0, 80, 30)).getdata())
+            return "Python"
+
+    ocr_service.extract_text(stream.getvalue(), engine=PixelEngine())
 
 
 def test_truncated_image_never_reaches_engine():
