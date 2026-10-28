@@ -82,6 +82,12 @@ counts (including deletions and insertions), and Turkish special-character
 accuracy. Folding changes case and I/İ/ı as implemented by `normalize_text`; it
 does not remove all diacritics. CER is not semantic accuracy.
 
+The synthetic catalog-terms image contains the canonical names from
+`app/skill_catalog.py`, wrapped across several short lines. The report measures
+term recall after `normalize_text` and lists the ten most frequent nonmatching
+character pairs. This measures exact catalog-name recovery on this synthetic
+line layout; it does not measure skill extraction from arbitrary descriptions.
+
 First-call and repeated-call wall/CPU times are reported separately; process CPU
 time sums worker threads and may exceed wall time. RSS is approximate and includes
 Python/libraries/model memory. OS cache is not flushed. Font hash, dependency

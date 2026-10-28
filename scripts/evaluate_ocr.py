@@ -151,16 +151,20 @@ def synthetic_cases(font_path=None):
                       "width": width, "height": height, "font_px": size})
 
     catalog_terms = tuple(entry["name"] for entry in SKILL_CATALOG)
-    text = "Aranan beceriler: " + ", ".join(catalog_terms) + "."
+    term_lines = [", ".join(catalog_terms[index:index + 3])
+                  for index in range(0, len(catalog_terms), 3)]
+    lines = ["Aranan beceriler:", *term_lines]
+    text = "\n".join(lines)
     font = ImageFont.truetype(str(font_path), 28) if font_path else ImageFont.load_default(size=28)
-    width = max(700, int(font.getlength(text)) + 80)
-    image = Image.new("RGB", (width, 120), "white")
-    ImageDraw.Draw(image).text((28, 28), text, font=font, fill=(20, 20,  20))
+    width = max(700, int(max(font.getlength(line) for line in lines)) + 80)
+    height = max(120, 60 + len(lines) * 48)
+    image = Image.new("RGB", (width, height), "white")
+    ImageDraw.Draw(image).multiline_text((28, 28), text, font=font, spacing=20, fill=(20, 20, 20))
     stream = BytesIO()
     image.save(stream, format="PNG")
     image.close()
     cases.append({"id": "tr-catalog-terms", "reference": text, "image": stream.getvalue(),
-                  "width": width, "height": 120, "font_px": 28, "skill_terms": catalog_terms})
+                  "width": width, "height": height, "font_px": 28, "skill_terms": catalog_terms})
     return cases
 
 
