@@ -24,6 +24,10 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      - name: Verify optional OCR dependency boundary
+        run: |
+          python -c "import importlib.util as u; assert u.find_spec('PIL'); assert u.find_spec('rapidocr') is None; assert u.find_spec('onnxruntime') is None"
+
       - name: Create database tables through migrations
         run: python -m alembic upgrade head
 
@@ -32,6 +36,23 @@ jobs:
 
       - name: Run tests
         run: python -m pytest
+
+  ocr-smoke:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "sqlite:///:memory:"
+      PYTHON_DOTENV_DISABLED: "1"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install optional OCR dependencies
+        run: pip install -e ".[dev,ocr]"
+      - name: Run full test suite with OCR dependencies
+        run: python -m pytest -q
 
   postgres-migrations:
     runs-on: ubuntu-latest
