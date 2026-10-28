@@ -39,6 +39,8 @@ class RapidOCREngine:
     """
 
     def __init__(self, lang: str = "tr"):
+        # PP-OCRv6 maps "tr" and "ch" to the same multilingual model; this
+        # option currently does not select Turkish-specific model weights.
         self.lang = lang
         self._runtime = None
         self._initialization_lock = Lock()
