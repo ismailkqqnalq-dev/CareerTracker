@@ -90,3 +90,47 @@ def test_delete_opportunity(authenticated_client):
     opportunity_id = create_response.json()["id"]
     delete_response = client.delete(f"/opportunities/{opportunity_id}") 
     assert delete_response.status_code==200
+
+
+def test_delete_opportunity_cascades_linked_crm_records(authenticated_client):
+    client = authenticated_client
+    opportunity = client.post("/opportunities", json={
+        "company": "Cascade test company",
+        "position": "Engineer",
+        "type": "full-time",
+        "application_date": "2026-10-28",
+        "job_link": "https://example.com/cascade",
+        "salary": 1000,
+        "location": "Remote",
+        "status": "Başvuruldu",
+        "notes": "test",
+        "next_action": "follow up",
+        "last_contact_date": "2026-10-28",
+    }).json()
+    contact = client.post("/contacts", json={
+        "name": "Cascade test contact",
+        "role": "Recruiter",
+        "email": "cascade@example.com",
+        "linkedin": "https://example.com/person",
+        "opportunity_id": opportunity["id"],
+    }).json()
+    activity = client.post("/activities", json={
+        "opportunity_id": opportunity["id"],
+        "contact_id": contact["id"],
+        "activity_type": "email",
+        "dates": "2026-10-28",
+        "notes": "test activity",
+    }).json()
+    task = client.post("/tasks", json={
+        "opportunity_id": opportunity["id"],
+        "description": "test task",
+        "due_date": "2026-10-29",
+        "is_completed": False,
+    }).json()
+
+    response = client.delete(f"/opportunities/{opportunity['id']}")
+
+    assert response.status_code == 200
+    assert client.get(f"/contacts/{contact['id']}").status_code == 404
+    assert client.get(f"/activities/{activity['id']}").status_code == 404
+    assert client.get(f"/tasks/{task['id']}").status_code == 404

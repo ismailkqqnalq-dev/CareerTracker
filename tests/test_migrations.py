@@ -28,7 +28,7 @@ ALL_TABLES = PRE_USER_TABLES | {"users", "user_skills", "skill_suggestions", "pe
 
 INITIAL = "d0fe616da34f"
 PRE_USER_HEAD = "b3b24fd6d532"
-HEAD = "a91e73c208bf"
+HEAD = "e3f2a187b96c"
 
 def _alembic(url, *args):
     env = os.environ.copy()

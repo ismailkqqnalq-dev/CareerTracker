@@ -122,4 +122,42 @@ def test_delete_contact(authenticated_client):
     contact_id = create_response.json()["id"]
     delete_response = client.delete(f"/contacts/{contact_id}")
     assert delete_response.status_code == 200
-    
+
+
+def test_delete_contact_preserves_activity_and_clears_contact_link(authenticated_client):
+    client = authenticated_client
+    opportunity_id = client.post("/opportunities", json={
+        "company": "Contact delete test",
+        "position": "Engineer",
+        "type": "full-time",
+        "application_date": "2026-10-28",
+        "job_link": "https://example.com/contact-delete",
+        "salary": 1000,
+        "location": "Remote",
+        "status": "Başvuruldu",
+        "notes": "test",
+        "next_action": "follow up",
+        "last_contact_date": "2026-10-28",
+    }).json()["id"]
+    contact_id = client.post("/contacts", json={
+        "name": "Contact to delete",
+        "role": "Recruiter",
+        "email": "contact-delete@example.com",
+        "linkedin": "https://example.com/person",
+        "opportunity_id": opportunity_id,
+    }).json()["id"]
+    activity_id = client.post("/activities", json={
+        "opportunity_id": opportunity_id,
+        "contact_id": contact_id,
+        "activity_type": "email",
+        "dates": "2026-10-28",
+        "notes": "Keep this activity after deleting its contact",
+    }).json()["id"]
+
+    response = client.delete(f"/contacts/{contact_id}")
+
+    assert response.status_code == 200
+    assert client.get(f"/contacts/{contact_id}").status_code == 404
+    activity = client.get(f"/activities/{activity_id}")
+    assert activity.status_code == 200
+    assert activity.json()["contact_id"] is None
