@@ -27,9 +27,9 @@ class OcrEngine(Protocol):
 def _load_rapidocr():
     # The core application and fake-engine tests must work without either package.
     import onnxruntime  # noqa: F401
-    from rapidocr import RapidOCR
+    from rapidocr import ModelType, OCRVersion, RapidOCR
 
-    return RapidOCR
+    return RapidOCR, ModelType, OCRVersion
 
 
 class RapidOCREngine:
@@ -47,13 +47,15 @@ class RapidOCREngine:
         with self._initialization_lock:
             if self._runtime is None:
                 try:
-                    factory = _load_rapidocr()
+                    factory, model_type, ocr_version = _load_rapidocr()
                 except (ImportError, OSError) as exc:
                     raise OcrError("ocr_engine_unavailable", "Install the optional ocr extra to use the OCR motor.") from exc
                 try:
                     self._runtime = factory(params={
-                        "Det.ocr_version": "PP-OCRv6", "Det.model_type": "small",
-                        "Rec.ocr_version": "PP-OCRv6", "Rec.model_type": "small",
+                        "Det.ocr_version": ocr_version.PPOCRV6,
+                        "Det.model_type": model_type.SMALL,
+                        "Rec.ocr_version": ocr_version.PPOCRV6,
+                        "Rec.model_type": model_type.SMALL,
                         "Rec.lang_type": self.lang,
                     })
                 except Exception as exc:

@@ -110,12 +110,21 @@ def test_engine_initializes_lazily_and_once(monkeypatch):
     def factory(**kwargs):
         created.append(kwargs)
         return lambda image: SimpleNamespace(txts=["Python", "İş ilanı"])
-    monkeypatch.setattr(ocr_engine, "_load_rapidocr", lambda: factory)
+    model_type = SimpleNamespace(SMALL="small-enum")
+    ocr_version = SimpleNamespace(PPOCRV6="ppocrv6-enum")
+    monkeypatch.setattr(ocr_engine, "_load_rapidocr", lambda: (factory, model_type, ocr_version))
     engine = RapidOCREngine()
     assert created == []
     for _ in range(2):
         assert ocr_service.extract_text(image_bytes(), engine=engine).text == "Python\nİş ilanı"
     assert len(created) == 1
+    assert created[0]["params"] == {
+        "Det.ocr_version": "ppocrv6-enum",
+        "Det.model_type": "small-enum",
+        "Rec.ocr_version": "ppocrv6-enum",
+        "Rec.model_type": "small-enum",
+        "Rec.lang_type": "tr",
+    }
     assert ocr_engine.get_default_engine() is ocr_engine.get_default_engine()
 
 
@@ -147,7 +156,11 @@ def test_invalid_motor_result_is_distinct_from_empty():
 def test_initialization_failure_has_own_code(monkeypatch):
     def broken_factory(**kwargs):
         raise RuntimeError("internal model path")
-    monkeypatch.setattr(ocr_engine, "_load_rapidocr", lambda: broken_factory)
+    monkeypatch.setattr(
+        ocr_engine,
+        "_load_rapidocr",
+        lambda: (broken_factory, SimpleNamespace(SMALL="small"), SimpleNamespace(PPOCRV6="v6")),
+    )
     with pytest.raises(OcrError) as error:
         ocr_service.extract_text(image_bytes(), engine=RapidOCREngine())
     assert error.value.error_code == "ocr_engine_initialization_failed"
