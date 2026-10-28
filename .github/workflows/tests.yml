@@ -51,8 +51,8 @@ jobs:
           python-version: "3.11"
       - name: Install optional OCR dependencies
         run: pip install -e ".[dev,ocr]"
-      - name: Run real OCR smoke test
-        run: python -m pytest tests/test_ocr_real_engine.py -q -rs
+      - name: Run full test suite with OCR dependencies
+        run: python -m pytest -q
 
   postgres-migrations:
     runs-on: ubuntu-latest
