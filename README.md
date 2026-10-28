@@ -85,6 +85,7 @@ gövdeyi uygulamaya iletmeden önce tamponlayıp tamponlamadığı dağıtım ay
 | `error_code` | HTTP | Anlamı |
 |---|---:|---|
 | `invalid_content_length` | 400 | Geçersiz uzunluk başlığı |
+| `request_body_timeout` | 408 | Görsel gövdesi 20 saniyelik okuma süresinde tamamlanmadı |
 | `image_too_large` | 413 | Gövde 10 MiB sınırını aşıyor |
 | `image_pixel_limit_exceeded` | 413 | Görsel piksel sınırını aşıyor |
 | `unsupported_image_type` | 415 | İçerik PNG/JPEG değil |
@@ -92,12 +93,20 @@ gövdeyi uygulamaya iletmeden önce tamponlayıp tamponlamadığı dağıtım ay
 | `invalid_image_input`, `empty_image`, `invalid_image` | 422 | Gövde boş, bozuk veya çözümlenemiyor |
 | `empty_ocr_result` | 200 | Görsel geçerli, okunabilir metin yok; `text` boş, ölçüler yine döner |
 | `invalid_ocr_result`, `ocr_engine_failed` | 502 | Motor geçersiz sonuç verdi veya çıkarım başarısız oldu |
-| `ocr_engine_unavailable`, `ocr_engine_initialization_failed`, `ocr_busy` | 503 | OCR bağımlılığı/motor yok, başlatılamadı veya süreçteki tek OCR yuvası dolu |
+| `ocr_engine_unavailable`, `ocr_engine_initialization_failed`, `ocr_busy` | 503 | OCR bağımlılığı/motor yok, başlatılamadı, dört yükleme yuvası dolu veya OCR yuvası dolu |
 | `ocr_timeout` | 504 | OCR çıkarımı bekleme sınırını aştı; çalışan CPU çıkarımı durdurulamaz ve bitene kadar yuva tutulur |
 
-OCR eşzamanlılık sınırı süreç başına 1'dir. Birden fazla Uvicorn worker varsa her biri
-kendi yuvasına sahiptir; toplam eşzamanlılık worker sayısına kadar çıkabilir. OCR
-gövdesi ve çıkarılan metin uygulama loglarına yazılmaz. Swagger `/docs` sayfasında
+Süreç başına en fazla 4 gövde okuması eşzamanlı yürür; her biri 10 MiB ile
+sınırlandırıldığı için birikmiş istek gövdeleri için nominal üst sınır 40 MiB'dir.
+ASGI sunucusunun teslim ettiği tek bir büyük parça ve bayta dönüştürme sırasındaki
+geçici kopya ek bellek kullanabilir. Gövde okuması 20 saniyeyi aşarsa 408 döner ve
+okuma yuvası bırakılır. Yükleme tamamlanınca bu yuva OCR için serbest kalır.
+
+OCR eşzamanlılık sınırı süreç başına 1'dir. Gövde yuvaları veya OCR yuvası doluysa
+istek bekletilmeden `ocr_busy` / 503 döner. Birden fazla Uvicorn worker varsa her
+işçi kendi limitlerine sahiptir; host genelindeki limit worker sayısıyla çarpılır.
+OCR çıkarım beklemesi 30 saniyedir; zaman aşımı çalışan OCR işini durdurmaz ve yuva
+iş bitene kadar tutulur. OCR gövdesi ve çıkarılan metin uygulama loglarına yazılmaz. Swagger `/docs` sayfasında
 `POST /ocr/extract` için şemada PNG/JPEG ikili gövde tanımlıdır. Swagger UI'da
 **Try it out** ile dosya seçip **Execute**'a basarak tokenli isteği deneyebilirsin;
 canlı tarayıcıda bu kontrol bu değişiklikte tamamlanmadı.

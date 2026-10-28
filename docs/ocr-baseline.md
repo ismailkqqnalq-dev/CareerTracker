@@ -75,6 +75,9 @@ header is absent or lies. Content-Type does not decide whether bytes are trusted
 Pillow validates the actual image content. The route's accumulation buffer is capped
 at the configured body limit plus one byte, aside from any larger single chunk already
 delivered by the ASGI server. Conversion to immutable bytes briefly copies that buffer.
+Four body reads may be active per process, so accumulated request buffers have a
+nominal 40 MiB aggregate cap (4 × 10 MiB); ASGI-delivered chunks and the brief bytes
+conversion can add transient memory overhead.
 
 All service `OcrError` mappings are:
 
@@ -93,10 +96,13 @@ All service `OcrError` mappings are:
 | `ocr_engine_initialization_failed` | 503 | Motor could not initialize |
 | `ocr_engine_failed` | 502 | Inference failed |
 
-The API also returns `invalid_content_length` (400), `ocr_busy` (503), and
-`ocr_timeout` (504). One inference slot is allowed per process. A busy process
-returns immediately; it does not queue another image. The OCR inference wait limit is 30
-seconds (request-body upload time is not included). ONNX inference cannot be cancelled once running, so after a 504 or client
+The API also returns `invalid_content_length` (400), `request_body_timeout` (408),
+`ocr_busy` (503), and `ocr_timeout` (504). Request bodies have a 20-second total
+read deadline. Up to four body reads may happen concurrently per process; when all
+four slots are occupied, the next request gets `ocr_busy` immediately. The upload
+slot is released before trying to acquire the single OCR inference slot, which is
+also non-queuing. The OCR inference wait limit is 30 seconds (body-read time is not
+included). ONNX inference cannot be cancelled once running, so after a 504 or client
 cancellation the worker keeps the slot until its own `finally` releases it. With
 multiple Uvicorn workers the limit is per worker, not global.
 

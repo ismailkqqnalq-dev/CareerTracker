@@ -20,7 +20,12 @@ router = APIRouter(tags=["ocr"])
 OCR_CONCURRENCY_LIMIT = 1
 OCR_PER_PROCESS_LIMIT = OCR_CONCURRENCY_LIMIT
 OCR_REQUEST_TIMEOUT_SECONDS = 30
+# Four 10 MiB request buffers (40 MiB aggregate) maximum; ASGI chunks and the
+# short-lived bytearray-to-bytes conversion can temporarily add memory overhead.
+MAX_CONCURRENT_BODY_READS = 4
+BODY_READ_TIMEOUT_SECONDS = 20
 _OCR_SLOT = BoundedSemaphore(OCR_CONCURRENCY_LIMIT)
+_UPLOAD_SLOT = BoundedSemaphore(MAX_CONCURRENT_BODY_READS)
 _OCR_EXECUTOR = ThreadPoolExecutor(max_workers=OCR_CONCURRENCY_LIMIT, thread_name_prefix="ocr")
 
 _ERROR_STATUS = {
@@ -73,6 +78,14 @@ async def _read_image_body(request: Request) -> bytes:
     return bytes(body)
 
 
+def _busy_response() -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "OCR is busy; try again shortly.", "error_code": "ocr_busy"},
+        headers={"Cache-Control": "no-store", "Retry-After": "1"},
+    )
+
+
 def _run_reserved_ocr(data: bytes, engine: OcrEngine) -> OcrResult:
     # The worker owns the slot from submission until actual OCR completion.
     # Request cancellation cannot stop an already-running ONNX inference.
@@ -116,12 +129,13 @@ def _error_response(error: OcrError) -> JSONResponse:
     responses={
         400: {"description": "Invalid request headers", "content": {"application/json": {"example": {"detail": "Invalid request", "error_code": "invalid_content_length"}}}},
         401: {"description": "Authentication required"},
+        408: {"description": "Image body could not be read within the upload time limit", "content": {"application/json": {"example": {"detail": "Image body timed out.", "error_code": "request_body_timeout"}}}},
         413: {"description": "Encoded image or pixel limit exceeded"},
         415: {"description": "Unsupported or animated image type"},
         422: {"description": "Empty, corrupt, or invalid image"},
         502: {"description": "OCR engine or result failure"},
         503: {"description": "OCR engine unavailable or process slot busy"},
-        504: {"description": "OCR exceeded the request wait limit; inference may still be running"},
+        504: {"description": "OCR exceeded its wait limit; inference may still be running"},
     },
     openapi_extra={
         "requestBody": {
@@ -145,16 +159,32 @@ async def extract_ocr(
     except OcrError as error:
         return _error_response(error)
 
+    if not _UPLOAD_SLOT.acquire(blocking=False):
+        return _busy_response()
+    try:
+        try:
+            async with asyncio.timeout(BODY_READ_TIMEOUT_SECONDS):
+                data = await _read_image_body(request)
+        except OcrError as error:
+            return _error_response(error)
+        except TimeoutError:
+            return JSONResponse(
+                status_code=408,
+                content={
+                    "detail": "Image body was not received within the upload time limit.",
+                    "error_code": "request_body_timeout",
+                },
+                headers={"Cache-Control": "no-store"},
+            )
+    finally:
+        _UPLOAD_SLOT.release()
+
+    # Upload slots are released before competing for the single OCR worker.
     if not _OCR_SLOT.acquire(blocking=False):
-        return JSONResponse(
-            status_code=503,
-            content={"detail": "OCR is busy; try again shortly.", "error_code": "ocr_busy"},
-            headers={"Cache-Control": "no-store", "Retry-After": "1"},
-        )
+        return _busy_response()
 
     owns_slot = True
     try:
-        data = await _read_image_body(request)
         worker = _submit_reserved_ocr(data, engine)
         owns_slot = False  # Worker finally now owns and releases the slot.
         result = await _await_ocr_worker(worker)
