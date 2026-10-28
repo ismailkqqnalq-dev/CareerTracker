@@ -1,7 +1,7 @@
-# OCR service baseline
+# OCR baseline and API
 
 This slice provides an in-memory image validation service, an optional OCR adapter,
-and an offline synthetic evaluation CLI. It does not add routes, UI, tables or migrations.
+and an authenticated, non-persisting raw-body API. It adds no UI, tables or migrations.
 
 ## Installation
 
@@ -49,16 +49,62 @@ animated PNG is rejected. Limits are named constants: `MAX_IMAGE_BYTES` (10 MiB)
 and `MAX_IMAGE_PIXELS` (20 million). Images are never written to disk by the service.
 
 `OcrError` exposes `error_code`, `detail`, and `to_payload()` for the existing
-`{"detail": ..., "error_code": ...}` envelope. There is no HTTP mapping in this slice.
+`{"detail": ..., "error_code": ...}` envelope.
 Codes: `invalid_image_input`, `empty_image`, `image_too_large`,
 `image_pixel_limit_exceeded`, `unsupported_image_type`, `animated_image_unsupported`,
 `invalid_image`, `empty_ocr_result`, `invalid_ocr_result`, `ocr_engine_unavailable`,
 `ocr_engine_initialization_failed`, `ocr_engine_failed`.
 
 The default adapter is reused process-wide. It imports and creates the real motor
-only on first valid request; a small lock guards construction only. Inference
-concurrency, request scheduling, cancellation and timeouts are deferred to the API
-slice. The adapter is not advertised as safe for concurrent inference.
+only on first valid request; a small lock guards construction only. The adapter is
+not advertised as safe for concurrent inference.
+
+## API slice
+
+`POST /ocr/extract` requires a valid Bearer token (`get_current_user`). It accepts
+raw `image/png` or `image/jpeg` bytes, returns `{text, width, height, image_format}`,
+and stores neither the image nor the OCR result. The route does not use
+`UploadFile`/multipart, so the application does not spool the uploaded body through
+Starlette's upload-file temporary-file mechanism. This is not a guarantee about
+reverse proxies or the ASGI server, which may buffer request bodies before the
+application receives them. The route does not log image bytes, filenames, or OCR text.
+
+The route rejects an announced `Content-Length` over 10 MiB after authentication,
+then counts streamed bytes and stops at the 10 MiB + 1 byte boundary even when the
+header is absent or lies. Content-Type does not decide whether bytes are trusted;
+Pillow validates the actual image content. The route's accumulation buffer is capped
+at the configured body limit plus one byte, aside from any larger single chunk already
+delivered by the ASGI server. Conversion to immutable bytes briefly copies that buffer.
+
+All service `OcrError` mappings are:
+
+| Error code | HTTP | Meaning |
+|---|---:|---|
+| `invalid_image_input` | 422 | Non-byte input |
+| `empty_image` | 422 | Empty request body |
+| `image_too_large` | 413 | Encoded body exceeds 10 MiB |
+| `image_pixel_limit_exceeded` | 413 | Header dimensions exceed 20 million pixels |
+| `unsupported_image_type` | 415 | Content is not PNG/JPEG |
+| `animated_image_unsupported` | 415 | Animated image |
+| `invalid_image` | 422 | Corrupt/unreadable image |
+| `empty_ocr_result` | 200 | Valid image with no recognized text; empty `text` plus image metadata |
+| `invalid_ocr_result` | 502 | Engine returned a non-text value |
+| `ocr_engine_unavailable` | 503 | Optional motor package is unavailable |
+| `ocr_engine_initialization_failed` | 503 | Motor could not initialize |
+| `ocr_engine_failed` | 502 | Inference failed |
+
+The API also returns `invalid_content_length` (400), `ocr_busy` (503), and
+`ocr_timeout` (504). One inference slot is allowed per process. A busy process
+returns immediately; it does not queue another image. The OCR inference wait limit is 30
+seconds (request-body upload time is not included). ONNX inference cannot be cancelled once running, so after a 504 or client
+cancellation the worker keeps the slot until its own `finally` releases it. With
+multiple Uvicorn workers the limit is per worker, not global.
+
+OpenAPI declares PNG/JPEG raw binary request bodies. In Swagger UI, open
+`/docs` → `POST /ocr/extract` → **Try it out**, select a PNG/JPEG file, authorize
+with a Bearer token, and **Execute**. The intended request body is the image bytes;
+it does not use multipart. The OpenAPI schema is covered by a test, but a live
+browser check of Swagger's file selector was not completed in this environment.
 
 ## Synthetic evaluation
 
