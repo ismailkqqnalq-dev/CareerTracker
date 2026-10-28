@@ -1,26 +1,24 @@
 from fastapi import FastAPI
-from app.routes.opportunity_routes import router as opportunity_router
-app = FastAPI(title="CareerTracker")
-app.include_router(opportunity_router)
-from app.routes.contact_routes import router as contact_router
 
 from app.routes.activity_routes import router as activity_router
-app.include_router(activity_router)
-
-from app.routes.task_routes import router as task_router
-app.include_router(task_router)
-app.include_router(contact_router)
-
+from app.routes.contact_routes import router as contact_router
+from app.routes.job_analysis_routes import router as job_analysis_router
+from app.routes.ocr_routes import router as ocr_router
+from app.routes.opportunity_routes import router as opportunity_router
 from app.routes.skill_routes import router as skill_router
-app.include_router(skill_router)
-
+from app.routes.task_routes import router as task_router
 from app.routes.auth_routes import router as auth_router
 
+
+app = FastAPI(title="CareerTracker")
+app.include_router(opportunity_router)
+app.include_router(activity_router)
+app.include_router(task_router)
+app.include_router(contact_router)
+app.include_router(skill_router)
 app.include_router(auth_router)
-
-from app.routes.ocr_routes import router as ocr_router
-
 app.include_router(ocr_router)
+app.include_router(job_analysis_router)
 
 
 @app.get("/")

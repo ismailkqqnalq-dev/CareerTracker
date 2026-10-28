@@ -56,6 +56,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Fırsat skill'leri | `POST, GET /opportunities/{opportunity_id}/skills` | Evet | Fırsata skill bağlar veya bağlı skill'leri listeler |
 | Fırsat skill eşleşmesi | `GET /opportunities/{opportunity_id}/skill-match` | Evet | Profilde bulunan ve eksik skill'leri karşılaştırır |
 | OCR | `POST /ocr/extract` | Evet | PNG/JPEG ham ikili gövdesini bellekte işler, metin ve görsel ölçülerini döndürür; sonuç saklanmaz |
+| İlan analizi | `POST /job-analysis` | Evet | En fazla 100 KB metni görünür beceri kataloğuyla kural tabanlı karşılaştırır; sonucu saklamaz |
 | Fırsatlar | `GET, POST /opportunities`; `GET, PATCH, DELETE /opportunities/{id}` | Evet | Kullanıcının fırsatlarını yönetir |
 | Kişiler | `GET, POST /contacts`; `GET, PATCH, DELETE /contacts/{id}` | Evet | Kullanıcının kişilerini yönetir |
 | Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
@@ -73,6 +74,18 @@ JSON hata gövdesindeki sabit kodlar:
 | `skill_already_recognized` | `POST /skills/suggestions` | Skill zaten tanınıyor; öneri yerine katalogdaki skill kullanılmalı (409) |
 | `opportunity_not_found` | `POST, GET /opportunities/{opportunity_id}/skills`; `GET /opportunities/{opportunity_id}/skill-match` | Fırsat bulunamadı veya kullanıcıya ait değil (404) |
 | `unknown_skill` | `POST /opportunities/{opportunity_id}/skills` | Skill tanınmadı (404); öneri kaydedildiyse gövdede `suggestion_id` de bulunur |
+
+### İlan analizi hata kodları
+
+`POST /job-analysis`, `Cache-Control: no-store` ile çalışır; metin veritabanına
+yazılmaz. İstek gövdesi UTF-8 JSON'dur ve en fazla 100.000 bayt kabul edilir.
+
+| `error_code` | HTTP | Anlamı |
+|---|---:|---|
+| `invalid_content_length` | 400 | Geçersiz `Content-Length` başlığı |
+| `job_text_too_large` | 413 | İstek gövdesi 100 KB sınırını aşıyor |
+| `invalid_job_text` | 422 | JSON veya `text` alanı geçersiz |
+| `empty_job_text` | 422 | Metin boş veya yalnızca boşluk içeriyor |
 
 ### OCR API hata kodları
 
@@ -153,6 +166,16 @@ Docker Compose içindeki PostgreSQL servisine bağlanmak için `.env` dosyasınd
 ```text
 DATABASE_URL=postgresql://careertracker:careertracker@db:5432/careertracker
 ```
+
+Sentetik ilan metni analizi ölçümünü bellekteki SQLite kataloğunda çalıştır:
+
+```powershell
+python -m scripts.evaluate_job_text_analysis
+```
+
+Betik precision/recall/F1, tanınmayan sentetik terimleri ve OCR benzeri yazım
+bozulmalarındaki sonuçları JSON olarak terminale yazar; veritabanına veya dosyaya
+çıktı kaydetmez.
 
 Ardından uygulama ve veritabanını başlat, migration'ları uygula:
 
@@ -269,6 +292,7 @@ app/
 ├── schemas/       # Pydantic istek/yanıt şemaları
 ├── services/      # Uygulama iş mantığı
 └── main.py        # FastAPI uygulaması
+scripts/            # Tekrar çalıştırılabilir değerlendirme ve yardımcı betikler
 migrations/        # Alembic migration dosyaları
 tests/             # pytest testleri
 ```
@@ -278,8 +302,8 @@ tests/             # pytest testleri
 - **Tamamlandı — Faz 1:** Fırsat, kişi, aktivite ve görev backend CRUD'ları.
 - **Tamamlandı — Faz 2:** Dashboard, CSV dışa aktarma, PostgreSQL/Docker, Alembic ve CI.
 - **Tamamlandı — Faz 2.5:** Skill modelleri ve API'si, seed katalogu, kişisel skill/alias ve öneri eşleştirme temeli.
-- **Kısmi — Faz 3:** Görsel doğrulama/OCR servis baseline'ı ve kimlik doğrulamalı ham metin çıkarma API'si var; kullanıcı arayüzü ve kalıcı ilan akışı bu kapsamda değil.
-- **Planlandı — Faz 4:** İlan metninden yapılandırılmış bilgi çıkarımı ve ölçüm.
+- **Kısmi — Faz 3:** Görsel doğrulama/OCR servis baseline'ı ve kimlik doğrulamalı ham metin çıkarma API'si var; OCR sonucunu analiz ekranına aktaran otomatik akış ve kalıcı ilan akışı yok.
+- **Kısmi — Faz 4:** Yapıştırılan ilan metninden görünür katalog becerilerini, açık rol etiketini ve tanınan gereksinim bölüm başlıklarını bulan kural tabanlı servis, API, MVP arayüzü ve sentetik değerlendirme betiği var; gerçek ilanları temsil eden ölçüm ve kapsamlı çıkarım tamamlanmadı.
 - **Kısmi — Faz 5:** Normalizasyon, seed alias'ları, kişisel alias'lar ve metin benzerliğine dayalı aday sıralaması var; kapsamlı beceri normalizasyonu tamamlanmadı.
 - **Kısmi — Faz 6:** Kullanıcı skill profili ve fırsat skill-match/gap endpoint'i var; tam eşleştirme ürünü ve arayüzü tamamlanmadı.
 - **Planlandı — Faz 7–10:** Analitik, semantic similarity, makine öğrenmesi ve deep learning/computer vision çalışmaları.
@@ -290,9 +314,11 @@ Fazlar doğrusal ilerlemez. Faz 5, 6 ve 11'in bazı altyapı parçaları OCR/NLP
 ## Durum
 
 Faz 1, 2 ve 2.5 tamamlandı. Faz 3 OCR baseline aşamasında; görsel yükleme için
-kimlik doğrulamalı ve sonuç saklamayan API eklendi. Faz 5, 6 ve 11'den bazı
-parçalar erken teslim edildi ancak bu fazların bütünü tamamlanmış değildir. Bugünkü
-arayüz beceri önerilerinin gözden geçirilmesi ve eşleştirilmesiyle sınırlıdır.
+kimlik doğrulamalı ve sonuç saklamayan API eklendi. Faz 4'te metin analizi için
+ilk kural tabanlı API ve arayüz eklendi. Faz 5, 6 ve 11'den bazı parçalar erken
+teslim edildi ancak bu fazların bütünü tamamlanmış değildir. Arayüz beceri
+önerilerini yönetmenin yanında yapıştırılmış ilan metni için temel beceri
+eşleştirmesi de sunar.
 
 ## Bilinen sınırlar
 
@@ -304,6 +330,10 @@ arayüz beceri önerilerinin gözden geçirilmesi ve eşleştirilmesiyle sınır
 - Aday sıralaması yazım/metin benzerliği heuristiğidir. Kısa veya sembollü adlarda
   skorlar anlamsal doğruluk anlamına gelmez.
 - Bir fırsata bağlanan skill'i kaldırmak için endpoint yoktur; yalnızca profil skill'i silinebilir.
+- İlan analizi yalnızca ortak katalogu, kullanıcının kendi skill'lerini ve kişisel eşleştirmelerini görür. Katalog dışında kalan terimleri otomatik olarak öneri veya alias yapmaz.
+- İlan analizi ML değildir: becerileri ad/alias sözlüğü ve sözcük sınırlarıyla arar. Rolü yalnızca açık `Pozisyon:` / `Role:` benzeri etiketlerden, gereksinim türünü yalnızca tanınan bölüm başlıklarından alır; serbest başlık tahmini yapmaz.
+- Eşleşme başarısı mevcut katalog kapsamına bağlıdır. Türkçe ekler ve OCR kaynaklı yazım bozulmaları için anlamsal düzeltme yapılmaz; eşleşmeyen veya bozuk yazılan beceriler kaçabilir.
+- Değerlendirme betiği yalnızca küçük, sentetik örnekler kullanır; precision/recall/F1 sonuçları gerçek iş ilanlarına genellenemez.
 
 ## Lisans
 
