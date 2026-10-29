@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.auth import get_current_user
 from app.database.session import get_db
@@ -99,6 +100,11 @@ async def analyze_text(
     if not data.text.strip():
         return _error(422, "empty_job_text", "Job text cannot be empty.")
 
-    result = analyze_job_text(db, user_id=current_user.id, text=data.text)
+    result = await run_in_threadpool(
+        analyze_job_text,
+        db,
+        user_id=current_user.id,
+        text=data.text,
+    )
     response.headers["Cache-Control"] = "no-store"
     return result
