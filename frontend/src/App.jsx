@@ -212,7 +212,28 @@ function App() {
         setError("Beceri önerisi beklenmeyen bir durumla döndü. Tekrar deneyebilirsin.");
       }
     } catch (submitError) {
-      if (submitError.status !== 401) setError(errorMessage(submitError));
+      if (
+        submitError.status === 409 &&
+        submitError.errorCode === "skill_already_recognized"
+      ) {
+        try {
+          const recognizedSkill = await api.request(
+            `/skills/resolve?name=${encodeURIComponent(skill)}`,
+            { token },
+          );
+          if (recognizedSkill?.name) {
+            setError(
+              `Bu beceri katalogda "${recognizedSkill.name}" olarak tanınıyor. Mevcut beceriyi kullanabilirsin.`,
+            );
+            return;
+          }
+        } catch (resolveError) {
+          if (resolveError.status === 401) return;
+        }
+        setError(errorMessage(submitError));
+      } else if (submitError.status !== 401) {
+        setError(errorMessage(submitError));
+      }
     } finally {
       setSubmittingSuggestion(false);
     }
