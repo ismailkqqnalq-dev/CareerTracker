@@ -1,4 +1,5 @@
 from app.database.session import SessionLocal
+from app.models.users import User  # Register the users table in Base.metadata.
 from app.services.skill_catalog_service import seed_skill_catalog
 
 
