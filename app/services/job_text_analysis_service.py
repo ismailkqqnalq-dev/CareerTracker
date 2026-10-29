@@ -15,19 +15,19 @@ from app.services.skill_normalizer import normalize_text
 
 
 _ROLE_LABEL = re.compile(
-    r"^\s*(?:position|job title|role|title|pozisyon|rol|unvan)\s*[:：-]\s*(.*?)\s*$",
+    r"(?:position|job title|role|title|pozisyon|rol|unvan)[ \t]*[:：-][ \t]*(?P<value>.+)",
     re.IGNORECASE,
 )
 _REQUIRED_HEADING = re.compile(
-    r"^\s*(?:required(?:\s+(?:skills?|qualifications?))?|requirements?|"
-    r"what you(?:'|’)ll need|must[- ]have|aranan nitelikler|"
-    r"gereklilikler|zorunlu (?:beceriler|nitelikler))\s*[:：]?\s*$",
+    r"(?:required(?:[ \t]+(?:skills?|qualifications?))?|requirements?|"
+    r"what you(?:'|’)ll need|must[- ]have|aranan[ \t]+nitelikler|"
+    r"gereklilikler|zorunlu[ \t]+(?:beceriler|nitelikler))[ \t]*[:：]?",
     re.IGNORECASE,
 )
 _PREFERRED_HEADING = re.compile(
-    r"^\s*(?:preferred(?:\s+(?:skills?|qualifications?))?|nice to have|"
+    r"(?:preferred(?:[ \t]+(?:skills?|qualifications?))?|nice to have|"
     r"bonus points|tercihen|tercih sebebi|tercih edilen(?: beceriler)?|"
-    r"avantaj)\s*[:：]?\s*$",
+    r"avantaj)[ \t]*[:：]?",
     re.IGNORECASE,
 )
 _SHORT_AMBIGUOUS_ALIASES = {"c", "r", "go"}
@@ -80,9 +80,9 @@ def _visible_aliases(db: Session, user_id: int) -> dict[str, int]:
 
 
 def _line_section(line: str, current: str) -> tuple[str, bool]:
-    if _REQUIRED_HEADING.match(line):
+    if _REQUIRED_HEADING.fullmatch(line):
         return "required", True
-    if _PREFERRED_HEADING.match(line):
+    if _PREFERRED_HEADING.fullmatch(line):
         return "preferred", True
     return current, False
 
@@ -105,11 +105,15 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
     extracted: dict[int, dict] = {}
 
     for line_number, line in enumerate(text.splitlines(), start=1):
-        role_match = _ROLE_LABEL.match(line)
-        if role is None and role_match and role_match.group(1):
-            role = role_match.group(1).strip()
-
-        section, is_heading = _line_section(line, section)
+        clean_line = line.strip()
+        metadata_line = len(clean_line) <= 200
+        if metadata_line:
+            role_match = _ROLE_LABEL.fullmatch(clean_line)
+            if role is None and role_match and role_match.group("value").strip():
+                role = role_match.group("value").strip()
+            section, is_heading = _line_section(clean_line, section)
+        else:
+            is_heading = False
         if is_heading:
             continue
 
