@@ -122,7 +122,7 @@ describe("skill suggestion input", () => {
     expect(screen.getByRole("status").textContent).not.toContain("hedef beceri artık mevcut değil");
   });
 
-  it("uses error_code to explain that a submitted skill is already recognized", async () => {
+  it("resolves a recognized skill and shows its canonical catalog name", async () => {
     const fetchMock = setupLoggedInApp();
     fetchMock.mockImplementation(async (url, options = {}) => {
       if (url.endsWith("/skills/suggestions") && options.method === "POST") {
@@ -130,6 +130,9 @@ describe("skill suggestion input", () => {
           detail: "backend wording is not a UI contract",
           error_code: "skill_already_recognized",
         });
+      }
+      if (url.endsWith("/skills/resolve?name=Python")) {
+        return jsonResponse(200, { id: 5, name: "Python", category: "language" });
       }
       if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
       if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
@@ -140,8 +143,54 @@ describe("skill suggestion input", () => {
     fireEvent.change(await screen.findByLabelText("Beceri adı"), { target: { value: "Python" } });
     fireEvent.click(screen.getByRole("button", { name: "Öneri gönder" }));
 
-    expect((await screen.findByRole("alert")).textContent).toContain("zaten katalogda tanınıyor");
+    expect((await screen.findByRole("alert")).textContent).toContain('"Python" olarak tanınıyor');
+    expect(fetchMock).toHaveBeenCalledWith("/api/skills/resolve?name=Python", expect.anything());
     expect(screen.queryByText("backend wording is not a UI contract")).toBeNull();
+  });
+
+  it("keeps the generic recognized-skill message when catalog resolution fails", async () => {
+    const fetchMock = setupLoggedInApp();
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      if (url.endsWith("/skills/suggestions") && options.method === "POST") {
+        return jsonResponse(409, { error_code: "skill_already_recognized" });
+      }
+      if (url.endsWith("/skills/resolve?name=Python")) {
+        return jsonResponse(404, { detail: "do not show backend detail" });
+      }
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    fireEvent.change(await screen.findByLabelText("Beceri adı"), { target: { value: "Python" } });
+    fireEvent.click(screen.getByRole("button", { name: "Öneri gönder" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("Bu beceri zaten katalogda tanınıyor");
+    expect(screen.queryByText("do not show backend detail")).toBeNull();
+  });
+
+  it("uses centralized 401 handling if resolving a recognized skill returns unauthorized", async () => {
+    const fetchMock = setupLoggedInApp();
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      if (url.endsWith("/skills/suggestions") && options.method === "POST") {
+        return jsonResponse(409, { error_code: "skill_already_recognized" });
+      }
+      if (url.endsWith("/skills/resolve?name=Python")) {
+        return jsonResponse(401, { detail: "private auth detail" });
+      }
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    fireEvent.change(await screen.findByLabelText("Beceri adı"), { target: { value: "Python" } });
+    fireEvent.click(screen.getByRole("button", { name: "Öneri gönder" }));
+
+    expect(await screen.findByRole("heading", { name: "Hesabına giriş yap" })).toBeTruthy();
+    expect(sessionStorage.getItem("careertracker_token")).toBeNull();
+    expect(screen.queryByText("private auth detail")).toBeNull();
   });
 
   it("shows mapping success and removes the accepted suggestion from the pending list", async () => {
