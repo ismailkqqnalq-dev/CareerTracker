@@ -49,6 +49,12 @@ SYNTHETIC_CASES = (
         "expected": ("FastAPI", "PostgreSQL"),
         "unknown_terms": ("Redis",),
     },
+    {
+        "id": "turkish-ascii-ocr-folding",
+        "text": "Pythön, FastAPI, JavaScript, C# ve C++",
+        "expected": ("Python", "FastAPI", "JavaScript", "C#", "C++"),
+        "unknown_terms": ("Redis",),
+    },
 )
 
 
@@ -69,7 +75,7 @@ def _scores(expected: set[str], predicted: set[str]) -> dict[str, int | float]:
     }
 
 
-def evaluate() -> dict:
+def evaluate(analyzer=analyze_job_text) -> dict:
     engine = create_database_engine("sqlite:///:memory:")
     tables = [
         User.__table__,
@@ -87,7 +93,7 @@ def evaluate() -> dict:
         total_tp = total_fp = total_fn = 0
 
         for case in SYNTHETIC_CASES:
-            result = analyze_job_text(db, user_id=user_id, text=case["text"])
+            result = analyzer(db, user_id=user_id, text=case["text"])
             predicted = {skill["name"] for skill in result["skills"]}
             expected = set(case["expected"])
             scores = _scores(expected, predicted)
