@@ -1,3 +1,7 @@
+import os
+import subprocess
+import sys
+
 import pytest
 
 from app.database.session import get_db
@@ -35,6 +39,48 @@ def test_seed_skill_catalog_is_idempotent(db_session):
         "skills_created": 0,
         "aliases_created": 0,
     }
+
+
+def test_seed_entrypoint_registers_user_metadata_on_fresh_database(tmp_path):
+    database_path = tmp_path / "fresh-seed.db"
+    script = """
+from app.seed_skill_catalog import main
+from app.database.session import Base, SessionLocal, engine
+Base.metadata.create_all(bind=engine)
+from app.models.users import User
+from app.models.skills import PersonalSkillAlias, Skill
+with SessionLocal() as db:
+    user = User(email='seed-user@example.test', hashed_password='unused')
+    db.add(user)
+    db.flush()
+    private_skill = Skill(name='Private seed fixture', category='tool', owner_user_id=user.id)
+    db.add(private_skill)
+    db.flush()
+    alias = PersonalSkillAlias(user_id=user.id, alias='private seed alias', skill_id=private_skill.id)
+    db.add(alias)
+    db.commit()
+main()
+main()
+with SessionLocal() as db:
+    assert db.query(User).filter_by(email='seed-user@example.test').count() == 1
+    assert db.query(Skill).filter_by(name='Private seed fixture').count() == 1
+    assert db.query(PersonalSkillAlias).filter_by(alias='private seed alias').count() == 1
+"""
+    env = os.environ.copy()
+    env["DATABASE_URL"] = f"sqlite:///{database_path.as_posix()}"
+    env["PYTHON_DOTENV_DISABLED"] = "1"
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Skill catalog seeded: 12 skills, 34 aliases added." in result.stdout
+    assert "Skill catalog seeded: 0 skills, 0 aliases added." in result.stdout
 
 
 def test_catalog_aliases_resolve_to_canonical_skill(db_session):
