@@ -14,28 +14,50 @@ from app.services.skill_access import visible_skills
 from app.services.skill_normalizer import normalize_text
 
 
+MAX_METADATA_LINE_LENGTH = 200
 _ROLE_LABEL = re.compile(
-    r"(?:position|job title|role|title|pozisyon|rol|unvan)[ \t]*[:：-][ \t]*(?P<value>.+)",
+    r"(?:position|job title|role|title|pozisyon|rol|unvan)[ \t]*[:\uff1a-][ \t]*(?P<value>.+)",
     re.IGNORECASE,
 )
 _REQUIRED_HEADING = re.compile(
     r"(?:required(?:[ \t]+(?:skills?|qualifications?))?|requirements?|"
-    r"what you(?:'|’)ll need|must[- ]have|aranan[ \t]+nitelikler|"
-    r"gereklilikler|zorunlu[ \t]+(?:beceriler|nitelikler))[ \t]*[:：]?",
+    r"what you(?:'|\u2019)ll need|must[- ]have|aranan[ \t]+nitelikler|"
+    r"is icin gerekli beceriler|"
+    r"gereklilikler|zorunlu[ \t]+(?:beceriler|nitelikler))[ \t]*[:\uff1a]?",
     re.IGNORECASE,
 )
 _PREFERRED_HEADING = re.compile(
     r"(?:preferred(?:[ \t]+(?:skills?|qualifications?))?|nice to have|"
     r"bonus points|tercihen|tercih sebebi|tercih edilen(?: beceriler)?|"
-    r"avantaj)[ \t]*[:：]?",
+    r"one cikan ozellikler|avantaj)[ \t]*[:\uff1a]?",
     re.IGNORECASE,
 )
 _SHORT_AMBIGUOUS_ALIASES = {"c", "r", "go"}
 _SHORT_ALIAS_CONTEXT = re.compile(
     r"\b(?:programming|programming language|language|experience|"
-    r"dili|programlama|deneyim|tecrübe|beceri)\b",
+    r"dili|programlama|deneyim|tecrube|beceri)\b",
     re.IGNORECASE,
 )
+_MATCH_FOLD_TRANSLATION = str.maketrans(
+    {
+        "ş": "s", "Ş": "s",
+        "ğ": "g", "Ğ": "g",
+        "ç": "c", "Ç": "c",
+        "ö": "o", "Ö": "o",
+        "ü": "u", "Ü": "u",
+        "ı": "i", "İ": "i",
+        "â": "a", "Â": "a",
+        "î": "i", "Î": "i",
+        "û": "u", "Û": "u",
+    }
+)
+
+
+def _fold_for_matching(value: str) -> str:
+    """Fold supported Turkish/OCR variants one character at a time."""
+    # Translate dotted capital İ before lower(): its default lower() expands to
+    # two code points, which would invalidate offsets into the original line.
+    return value.translate(_MATCH_FOLD_TRANSLATION).lower()
 
 
 def _visible_aliases(db: Session, user_id: int) -> dict[str, int]:
@@ -80,10 +102,17 @@ def _visible_aliases(db: Session, user_id: int) -> dict[str, int]:
 
 
 def _line_section(line: str, current: str) -> tuple[str, bool]:
-    if _REQUIRED_HEADING.fullmatch(line):
+    clean_line = line.strip()
+    if len(clean_line) > MAX_METADATA_LINE_LENGTH:
+        return current, False
+
+    folded_line = _fold_for_matching(clean_line)
+    if _REQUIRED_HEADING.fullmatch(folded_line):
         return "required", True
-    if _PREFERRED_HEADING.fullmatch(line):
+    if _PREFERRED_HEADING.fullmatch(folded_line):
         return "preferred", True
+    if len(clean_line) < 80 and clean_line.endswith(":"):
+        return "unspecified", True
     return current, False
 
 
@@ -91,13 +120,24 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
     """Return explicit skill mentions; never writes or guesses missing catalog terms."""
     aliases = _visible_aliases(db, user_id)
     visible = {skill.id: skill for skill in visible_skills(db, user_id).all()}
+    folded_alias_owners: dict[str, set[int]] = {}
+    for alias, skill_id in aliases.items():
+        folded_alias = _fold_for_matching(alias)
+        if folded_alias:
+            folded_alias_owners.setdefault(folded_alias, set()).add(skill_id)
+
+    # Folding may merge previously distinct spellings. Never assign an
+    # ambiguous folded spelling to whichever skill happened to be visited first.
     patterns = [
-        (alias, skill_id, re.compile(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", re.IGNORECASE))
-        for alias, skill_id in sorted(
-            aliases.items(),
+        (
+            alias,
+            next(iter(skill_ids)) if len(skill_ids) == 1 else None,
+            re.compile(r"(?<!\w)" + re.escape(alias) + r"(?!\w)"),
+        )
+        for alias, skill_ids in sorted(
+            folded_alias_owners.items(),
             key=lambda item: (-len(item[0]), item[0]),
         )
-        if alias
     ]
 
     role = None
@@ -106,7 +146,7 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
 
     for line_number, line in enumerate(text.splitlines(), start=1):
         clean_line = line.strip()
-        metadata_line = len(clean_line) <= 200
+        metadata_line = len(clean_line) <= MAX_METADATA_LINE_LENGTH
         if metadata_line:
             role_match = _ROLE_LABEL.fullmatch(clean_line)
             if role is None and role_match and role_match.group("value").strip():
@@ -114,17 +154,19 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
             section, is_heading = _line_section(clean_line, section)
         else:
             is_heading = False
+
         if is_heading:
             continue
 
+        folded_line = _fold_for_matching(line)
         line_matches = []
         for alias, skill_id, pattern in patterns:
-            if skill_id not in visible:
+            if skill_id is not None and skill_id not in visible:
                 continue
-            for match in pattern.finditer(line):
+            for match in pattern.finditer(folded_line):
                 if alias in _SHORT_AMBIGUOUS_ALIASES:
                     context = line[max(0, match.start() - 16):match.end() + 16]
-                    if not _SHORT_ALIAS_CONTEXT.search(context):
+                    if not _SHORT_ALIAS_CONTEXT.search(_fold_for_matching(context)):
                         continue
                 line_matches.append((match, alias, skill_id))
 
@@ -143,6 +185,10 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
             accepted_matches.append((match, alias, skill_id))
 
         for match, _alias, skill_id in accepted_matches:
+            if skill_id is None:
+                # An ambiguous longer folded phrase blocks shorter overlaps,
+                # but is never attributed to either skill.
+                continue
             skill = visible[skill_id]
             entry = extracted.setdefault(
                 skill_id,
@@ -161,7 +207,7 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
             entry["occurrences"].append(
                 {
                     "line_number": line_number,
-                    "matched_text": match.group(0),
+                    "matched_text": line[match.start():match.end()],
                     "section": section,
                 }
             )
