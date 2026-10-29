@@ -1,5 +1,7 @@
+import time
+
 from app.models.skills import PersonalSkillAlias, SkillSuggestion
-from app.services.job_text_analysis_service import _fold_for_matching
+from app.services.job_text_analysis_service import _fold_for_matching, analyze_job_text
 
 
 def _add_private_skill(client, name, category):
@@ -238,3 +240,26 @@ def test_personal_alias_is_not_visible_to_another_user(authenticated_client, db_
 
     assert response.status_code == 200
     assert response.json()["skills"] == []
+def test_job_analysis_handles_100kb_adversarial_text_quickly(db_session):
+    cases = [
+        "requirements" + " " * 99_980 + "x",
+        "role: a" + " " * 99_990 + "x",
+        "x" * 100_000,
+        ("requirements: x\n" * 6_000)[:100_000],
+        ("Requirements:\nPreferred:\n" * 4_000)[:100_000],
+    ]
+
+    started = time.perf_counter()
+    for text in cases:
+        analyze_job_text(db_session, user_id=1, text=text)
+
+    assert time.perf_counter() - started < 1.0
+
+
+def test_folded_heading_over_200_characters_is_not_classified():
+    from app.services.job_text_analysis_service import _line_section
+
+    long_heading = "İş İçin Gerekli Beceriler" + " " * 190 + ":"
+
+    assert len(long_heading) > 200
+    assert _line_section(long_heading, "unspecified") == ("unspecified", False)

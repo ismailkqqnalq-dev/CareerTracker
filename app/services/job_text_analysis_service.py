@@ -14,22 +14,22 @@ from app.services.skill_access import visible_skills
 from app.services.skill_normalizer import normalize_text
 
 
+MAX_METADATA_LINE_LENGTH = 200
 _ROLE_LABEL = re.compile(
-    r"^\s*(?:position|job title|role|title|pozisyon|rol|unvan)\s*[:：-]\s*(.*?)\s*$",
+    r"(?:position|job title|role|title|pozisyon|rol|unvan)[ \t]*[:\uff1a-][ \t]*(?P<value>.+)",
     re.IGNORECASE,
 )
 _REQUIRED_HEADING = re.compile(
-    r"^\s*(?:required(?:\s+(?:skills?|qualifications?))?|requirements?|"
-    r"what you(?:'|’)ll need|must[- ]have|aranan nitelikler|"
+    r"(?:required(?:[ \t]+(?:skills?|qualifications?))?|requirements?|"
+    r"what you(?:'|\u2019)ll need|must[- ]have|aranan[ \t]+nitelikler|"
     r"is icin gerekli beceriler|"
-    r"gereklilikler|zorunlu (?:beceriler|nitelikler))\s*[:：]?\s*$",
+    r"gereklilikler|zorunlu[ \t]+(?:beceriler|nitelikler))[ \t]*[:\uff1a]?",
     re.IGNORECASE,
 )
 _PREFERRED_HEADING = re.compile(
-    r"^\s*(?:preferred(?:\s+(?:skills?|qualifications?))?|nice to have|"
+    r"(?:preferred(?:[ \t]+(?:skills?|qualifications?))?|nice to have|"
     r"bonus points|tercihen|tercih sebebi|tercih edilen(?: beceriler)?|"
-    r"one cikan ozellikler|"
-    r"avantaj)\s*[:：]?\s*$",
+    r"one cikan ozellikler|avantaj)[ \t]*[:\uff1a]?",
     re.IGNORECASE,
 )
 _SHORT_AMBIGUOUS_ALIASES = {"c", "r", "go"}
@@ -102,12 +102,16 @@ def _visible_aliases(db: Session, user_id: int) -> dict[str, int]:
 
 
 def _line_section(line: str, current: str) -> tuple[str, bool]:
-    folded_line = _fold_for_matching(line)
+    clean_line = line.strip()
+    if len(clean_line) > MAX_METADATA_LINE_LENGTH:
+        return current, False
+
+    folded_line = _fold_for_matching(clean_line)
     if _REQUIRED_HEADING.fullmatch(folded_line):
         return "required", True
     if _PREFERRED_HEADING.fullmatch(folded_line):
         return "preferred", True
-    if len(line) < 80 and line.endswith(":"):
+    if len(clean_line) < 80 and clean_line.endswith(":"):
         return "unspecified", True
     return current, False
 
@@ -141,11 +145,16 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
     extracted: dict[int, dict] = {}
 
     for line_number, line in enumerate(text.splitlines(), start=1):
-        role_match = _ROLE_LABEL.match(line)
-        if role is None and role_match and role_match.group(1):
-            role = role_match.group(1).strip()
+        clean_line = line.strip()
+        metadata_line = len(clean_line) <= MAX_METADATA_LINE_LENGTH
+        if metadata_line:
+            role_match = _ROLE_LABEL.fullmatch(clean_line)
+            if role is None and role_match and role_match.group("value").strip():
+                role = role_match.group("value").strip()
+            section, is_heading = _line_section(clean_line, section)
+        else:
+            is_heading = False
 
-        section, is_heading = _line_section(line, section)
         if is_heading:
             continue
 
