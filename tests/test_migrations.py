@@ -28,11 +28,12 @@ ALL_TABLES = PRE_USER_TABLES | {"users", "user_skills", "skill_suggestions", "pe
 
 INITIAL = "d0fe616da34f"
 PRE_USER_HEAD = "b3b24fd6d532"
-HEAD = "e3f2a187b96c"
+HEAD = "f6c52d90e34a"
 
 def _alembic(url, *args):
     env = os.environ.copy()
     env["DATABASE_URL"] = url
+    env["PYTHON_DOTENV_DISABLED"] = "1"
     result = subprocess.run(
         [sys.executable, "-m", "alembic", *args],
         cwd=ROOT,
@@ -103,6 +104,21 @@ def test_existing_versioned_database_keeps_its_data(tmp_path, revision):
                     id=1,
                     company="Existing company",
                 )
+            )
+
+        # The ownership migration adds nullable user_id columns. Give this
+        # legacy row an owner before the new NOT NULL migration is reached.
+        _alembic(url, "upgrade", "64aa267fb63d")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users "
+                    "(id, email, hashed_password, is_active) "
+                    "VALUES (1, 'existing-owner@example.com', 'unused', true)"
+                )
+            )
+            connection.execute(
+                text("UPDATE opportunities SET user_id = 1 WHERE id = 1")
             )
 
         _alembic(url, "upgrade", "head")

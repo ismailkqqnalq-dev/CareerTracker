@@ -7,7 +7,7 @@ class Opportunity(Base):
     user_id = Column(
     Integer,
     ForeignKey("users.id", ondelete="CASCADE"),
-    nullable=True,
+    nullable=False,
     index=True,
     )
     company=Column(String)
