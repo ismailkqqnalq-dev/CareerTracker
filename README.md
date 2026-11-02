@@ -269,6 +269,46 @@ otomatik onarılmaz. `init_db.py` ile kurulmuş fakat Alembic revision'ı olmaya
 veritabanlarında da önce yedek alınmalı ve şema/revision eşleşmesi incelenmelidir;
 körlemesine `stamp head` uygulanmamalıdır.
 
+### Eski CRM kayıtlarına sahip atama
+
+`opportunities`, `contacts`, `tasks` veya `activities` tablolarında `user_id`
+değeri `NULL` olan eski kayıtlar varsa, son sahiplik migration'ı `user_id` alanlarını
+`NOT NULL` yapmadan önce bu kayıtların hangi mevcut kullanıcıya ait olduğunu açıkça
+belirlemek gerekir. Migration kayıtları silmez veya otomatik olarak bir kullanıcıya
+atamaz. Önce uygulamayı durdurup yedek alın; ardından betiği varsayılan salt okunur
+dry-run ile çalıştırıp sayıları ve bağlantı tutarsızlıklarını inceleyin:
+
+```powershell
+python scripts/claim_orphan_records.py --user-id 1 --database-url "sqlite:///C:/path/to/careertracker.db"
+```
+
+SQLite'ta `--apply`, değişikliklerden hemen önce veritabanının tutarlı bir kopyasını
+aynı dizine `careertracker.db.bak-claim-YYYYMMDD-HHMMSS` adıyla alır ve yedek yolunu
+çıktıda gösterir. Yolu not edip yedeğin oluşturulduğunu doğruladıktan sonra sahipliği
+atanabilir:
+
+```powershell
+python scripts/claim_orphan_records.py --user-id 1 --database-url "sqlite:///C:/path/to/careertracker.db" --apply
+```
+
+PostgreSQL için önce `pg_dump` ile elle yedek alın ve yedeği doğrulayın; betik
+PostgreSQL yedeği oluşturmaz. Uygulamadan önce bu onayı ayrıca verin:
+
+```powershell
+python scripts/claim_orphan_records.py --user-id 1 --database-url "postgresql://..." --apply --i-have-a-backup
+```
+
+Betiğin bağlantı tutarsızlığı raporladığı durumda otomatik düzeltme yapmayın; ilgili
+kayıtların sahipliğini inceleyin. Betik başarıyla tamamlandıktan ve sahipsiz satır
+kalmadığı doğrulandıktan **sonra** migration'ı çalıştırın:
+
+```powershell
+python -m alembic upgrade head
+```
+
+Yeni kurulan veritabanlarında bu sahiplik devri adımı gerekmez. CRM kayıtları artık
+her zaman bir kullanıcıya bağlı olmalıdır; downgrade bu kısıtı kaldırır.
+
 `alembic downgrade base` artık temel tabloları da siler; yalnızca atılabilir test
 veritabanlarında kullanılmalıdır. CI, SQLite ve PostgreSQL'de temiz kurulumu ve
 model/şema uyumunu; ayrıca PostgreSQL'de geri alma ve tekrar kurulumu kontrol eder.
