@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.users import User
-from app.security import hash_password, verify_password
+from app.security import DUMMY_PASSWORD_HASH, hash_password, verify_password
 
 
 def register_user(db: Session, email: str, password: str) -> User:
@@ -47,6 +47,7 @@ def authenticate_user(
     )
 
     if user is None or not user.is_active:
+        verify_password(password, DUMMY_PASSWORD_HASH)
         return None
 
     if not verify_password(password, user.hashed_password):

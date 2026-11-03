@@ -4,6 +4,9 @@ import { createApiClient } from "./api.js";
 const authApi = createApiClient();
 
 function errorMessage(error, context = "İstek") {
+  if (context === "Kayıt" && error.errorCode === "registration_disabled") {
+    return "Kayıtlar şu anda kapalı.";
+  }
   if (error.errorCode === "skill_already_recognized") {
     return "Bu beceri zaten katalogda tanınıyor. Mevcut beceriyi kullanabilirsin.";
   }

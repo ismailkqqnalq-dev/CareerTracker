@@ -77,4 +77,24 @@ describe("authenticated API requests", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("İstek tamamlanamadı"));
     expect(screen.queryByText("private backend detail")).toBeNull();
   });
+  it("shows a clear message when registration is disabled", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(403, {
+        detail: "server wording can change",
+        error_code: "registration_disabled",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Kayıt ol" }));
+    fireEvent.change(screen.getByLabelText("E-posta"), { target: { value: "new@example.com" } });
+    fireEvent.change(screen.getByLabelText("Şifre"), { target: { value: "StrongPass123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Kayıt ol" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("Kayıtlar şu anda kapalı");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem("careertracker_token")).toBeNull();
+  });
+
 });

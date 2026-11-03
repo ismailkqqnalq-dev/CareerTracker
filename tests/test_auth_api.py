@@ -82,7 +82,8 @@ def test_app_rejects_invalid_jwt_secret_at_startup(monkeypatch, bad_secret):
             pass
 
     assert "JWT_SECRET_KEY" in str(error.value)
-    assert bad_secret not in str(error.value)
+    if bad_secret:
+        assert bad_secret not in str(error.value)
 
 
 def test_app_accepts_a_32_byte_jwt_secret_at_startup(monkeypatch):
