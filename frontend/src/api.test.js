@@ -23,6 +23,22 @@ describe("createApiClient", () => {
       .rejects.toMatchObject({ status: 409, errorCode: "skill_already_recognized" });
   });
 
+  it("shows a friendly rate-limit message and preserves Retry-After", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ...response(429, { detail: "server detail", error_code: "rate_limited" }),
+      headers: { get: () => "12" },
+    }));
+    const api = createApiClient();
+
+    await expect(api.request("/auth/token"))
+      .rejects.toMatchObject({
+        status: 429,
+        errorCode: "rate_limited",
+        retryAfter: 12,
+        message: expect.stringContaining("12 saniye"),
+      });
+  });
+
   it("calls the shared unauthorized handler on HTTP 401", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
       response(401, { detail: "do not parse this text" }),

@@ -21,6 +21,7 @@ dependencies = [
   "pwdlib[argon2]",
   "python-multipart",
   "email-validator",
+  "limits==5.8.0",
   "Pillow>=11.3,<14",
 ]
 [project.optional-dependencies]

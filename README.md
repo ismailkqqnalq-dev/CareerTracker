@@ -64,6 +64,35 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Dashboard | `GET /dashboard` | Evet | Kullanıcının fırsat istatistiklerini döndürür |
 | CSV | `GET /opportunities/export` | Evet | Kullanıcının fırsatlarını CSV olarak indirir |
 
+### İstek sınırları
+
+Kimlik doğrulama ve kaynak tüketen işlemler için süreç içi, bellek tabanlı
+sınırlar uygulanır. Varsayılanlar: girişte IP başına 30/dakika ve IP+e-posta
+çifti başına 8/dakika; kayıtta IP başına 5/saat; OCR ve ilan analizinde kullanıcı
+başına 10/dakika ve her işlem türü için aynı kullanıcının aynı anda en fazla bir
+isteği. Aşımda `429`, `{"detail","error_code":"rate_limited"}` ve
+`Retry-After` döner. OCR'ın mevcut süreç-geneli eşzamanlılık sınırı doluysa
+`503 ocr_busy` davranışı korunur.
+
+Sınırlar ve bellek anahtarı üst sınırı `.env` içindeki
+`RATE_LIMIT_LOGIN_IP_PER_MINUTE`, `RATE_LIMIT_LOGIN_IP_EMAIL_PER_MINUTE`,
+`RATE_LIMIT_REGISTER_IP_PER_HOUR`, `RATE_LIMIT_OCR_PER_USER_PER_MINUTE`,
+`RATE_LIMIT_JOB_ANALYSIS_PER_USER_PER_MINUTE` ve
+`RATE_LIMIT_MAX_TRACKED_KEYS` ile ayarlanabilir. Limiter e-posta adreslerini
+saklamaz; IP ve e-posta bileşimlerini tek yönlü özetlerle anahtarlar. Süresi
+dolmuş anahtarlar yeni isteklerde temizlenir. Bellek anahtar sınırına ulaşıldığında
+yeni anahtarlar, en yakın pencere süresi dolana kadar 429 alır.
+
+`X-Forwarded-For` varsayılan olarak yok sayılır. Yalnızca doğrudan istemci
+`TRUSTED_PROXY_IPS` içindeki IP/CIDR ağlarından biriyse zincir güvenilir proxy
+sınırına kadar sağdan sola değerlendirilir. Bu ayarı yalnızca uygulamanın önündeki
+gerçek proxy ağları için doldur.
+
+Sayaçlar süreç içinde tutulur; birden fazla Uvicorn worker veya uygulama örneği
+arasında paylaşılmaz. Bu nedenle çoklu worker dağıtımında sınırlar her worker için
+ayrı uygulanır. Paylaşımlı sayaç gereken yayında Redis gibi ortak depolama
+kullanılmalı; bu proje içi bellek deposu geliştirme ve tek-worker kullanım içindir.
+
 ### Beceri API hata kodları
 
 JSON hata gövdesindeki sabit kodlar:
