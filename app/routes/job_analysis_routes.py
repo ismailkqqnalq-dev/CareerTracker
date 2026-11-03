@@ -13,7 +13,7 @@ from app.auth import get_current_user
 from app.database.session import get_db
 from app.models.users import User
 from app.rate_limits import (
-    positive_int_env,
+    get_rate_limit_settings,
     rate_limit_manager,
     rate_limited_response,
     user_slot_limiter,
@@ -107,20 +107,18 @@ async def analyze_text(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    settings = get_rate_limit_settings()
     rate_decision = rate_limit_manager.check(
         "job-analysis-user",
         str(current_user.id),
-        positive_int_env("RATE_LIMIT_JOB_ANALYSIS_PER_USER_PER_MINUTE", 10),
+        settings.job_analysis_per_user_per_minute,
         "minute",
     )
     if not rate_decision.allowed:
         return rate_limited_response(rate_decision.retry_after)
 
-    user_slot = user_slot_limiter.acquire(current_user.id, scope="job-analysis")
-    if user_slot is None:
-        return rate_limited_response(1)
-
-    owns_user_slot = True
+    user_slot = None
+    owns_user_slot = False
     try:
         try:
             raw_body = await _read_body(request)
@@ -137,6 +135,15 @@ async def analyze_text(
 
         if not data.text.strip():
             return _error(422, "empty_job_text", "Job text cannot be empty.")
+
+        # Reserve the expensive per-user analysis slot only after the complete,
+        # valid request body has been received and parsed.
+        user_slot = user_slot_limiter.acquire(
+            current_user.id, scope="job-analysis"
+        )
+        if user_slot is None:
+            return rate_limited_response(1)
+        owns_user_slot = True
 
         # Shield the submitted worker: cancelling a client request must not
         # release the per-user slot while CPU analysis continues in the thread.
