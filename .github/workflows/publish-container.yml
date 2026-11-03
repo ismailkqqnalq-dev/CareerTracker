@@ -1,0 +1,73 @@
+name: Publish container
+
+on:
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  container-validation:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build and inspect release image without publishing
+        run: |
+          printf 'synthetic sentinel\n' > .env
+          printf 'synthetic sentinel\n' > careertracker.db
+          docker build --tag careertracker-release-check .
+          docker run --rm --entrypoint sh careertracker-release-check -c \
+            'test ! -e /app/.env && test ! -e /app/careertracker.db && test "$(id -u)" -ne 0'
+
+  publish:
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate release and determine image name
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must have format vMAJOR.MINOR.PATCH."
+            exit 1
+          fi
+          git merge-base --is-ancestor HEAD origin/main
+          echo "IMAGE=ghcr.io/${REPOSITORY,,}:$RELEASE_TAG" >> "$GITHUB_ENV"
+      - name: Build and inspect image
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          docker build --tag "$IMAGE" \
+            --label "org.opencontainers.image.source=https://github.com/$REPOSITORY" \
+            --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" .
+          docker run --rm --entrypoint sh "$IMAGE" -c \
+            'test ! -e /app/.env && test ! -e /app/careertracker.db && test "$(id -u)" -ne 0'
+      - name: Publish to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          trap 'docker logout ghcr.io' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
+          docker push "$IMAGE"
+          echo "Published $IMAGE" >> "$GITHUB_STEP_SUMMARY"
