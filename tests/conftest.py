@@ -21,6 +21,16 @@ TestingSessionLocal = sessionmaker(
 )
 
 
+@pytest.fixture(autouse=True)
+def reset_process_local_rate_limits():
+    """Keep request counters isolated between tests sharing the same client IP."""
+    from app.rate_limits import reset_rate_limit_state
+
+    reset_rate_limit_state()
+    yield
+    reset_rate_limit_state()
+
+
 @pytest.fixture()
 def db_session():
     Base.metadata.create_all(bind=engine)
@@ -35,18 +45,21 @@ def db_session():
 @pytest.fixture()
 def client():
     Base.metadata.create_all(bind=engine)
+
     def override_get_db():
         db = TestingSessionLocal()
         try:
             yield db
         finally:
             db.close()
+
     app.dependency_overrides[get_db] = override_get_db
     test_client = TestClient(app)
     yield test_client
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
-    
+
+
 @pytest.fixture()
 def authenticated_client(client):
     client.post(
