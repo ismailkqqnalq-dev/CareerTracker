@@ -8,7 +8,7 @@ from app.database.session import get_db
 from app.models.users import User
 from app.rate_limits import (
     get_client_ip,
-    positive_int_env,
+    get_rate_limit_settings,
     rate_limit_manager,
     rate_limited_response,
 )
@@ -34,10 +34,11 @@ def register(
     data: RegisterRequest,
     db: Session = Depends(get_db),
 ):
+    settings = get_rate_limit_settings()
     decision = rate_limit_manager.check(
         "register-ip",
         get_client_ip(request),
-        positive_int_env("RATE_LIMIT_REGISTER_IP_PER_HOUR", 5),
+        settings.register_ip_per_hour,
         "hour",
     )
     if not decision.allowed:
@@ -72,11 +73,12 @@ def login(
     db: Session = Depends(get_db),
 ):
     # Swagger'daki "username" alanına e-posta adresini gir.
+    settings = get_rate_limit_settings()
     client_ip = get_client_ip(request)
     ip_decision = rate_limit_manager.check(
         "login-ip",
         client_ip,
-        positive_int_env("RATE_LIMIT_LOGIN_IP_PER_MINUTE", 30),
+        settings.login_ip_per_minute,
         "minute",
     )
     if not ip_decision.allowed:
@@ -87,7 +89,7 @@ def login(
     pair_decision = rate_limit_manager.check(
         "login-ip-email",
         pair_identifier,
-        positive_int_env("RATE_LIMIT_LOGIN_IP_EMAIL_PER_MINUTE", 8),
+        settings.login_ip_email_per_minute,
         "minute",
     )
     if not pair_decision.allowed:

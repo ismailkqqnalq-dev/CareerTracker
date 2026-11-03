@@ -2,9 +2,12 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
+from fastapi import Response
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 from app.main import app
 from app.routes import job_analysis_routes, ocr_routes
@@ -41,13 +44,21 @@ def assert_rate_limited(response):
 def clean_rate_limit_state():
     try:
         from app.rate_limits import reset_rate_limit_state
-    except ModuleNotFoundError:
+    except (ImportError, ModuleNotFoundError):
         reset_rate_limit_state = None
+    try:
+        from app.rate_limits import get_rate_limit_settings
+    except (ImportError, ModuleNotFoundError):
+        get_rate_limit_settings = None
+    if get_rate_limit_settings:
+        get_rate_limit_settings.cache_clear()
     if reset_rate_limit_state:
         reset_rate_limit_state()
     yield
     if reset_rate_limit_state:
         reset_rate_limit_state()
+    if get_rate_limit_settings:
+        get_rate_limit_settings.cache_clear()
 
 
 class FakeEngine:
@@ -207,19 +218,25 @@ def test_job_analysis_rate_limit_is_per_user(client, monkeypatch):
 
 
 
-def test_rate_window_resets_with_a_fake_clock():
+def test_rate_window_resets_using_the_storage_clock():
     from app.rate_limits import RateLimitManager
 
-    now = [time.time()]
-    manager = RateLimitManager(max_tracked_keys=5, clock=lambda: now[0])
+    manager = RateLimitManager(max_tracked_keys=5)
 
-    assert manager.check("login-ip", "192.0.2.1", 1, "minute").allowed
-    blocked = manager.check("login-ip", "192.0.2.1", 1, "minute")
+    assert manager.check("login-ip", "192.0.2.1", 1, "second").allowed
+    blocked = manager.check("login-ip", "192.0.2.1", 1, "second")
     assert not blocked.allowed
     assert blocked.retry_after >= 1
 
-    now[0] += 61
-    assert manager.check("login-ip", "192.0.2.1", 1, "minute").allowed
+    deadline = time.monotonic() + 3
+    allowed_again = False
+    while time.monotonic() < deadline:
+        time.sleep(0.025)
+        if manager.check("login-ip", "192.0.2.1", 1, "second").allowed:
+            allowed_again = True
+            break
+
+    assert allowed_again
     assert manager.tracked_key_count == 1
 
 
@@ -456,3 +473,214 @@ def test_job_analysis_worker_holds_user_slot_until_thread_finishes():
     replacement = user_slot_limiter.acquire(9004)
     assert replacement is not None
     replacement.release()
+
+
+RATE_LIMIT_SETTING_NAMES = [
+    "RATE_LIMIT_LOGIN_IP_PER_MINUTE",
+    "RATE_LIMIT_LOGIN_IP_EMAIL_PER_MINUTE",
+    "RATE_LIMIT_REGISTER_IP_PER_HOUR",
+    "RATE_LIMIT_OCR_PER_USER_PER_MINUTE",
+    "RATE_LIMIT_JOB_ANALYSIS_PER_USER_PER_MINUTE",
+    "RATE_LIMIT_MAX_TRACKED_KEYS",
+]
+
+
+@pytest.mark.parametrize("setting_name", RATE_LIMIT_SETTING_NAMES)
+def test_invalid_rate_limit_settings_fail_during_startup(monkeypatch, setting_name):
+    from app.rate_limits import get_rate_limit_settings
+
+    invalid_value = "not-a-positive-integer"
+    monkeypatch.setenv(setting_name, invalid_value)
+    get_rate_limit_settings.cache_clear()
+
+    async def start_application():
+        async with app.router.lifespan_context(app):
+            pass
+
+    with pytest.raises(RuntimeError, match=setting_name) as error:
+        asyncio.run(start_application())
+
+    assert invalid_value not in str(error.value)
+
+
+def test_invalid_trusted_proxy_configuration_warns_and_ignores_forwarded_for(
+    monkeypatch, caplog
+):
+    from app.rate_limits import (
+        get_client_ip,
+        get_rate_limit_settings,
+        validate_rate_limit_configuration,
+    )
+
+    invalid_entry = "not-an-ip-or-network"
+    monkeypatch.setenv("TRUSTED_PROXY_IPS", f"127.0.0.1,{invalid_entry}")
+    get_rate_limit_settings.cache_clear()
+
+    with caplog.at_level("WARNING"):
+        validate_rate_limit_configuration()
+
+    request = Request(
+        {
+            "type": "http",
+            "http_version": "1.1",
+            "method": "GET",
+            "scheme": "http",
+            "path": "/",
+            "raw_path": b"/",
+            "query_string": b"",
+            "headers": [(b"x-forwarded-for", b"203.0.113.9")],
+            "client": ("127.0.0.1", 43210),
+            "server": ("testserver", 80),
+        }
+    )
+
+    assert "TRUSTED_PROXY_IPS" in caplog.text
+    assert invalid_entry in caplog.text
+    assert get_client_ip(request) == "127.0.0.1"
+
+
+def _raw_request(path, receive):
+    return Request(
+        {
+            "type": "http",
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": path,
+            "raw_path": path.encode(),
+            "query_string": b"",
+            "headers": [(b"content-type", b"application/json")],
+            "client": ("127.0.0.1", 43210),
+            "server": ("testserver", 80),
+        },
+        receive,
+    )
+
+
+def test_ocr_rate_limit_rejects_before_consuming_body(monkeypatch):
+    calls = []
+    body = png_bytes()
+
+    async def receive():
+        calls.append("read")
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    monkeypatch.setattr(
+        ocr_routes.rate_limit_manager,
+        "check",
+        lambda *args, **kwargs: SimpleNamespace(allowed=False, retry_after=2),
+    )
+    user = SimpleNamespace(id=8801)
+    response = asyncio.run(
+        ocr_routes.extract_ocr(_raw_request("/ocr/extract", receive), user, FakeEngine())
+    )
+
+    assert response.status_code == 429
+    assert calls == []
+
+
+def test_job_analysis_rate_limit_rejects_before_consuming_body(monkeypatch, db_session):
+    calls = []
+    body = b'{"text":"Python"}'
+
+    async def receive():
+        calls.append("read")
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    monkeypatch.setattr(
+        job_analysis_routes.rate_limit_manager,
+        "check",
+        lambda *args, **kwargs: SimpleNamespace(allowed=False, retry_after=2),
+    )
+    user = SimpleNamespace(id=8802)
+    response = asyncio.run(
+        job_analysis_routes.analyze_text(
+            _raw_request("/job-analysis", receive), Response(), db_session, user
+        )
+    )
+
+    assert response.status_code == 429
+    assert calls == []
+
+
+def test_ocr_user_slot_is_not_held_while_body_is_uploading(monkeypatch):
+    from app.rate_limits import user_slot_limiter
+
+    started = asyncio.Event()
+    continue_upload = asyncio.Event()
+    body = png_bytes()
+
+    async def receive():
+        started.set()
+        await continue_upload.wait()
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    monkeypatch.setattr(
+        ocr_routes.rate_limit_manager,
+        "check",
+        lambda *args, **kwargs: SimpleNamespace(allowed=True, retry_after=0),
+    )
+    user = SimpleNamespace(id=8803)
+    task = None
+
+    async def scenario():
+        nonlocal task
+        task = asyncio.create_task(
+            ocr_routes.extract_ocr(
+                _raw_request("/ocr/extract", receive), user, FakeEngine()
+            )
+        )
+        await asyncio.wait_for(started.wait(), timeout=1)
+        probe = user_slot_limiter.acquire(user.id, scope="ocr")
+        if probe is not None:
+            probe.release()
+        continue_upload.set()
+        response = await task
+        assert probe is not None
+        assert response.status_code == 200
+
+    asyncio.run(scenario())
+
+
+def test_job_analysis_user_slot_is_not_held_while_body_is_uploading(
+    monkeypatch, db_session
+):
+    from app.rate_limits import user_slot_limiter
+
+    started = asyncio.Event()
+    continue_upload = asyncio.Event()
+    body = b'{"text":"Python"}'
+
+    async def receive():
+        started.set()
+        await continue_upload.wait()
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    monkeypatch.setattr(
+        job_analysis_routes.rate_limit_manager,
+        "check",
+        lambda *args, **kwargs: SimpleNamespace(allowed=True, retry_after=0),
+    )
+    monkeypatch.setattr(
+        job_analysis_routes, "analyze_job_text", lambda *args, **kwargs: "analyzed"
+    )
+    user = SimpleNamespace(id=8804)
+    task = None
+
+    async def scenario():
+        nonlocal task
+        task = asyncio.create_task(
+            job_analysis_routes.analyze_text(
+                _raw_request("/job-analysis", receive), Response(), db_session, user
+            )
+        )
+        await asyncio.wait_for(started.wait(), timeout=1)
+        probe = user_slot_limiter.acquire(user.id, scope="job-analysis")
+        if probe is not None:
+            probe.release()
+        continue_upload.set()
+        result = await task
+        assert probe is not None
+        assert result == "analyzed"
+
+    asyncio.run(scenario())

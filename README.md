@@ -428,6 +428,18 @@ eşleştirmesi de sunar.
 - Eşleşme başarısı mevcut katalog kapsamına bağlıdır. Türkçe ekler ve OCR kaynaklı yazım bozulmaları için anlamsal düzeltme yapılmaz; eşleşmeyen veya bozuk yazılan beceriler kaçabilir.
 - Değerlendirme betiği yalnızca küçük, sentetik örnekler kullanır; precision/recall/F1 sonuçları gerçek iş ilanlarına genellenemez.
 
+
+- Rate-limit sayaçları süreç içi bellektedir; birden fazla worker veya replika
+  arasında paylaşılmaz. Dağıtık kullanımda ortak bir depo, örneğin Redis gerekir.
+- Giriş sınırları IP ve IP+e-posta bileşimi bazındadır. Çok sayıda farklı IP'den
+  tek hesaba yapılan dağıtık parola denemeleri bu sınırları aşabilir; hesap başına
+  sert kilit, hizmet engelleme riski nedeniyle uygulanmıyor.
+- `RATE_LIMIT_MAX_TRACKED_KEYS` üst sınırı dolduğunda yeni limiter anahtarları
+  pencere süresi dolana kadar `429` alır. Çok sayıda farklı IP'li saldırı bu
+  nedenle yeni kullanıcıları geçici olarak etkileyebilir.
+- Sabit pencere algoritması, pencere sınırının iki yanında kısa sürede yaklaşık
+  iki kat istek geçmesine izin verebilir.
+
 ## Lisans
 
 [MIT](LICENSE)

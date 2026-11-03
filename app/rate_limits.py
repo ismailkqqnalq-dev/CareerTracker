@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 import hashlib
+import logging
 import ipaddress
 import math
 import os
@@ -14,9 +16,13 @@ from typing import Any
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from limits import RateLimitItemPerHour, RateLimitItemPerMinute
+from limits import RateLimitItemPerHour, RateLimitItemPerMinute, RateLimitItemPerSecond
 from limits.strategies import FixedWindowRateLimiter
 from limits.storage import MemoryStorage
+
+
+logger = logging.getLogger(__name__)
+DEFAULT_MAX_TRACKED_KEYS = 10_000
 
 
 def positive_int_env(name: str, default: int) -> int:
@@ -39,6 +45,67 @@ class RateLimitDecision:
     retry_after: int = 0
 
 
+@dataclass(frozen=True)
+class RateLimitSettings:
+    login_ip_per_minute: int
+    login_ip_email_per_minute: int
+    register_ip_per_hour: int
+    ocr_per_user_per_minute: int
+    job_analysis_per_user_per_minute: int
+    max_tracked_keys: int
+    trusted_proxy_networks: tuple[
+        ipaddress.IPv4Network | ipaddress.IPv6Network, ...
+    ]
+    invalid_trusted_proxy_entries: tuple[str, ...]
+
+
+def _parse_trusted_proxy_networks() -> tuple[
+    tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...], tuple[str, ...]
+]:
+    raw_value = os.getenv("TRUSTED_PROXY_IPS", "")
+    networks = []
+    invalid_entries = []
+    for entry in raw_value.split(","):
+        candidate = entry.strip()
+        if not candidate:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(candidate, strict=False))
+        except ValueError:
+            invalid_entries.append(candidate)
+
+    # Fail closed for the entire setting rather than trusting a partial list.
+    if invalid_entries:
+        networks = []
+    return tuple(networks), tuple(invalid_entries)
+
+
+@lru_cache(maxsize=1)
+def get_rate_limit_settings() -> RateLimitSettings:
+    """Read and validate rate-limit environment settings once per process."""
+    trusted_networks, invalid_entries = _parse_trusted_proxy_networks()
+    return RateLimitSettings(
+        login_ip_per_minute=positive_int_env("RATE_LIMIT_LOGIN_IP_PER_MINUTE", 30),
+        login_ip_email_per_minute=positive_int_env(
+            "RATE_LIMIT_LOGIN_IP_EMAIL_PER_MINUTE", 8
+        ),
+        register_ip_per_hour=positive_int_env(
+            "RATE_LIMIT_REGISTER_IP_PER_HOUR", 5
+        ),
+        ocr_per_user_per_minute=positive_int_env(
+            "RATE_LIMIT_OCR_PER_USER_PER_MINUTE", 10
+        ),
+        job_analysis_per_user_per_minute=positive_int_env(
+            "RATE_LIMIT_JOB_ANALYSIS_PER_USER_PER_MINUTE", 10
+        ),
+        max_tracked_keys=positive_int_env(
+            "RATE_LIMIT_MAX_TRACKED_KEYS", DEFAULT_MAX_TRACKED_KEYS
+        ),
+        trusted_proxy_networks=trusted_networks,
+        invalid_trusted_proxy_entries=invalid_entries,
+    )
+
+
 class RateLimitManager:
     """Fixed-window limiter with an explicit cap and lazy expired-key cleanup."""
 
@@ -50,9 +117,7 @@ class RateLimitManager:
         self.storage = MemoryStorage()
         self.limiter = FixedWindowRateLimiter(self.storage)
         self.max_tracked_keys = (
-            max_tracked_keys
-            if max_tracked_keys is not None
-            else positive_int_env("RATE_LIMIT_MAX_TRACKED_KEYS", 10_000)
+            max_tracked_keys if max_tracked_keys is not None else DEFAULT_MAX_TRACKED_KEYS
         )
         if self.max_tracked_keys < 1:
             raise ValueError("max_tracked_keys must be positive")
@@ -85,12 +150,14 @@ class RateLimitManager:
     ) -> RateLimitDecision:
         if limit < 1:
             raise ValueError("limit must be positive")
-        if period == "minute":
+        if period == "second":
+            item = RateLimitItemPerSecond(limit, namespace=f"CareerTracker/{scope}")
+        elif period == "minute":
             item = RateLimitItemPerMinute(limit, namespace=f"CareerTracker/{scope}")
         elif period == "hour":
             item = RateLimitItemPerHour(limit, namespace=f"CareerTracker/{scope}")
         else:
-            raise ValueError("period must be minute or hour")
+            raise ValueError("period must be second, minute, or hour")
 
         safe_identifier = hashlib.sha256(
             f"{scope}:{identifier}".encode("utf-8")
@@ -174,26 +241,24 @@ class UserSlotLimiter:
             self._active.clear()
 
 
-rate_limit_manager = RateLimitManager()
+rate_limit_manager = RateLimitManager(max_tracked_keys=DEFAULT_MAX_TRACKED_KEYS)
 user_slot_limiter = UserSlotLimiter()
+
+
+def validate_rate_limit_configuration() -> None:
+    """Validate process settings at startup and warn about fail-closed proxy config."""
+    settings = get_rate_limit_settings()
+    rate_limit_manager.max_tracked_keys = settings.max_tracked_keys
+    for entry in settings.invalid_trusted_proxy_entries:
+        logger.warning(
+            "Ignoring invalid TRUSTED_PROXY_IPS entry %r; forwarded headers are ignored.",
+            entry,
+        )
 
 
 def reset_rate_limit_state() -> None:
     rate_limit_manager.reset()
     user_slot_limiter.reset()
-
-
-def _trusted_proxy_networks() -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
-    raw_value = os.getenv("TRUSTED_PROXY_IPS", "")
-    networks = []
-    try:
-        for item in raw_value.split(","):
-            if item.strip():
-                networks.append(ipaddress.ip_network(item.strip(), strict=False))
-    except ValueError:
-        # Invalid proxy configuration fails closed: ignore forwarded headers.
-        return []
-    return networks
 
 
 def get_client_ip(request: Request) -> str:
@@ -203,7 +268,7 @@ def get_client_ip(request: Request) -> str:
     except ValueError:
         return peer
 
-    trusted_networks = _trusted_proxy_networks()
+    trusted_networks = get_rate_limit_settings().trusted_proxy_networks
     if not any(peer_ip in network for network in trusted_networks):
         return peer
 
