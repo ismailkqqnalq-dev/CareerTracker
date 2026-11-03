@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from app.auth import get_current_user
 from app.models.users import User
 from app.rate_limits import (
-    positive_int_env,
+    get_rate_limit_settings,
     rate_limit_manager,
     rate_limited_response,
     user_slot_limiter,
@@ -175,20 +175,18 @@ async def extract_ocr(
     current_user: User = Depends(get_current_user),
     engine: OcrEngine = Depends(get_ocr_engine),
 ):
+    settings = get_rate_limit_settings()
     rate_decision = rate_limit_manager.check(
         "ocr-user",
         str(current_user.id),
-        positive_int_env("RATE_LIMIT_OCR_PER_USER_PER_MINUTE", 10),
+        settings.ocr_per_user_per_minute,
         "minute",
     )
     if not rate_decision.allowed:
         return rate_limited_response(rate_decision.retry_after)
 
-    user_slot = user_slot_limiter.acquire(current_user.id, scope="ocr")
-    if user_slot is None:
-        return rate_limited_response(1)
-
-    owns_user_slot = True
+    user_slot = None
+    owns_user_slot = False
     owns_ocr_slot = False
     try:
         # Authentication and rate checks happen before reading request bytes.
@@ -216,6 +214,13 @@ async def extract_ocr(
                 )
         finally:
             _UPLOAD_SLOT.release()
+
+        # Do not reserve expensive per-user or process-wide OCR slots while the
+        # client is still uploading; both are acquired only after the body ends.
+        user_slot = user_slot_limiter.acquire(current_user.id, scope="ocr")
+        if user_slot is None:
+            return rate_limited_response(1)
+        owns_user_slot = True
 
         # Keep the existing process-wide OCR limit and its 503 contract.
         if not _OCR_SLOT.acquire(blocking=False):
