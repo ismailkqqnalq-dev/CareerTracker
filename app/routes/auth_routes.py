@@ -1,10 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database.session import get_db
 from app.models.users import User
+from app.rate_limits import (
+    get_client_ip,
+    positive_int_env,
+    rate_limit_manager,
+    rate_limited_response,
+)
 from app.schemas.auth import RegisterRequest, TokenResponse, UserResponse
 from app.security import create_access_token
 from app.services import auth_service
@@ -17,11 +23,22 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={429: {"description": "Registration rate limit exceeded"}},
 )
 def register(
+    request: Request,
     data: RegisterRequest,
     db: Session = Depends(get_db),
 ):
+    decision = rate_limit_manager.check(
+        "register-ip",
+        get_client_ip(request),
+        positive_int_env("RATE_LIMIT_REGISTER_IP_PER_HOUR", 5),
+        "hour",
+    )
+    if not decision.allowed:
+        return rate_limited_response(decision.retry_after)
+
     try:
         return auth_service.register_user(db, data.email, data.password)
     except ValueError as error:
@@ -31,12 +48,38 @@ def register(
         ) from error
 
 
-@router.post("/token", response_model=TokenResponse)
+@router.post(
+    "/token",
+    response_model=TokenResponse,
+    responses={429: {"description": "Login rate limit exceeded"}},
+)
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
     # Swagger'daki "username" alanına e-posta adresini gir.
+    client_ip = get_client_ip(request)
+    ip_decision = rate_limit_manager.check(
+        "login-ip",
+        client_ip,
+        positive_int_env("RATE_LIMIT_LOGIN_IP_PER_MINUTE", 30),
+        "minute",
+    )
+    if not ip_decision.allowed:
+        return rate_limited_response(ip_decision.retry_after)
+
+    # Hash the composite identifier inside the limiter; raw email is not retained.
+    pair_identifier = f"{client_ip}:{form_data.username.strip().casefold()}"
+    pair_decision = rate_limit_manager.check(
+        "login-ip-email",
+        pair_identifier,
+        positive_int_env("RATE_LIMIT_LOGIN_IP_EMAIL_PER_MINUTE", 8),
+        "minute",
+    )
+    if not pair_decision.allowed:
+        return rate_limited_response(pair_decision.retry_after)
+
     user = auth_service.authenticate_user(
         db,
         email=form_data.username,

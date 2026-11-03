@@ -111,9 +111,18 @@ def test_pair_limit_does_not_lock_email_from_another_ip(client, monkeypatch):
 
 def test_registration_has_a_separate_stricter_ip_limit(client, monkeypatch):
     monkeypatch.setenv("RATE_LIMIT_REGISTER_IP_PER_HOUR", "1")
+    from app.services import auth_service
+
+    hash_calls = []
+    monkeypatch.setattr(
+        auth_service,
+        "hash_password",
+        lambda password: hash_calls.append(password) or "test-hash",
+    )
 
     assert register(client, "first@example.com").status_code == 201
     assert_rate_limited(register(client, "second@example.com"))
+    assert hash_calls == ["StrongPass123"]
 
     other_ip = client_at_ip(client, "198.51.100.28")
     assert register(other_ip, "third@example.com").status_code == 201
@@ -165,6 +174,8 @@ def test_forwarded_for_uses_rightmost_untrusted_hop_only_when_proxy_is_trusted(
 def test_ocr_rate_limit_is_per_user_and_preserves_global_ocr_busy(client, monkeypatch):
     monkeypatch.setenv("RATE_LIMIT_OCR_PER_USER_PER_MINUTE", "1")
     register_and_login(client)
+    second_user = client_at_ip(client, "198.51.100.44")
+    register_and_login(second_user, "second@example.com")
     from app.rate_limits import reset_rate_limit_state
 
     reset_rate_limit_state()
@@ -172,6 +183,7 @@ def test_ocr_rate_limit_is_per_user_and_preserves_global_ocr_busy(client, monkey
 
     assert client.post("/ocr/extract", content=png_bytes()).status_code == 200
     assert_rate_limited(client.post("/ocr/extract", content=png_bytes()))
+    assert second_user.post("/ocr/extract", content=png_bytes()).status_code == 200
 
     reset_rate_limit_state()
     assert ocr_routes._OCR_SLOT.acquire(blocking=False)
@@ -192,6 +204,99 @@ def test_job_analysis_rate_limit_is_per_user(client, monkeypatch):
 
     assert client.post("/job-analysis", json={"text": "Python"}).status_code == 200
     assert_rate_limited(client.post("/job-analysis", json={"text": "Python"}))
+
+
+
+def test_rate_window_resets_with_a_fake_clock():
+    from app.rate_limits import RateLimitManager
+
+    now = [time.time()]
+    manager = RateLimitManager(max_tracked_keys=5, clock=lambda: now[0])
+
+    assert manager.check("login-ip", "192.0.2.1", 1, "minute").allowed
+    blocked = manager.check("login-ip", "192.0.2.1", 1, "minute")
+    assert not blocked.allowed
+    assert blocked.retry_after >= 1
+
+    now[0] += 61
+    assert manager.check("login-ip", "192.0.2.1", 1, "minute").allowed
+    assert manager.tracked_key_count == 1
+
+
+def test_ocr_same_user_parallel_request_is_rate_limited(client, monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_OCR_PER_USER_PER_MINUTE", "10")
+    register_and_login(client)
+    from app.rate_limits import reset_rate_limit_state
+
+    reset_rate_limit_state()
+    started = threading.Event()
+    finish = threading.Event()
+
+    class BlockingEngine:
+        def recognize(self, image):
+            started.set()
+            assert finish.wait(timeout=5)
+            return "Python"
+
+    client.app.dependency_overrides[get_ocr_engine] = BlockingEngine
+    second_client = client_at_ip(client, "198.51.100.46")
+    second_client.headers["Authorization"] = client.headers["Authorization"]
+    first_result = []
+    first_request = threading.Thread(
+        target=lambda: first_result.append(
+            client.post("/ocr/extract", content=png_bytes())
+        ),
+        daemon=True,
+    )
+    first_request.start()
+    assert started.wait(timeout=5)
+    try:
+        second = second_client.post("/ocr/extract", content=png_bytes())
+        assert_rate_limited(second)
+    finally:
+        finish.set()
+        first_request.join(timeout=5)
+
+    assert not first_request.is_alive()
+    assert first_result[0].status_code == 200
+
+
+def test_job_analysis_same_user_parallel_request_is_rate_limited(client, monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_JOB_ANALYSIS_PER_USER_PER_MINUTE", "10")
+    register_and_login(client)
+    from app.rate_limits import reset_rate_limit_state
+
+    reset_rate_limit_state()
+    started = threading.Event()
+    finish = threading.Event()
+    original = job_analysis_routes.analyze_job_text
+
+    def blocking_analysis(*args, **kwargs):
+        started.set()
+        assert finish.wait(timeout=5)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(job_analysis_routes, "analyze_job_text", blocking_analysis)
+    second_client = client_at_ip(client, "198.51.100.47")
+    second_client.headers["Authorization"] = client.headers["Authorization"]
+    first_result = []
+    first_request = threading.Thread(
+        target=lambda: first_result.append(
+            client.post("/job-analysis", json={"text": "Python"})
+        ),
+        daemon=True,
+    )
+    first_request.start()
+    assert started.wait(timeout=5)
+    try:
+        second = second_client.post("/job-analysis", json={"text": "Python"})
+        assert_rate_limited(second)
+    finally:
+        finish.set()
+        first_request.join(timeout=5)
+
+    assert not first_request.is_alive()
+    assert first_result[0].status_code == 200
 
 
 def test_limiter_bounds_and_expires_unique_identifier_state():
@@ -217,15 +322,21 @@ def test_user_concurrency_slots_are_isolated_and_idempotently_released():
     from app.rate_limits import UserSlotLimiter
 
     slots = UserSlotLimiter()
-    first = slots.acquire(100)
-    assert first is not None
-    assert slots.acquire(100) is None
-    assert slots.acquire(200) is not None
+    first = slots.acquire(100, scope="ocr")
+    other_user = slots.acquire(200, scope="ocr")
+    other_operation = slots.acquire(100, scope="job-analysis")
+    assert first is not None and other_user is not None and other_operation is not None
+    assert slots.acquire(100, scope="ocr") is None
 
     first.release()
     first.release()
-    assert slots.acquire(100) is not None
-    assert slots.active_count == 2
+    replacement = slots.acquire(100, scope="ocr")
+    assert replacement is not None
+    assert slots.active_count == 3
+    replacement.release()
+    other_user.release()
+    other_operation.release()
+    assert slots.active_count == 0
 
 
 def test_ocr_worker_releases_user_slot_after_engine_error(monkeypatch):
@@ -243,10 +354,11 @@ def test_ocr_worker_releases_user_slot_after_engine_error(monkeypatch):
         with pytest.raises(OcrError):
             ocr_routes._run_reserved_ocr(png_bytes(), FakeEngine(), lease)
     finally:
-        if not ocr_routes._OCR_SLOT.acquire(blocking=False):
-            pass
-        else:
-            ocr_routes._OCR_SLOT.release()
+        # Return exactly the reservation this test acquired, whether or not the
+        # worker released it; the assertion below records the expected release.
+        available = ocr_routes._OCR_SLOT.acquire(blocking=False)
+        ocr_routes._OCR_SLOT.release()
+    assert available
 
     replacement = user_slot_limiter.acquire(9001)
     assert replacement is not None

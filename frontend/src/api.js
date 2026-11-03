@@ -1,11 +1,20 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export class ApiError extends Error {
-  constructor(status, errorCode = null) {
-    super("İstek tamamlanamadı.");
+  constructor(status, errorCode = null, retryAfter = null) {
+    const retrySeconds = Number.parseInt(retryAfter, 10);
+    const message = status === 429
+      ? Number.isFinite(retrySeconds) && retrySeconds > 0
+        ? `Çok fazla istek gönderildi. ${retrySeconds} saniye sonra tekrar dene.`
+        : "Çok fazla istek gönderildi. Lütfen biraz bekleyip tekrar dene."
+      : "İstek tamamlanamadı.";
+    super(message);
     this.name = "ApiError";
     this.status = status;
     this.errorCode = errorCode;
+    this.retryAfter = Number.isFinite(retrySeconds) && retrySeconds > 0
+      ? retrySeconds
+      : null;
   }
 }
 
@@ -24,7 +33,8 @@ export function createApiClient({ onUnauthorized } = {}) {
 
     if (!response.ok) {
       if (response.status === 401) onUnauthorized?.();
-      throw new ApiError(response.status, body?.error_code ?? null);
+      const retryAfter = response.headers?.get?.("Retry-After") ?? null;
+      throw new ApiError(response.status, body?.error_code ?? null, retryAfter);
     }
     return body;
   }
