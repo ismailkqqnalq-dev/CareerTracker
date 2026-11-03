@@ -44,9 +44,11 @@ def assert_rate_limited(response):
 def clean_rate_limit_state():
     try:
         from app.rate_limits import reset_rate_limit_state
-        from app.rate_limits import get_rate_limit_settings
-    except ModuleNotFoundError:
+    except (ImportError, ModuleNotFoundError):
         reset_rate_limit_state = None
+    try:
+        from app.rate_limits import get_rate_limit_settings
+    except (ImportError, ModuleNotFoundError):
         get_rate_limit_settings = None
     if get_rate_limit_settings:
         get_rate_limit_settings.cache_clear()
