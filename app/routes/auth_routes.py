@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -12,7 +13,7 @@ from app.rate_limits import (
     rate_limited_response,
 )
 from app.schemas.auth import RegisterRequest, TokenResponse, UserResponse
-from app.security import create_access_token
+from app.security import create_access_token, registration_is_enabled
 from app.services import auth_service
 
 
@@ -23,7 +24,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
-    responses={429: {"description": "Registration rate limit exceeded"}},
+    responses={
+        403: {"description": "Registration is disabled"},
+        429: {"description": "Registration rate limit exceeded"},
+    },
 )
 def register(
     request: Request,
@@ -38,6 +42,15 @@ def register(
     )
     if not decision.allowed:
         return rate_limited_response(decision.retry_after)
+
+    if not registration_is_enabled():
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={
+                "detail": "Registration is disabled",
+                "error_code": "registration_disabled",
+            },
+        )
 
     try:
         return auth_service.register_user(db, data.email, data.password)

@@ -3,8 +3,10 @@ from sqlalchemy.orm import sessionmaker
 import os
 import secrets
 
-# Ephemeral test-only key; never use the application's real secret in tests.
+# Ephemeral test-only settings; never use application credentials in tests.
 os.environ["JWT_SECRET_KEY"] = secrets.token_hex(32)
+os.environ["APP_ENV"] = "development"
+os.environ["REGISTRATION_ENABLED"] = "true"
 from app.database.session import Base, create_database_engine, get_db
 import pytest
 from app.main import app

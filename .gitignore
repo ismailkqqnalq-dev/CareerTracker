@@ -148,9 +148,11 @@ activemq-data/
 *.sage.py
 
 # Environments
-.env
+.env*
+!.env.example
 .envrc
 .venv
+.venv-ocr/
 env/
 venv/
 ENV/
@@ -216,4 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+*.db
+*.db-*
+*.sqlite*
+*.bak*
+*.bak-*
+career-backups/
 careertracker.db
