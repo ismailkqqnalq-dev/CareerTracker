@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -6,7 +7,7 @@ from app.auth import get_current_user
 from app.database.session import get_db
 from app.models.users import User
 from app.schemas.auth import RegisterRequest, TokenResponse, UserResponse
-from app.security import create_access_token
+from app.security import create_access_token, registration_is_enabled
 from app.services import auth_service
 
 
@@ -22,6 +23,15 @@ def register(
     data: RegisterRequest,
     db: Session = Depends(get_db),
 ):
+    if not registration_is_enabled():
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={
+                "detail": "Registration is disabled",
+                "error_code": "registration_disabled",
+            },
+        )
+
     try:
         return auth_service.register_user(db, data.email, data.password)
     except ValueError as error:

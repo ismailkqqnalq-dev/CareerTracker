@@ -1,4 +1,9 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+
+from app.security import validate_security_configuration
 
 from app.routes.activity_routes import router as activity_router
 from app.routes.contact_routes import router as contact_router
@@ -10,7 +15,13 @@ from app.routes.task_routes import router as task_router
 from app.routes.auth_routes import router as auth_router
 
 
-app = FastAPI(title="CareerTracker")
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    validate_security_configuration()
+    yield
+
+
+app = FastAPI(title="CareerTracker", lifespan=lifespan)
 app.include_router(opportunity_router)
 app.include_router(activity_router)
 app.include_router(task_router)

@@ -1,3 +1,11 @@
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.services import auth_service
+from app.security import registration_is_enabled
+
+
 def register(client, email="test@example.com", password="StrongPass123"):
     return client.post(
         "/auth/register",
@@ -62,3 +70,109 @@ def test_me_without_token_returns_401(client):
     response = client.get("/auth/me")
 
     assert response.status_code == 401
+
+@pytest.mark.parametrize(
+    "bad_secret",
+    ["", "short", "x" * 31, "replace-with-a-random-secret"],
+)
+def test_app_rejects_invalid_jwt_secret_at_startup(monkeypatch, bad_secret):
+    monkeypatch.setenv("JWT_SECRET_KEY", bad_secret)
+
+    with pytest.raises(RuntimeError) as error:
+        with TestClient(app):
+            pass
+
+    assert "JWT_SECRET_KEY" in str(error.value)
+    if bad_secret:
+        assert bad_secret not in str(error.value)
+
+
+def test_app_accepts_a_32_byte_jwt_secret_at_startup(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "x" * 32)
+
+    with TestClient(app) as test_client:
+        assert test_client.get("/").status_code == 200
+
+
+def test_registration_disabled_returns_structured_403(client, monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.delenv("REGISTRATION_ENABLED", raising=False)
+
+    response = register(client)
+
+    assert response.status_code == 403
+    assert response.json()["error_code"] == "registration_disabled"
+
+
+def test_registration_can_be_explicitly_enabled_in_production(client, monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("REGISTRATION_ENABLED", "true")
+
+    assert register(client).status_code == 201
+
+
+def test_login_verifies_a_dummy_hash_for_unknown_email(client, monkeypatch):
+    calls = []
+
+    def record_verification(password, encoded_hash):
+        calls.append((password, encoded_hash))
+        return False
+
+    monkeypatch.setattr(auth_service, "verify_password", record_verification)
+    response = client.post(
+        "/auth/token",
+        data={"username": "missing@example.com", "password": "WrongPass123"},
+    )
+
+    assert response.status_code == 401
+    assert len(calls) == 1
+    assert calls[0][0] == "WrongPass123"
+    assert calls[0][1]
+
+
+def test_login_verifies_stored_hash_for_existing_user(client, monkeypatch):
+    assert register(client).status_code == 201
+    calls = []
+
+    def record_verification(password, encoded_hash):
+        calls.append((password, encoded_hash))
+        return True
+
+    monkeypatch.setattr(auth_service, "verify_password", record_verification)
+    response = client.post(
+        "/auth/token",
+        data={"username": "test@example.com", "password": "StrongPass123"},
+    )
+
+    assert response.status_code == 200
+    assert len(calls) == 1
+    assert calls[0][0] == "StrongPass123"
+    assert calls[0][1]
+
+
+@pytest.mark.parametrize("app_env", [None, "", "prod", "staging"])
+def test_registration_defaults_closed_without_explicit_development(monkeypatch, app_env):
+    monkeypatch.delenv("REGISTRATION_ENABLED", raising=False)
+    if app_env is None:
+        monkeypatch.delenv("APP_ENV", raising=False)
+    else:
+        monkeypatch.setenv("APP_ENV", app_env)
+
+    assert registration_is_enabled() is False
+
+
+@pytest.mark.parametrize("app_env", ["development", "DEVELOPMENT", " DeVeLoPmEnT "])
+def test_registration_defaults_open_only_for_explicit_development(monkeypatch, app_env):
+    monkeypatch.delenv("REGISTRATION_ENABLED", raising=False)
+    monkeypatch.setenv("APP_ENV", app_env)
+
+    assert registration_is_enabled() is True
+
+
+@pytest.mark.parametrize("configured", ["sometimes", ""])
+def test_registration_rejects_invalid_override(monkeypatch, configured):
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("REGISTRATION_ENABLED", configured)
+
+    with pytest.raises(RuntimeError, match="REGISTRATION_ENABLED"):
+        registration_is_enabled()
