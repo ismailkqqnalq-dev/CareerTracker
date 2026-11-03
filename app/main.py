@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.security import validate_security_configuration
+from app.rate_limits import validate_rate_limit_configuration
 
 from app.routes.activity_routes import router as activity_router
 from app.routes.contact_routes import router as contact_router
@@ -18,6 +19,7 @@ from app.routes.auth_routes import router as auth_router
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     validate_security_configuration()
+    validate_rate_limit_configuration()
     yield
 
 
