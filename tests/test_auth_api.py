@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import auth_service
+from app.security import registration_is_enabled
 
 
 def register(client, email="test@example.com", password="StrongPass123"):
@@ -147,3 +148,31 @@ def test_login_verifies_stored_hash_for_existing_user(client, monkeypatch):
     assert len(calls) == 1
     assert calls[0][0] == "StrongPass123"
     assert calls[0][1]
+
+
+@pytest.mark.parametrize("app_env", [None, "", "prod", "staging"])
+def test_registration_defaults_closed_without_explicit_development(monkeypatch, app_env):
+    monkeypatch.delenv("REGISTRATION_ENABLED", raising=False)
+    if app_env is None:
+        monkeypatch.delenv("APP_ENV", raising=False)
+    else:
+        monkeypatch.setenv("APP_ENV", app_env)
+
+    assert registration_is_enabled() is False
+
+
+@pytest.mark.parametrize("app_env", ["development", "DEVELOPMENT", " DeVeLoPmEnT "])
+def test_registration_defaults_open_only_for_explicit_development(monkeypatch, app_env):
+    monkeypatch.delenv("REGISTRATION_ENABLED", raising=False)
+    monkeypatch.setenv("APP_ENV", app_env)
+
+    assert registration_is_enabled() is True
+
+
+@pytest.mark.parametrize("configured", ["sometimes", ""])
+def test_registration_rejects_invalid_override(monkeypatch, configured):
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("REGISTRATION_ENABLED", configured)
+
+    with pytest.raises(RuntimeError, match="REGISTRATION_ENABLED"):
+        registration_is_enabled()
