@@ -17,6 +17,7 @@ MIN_JWT_SECRET_BYTES = 32
 _PLACEHOLDER_SECRET_VALUES = frozenset(
     {
         "replace-with-a-random-secret",
+        "development-placeholder-secret-key",
         "your-secret-key",
         "change-me",
         "changeme",
