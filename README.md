@@ -166,10 +166,10 @@ python -c "import secrets; print(secrets.token_hex(32))"
 Üretilen değeri yalnızca yerel `.env` dosyasındaki `JWT_SECRET_KEY` alanına koy;
 gerçek anahtarı depoya veya `.env.example` dosyasına ekleme.
 
-Kayıt varsayılanı `APP_ENV=development` iken açıktır; diğer ortam adlarında
-(varsayılan olarak production dahil) kapalıdır. `REGISTRATION_ENABLED=true|false`
-ile bu davranış açıkça geçersiz kılınabilir. Kapalı kayıt isteği
-`403 registration_disabled` döndürür.
+Yalnızca `APP_ENV=development` açıkça belirtilmişse (büyük/küçük harf duyarsız)
+kayıt varsayılan olarak açıktır. `APP_ENV` tanımsız, boş veya bilinmeyen bir değerse
+kayıt kapalıdır. `REGISTRATION_ENABLED=true|false` ile varsayılan açıkça
+geçersiz kılınabilir. Kapalı kayıt isteği `403 registration_disabled` döndürür.
 
 Kabul edilmiş risk: kayıtlı e-posta için `POST /auth/register` mevcut davranış
 gereği `409` döndürür ve bu, e-posta adresinin sistemde olup olmadığını ortaya

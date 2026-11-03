@@ -41,7 +41,7 @@ def validate_jwt_secret_key() -> str:
 def registration_is_enabled() -> bool:
     configured = os.getenv("REGISTRATION_ENABLED")
     if configured is None:
-        app_env = os.getenv("APP_ENV", "development").strip().casefold()
+        app_env = os.getenv("APP_ENV", "").strip().casefold()
         return app_env == "development"
 
     value = configured.strip().casefold()
