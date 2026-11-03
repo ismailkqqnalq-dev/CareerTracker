@@ -7,6 +7,27 @@ on:
     branches: [main]
 
 jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create excluded sentinel files
+        run: |
+          printf 'CI-only secret sentinel\n' > .env
+          printf 'CI-only database sentinel\n' > careertracker.db
+
+      - name: Build Docker image
+        run: docker build --tag careertracker-security-ci .
+
+      - name: Verify image excludes local data and runs as non-root
+        run: >-
+          docker run --rm --entrypoint sh careertracker-security-ci -c
+          'test ! -e /app/.env && test ! -e /app/careertracker.db && test "$(id -u)" -ne 0'
+
   test:
     runs-on: ubuntu-latest
     env:
@@ -112,3 +133,26 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+  docker-compose-config:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Prepare Compose environment file
+        run: cp .env.example .env
+      - name: Validate required password and safe defaults
+        shell: bash
+        run: |
+          POSTGRES_PASSWORD=ci-compose-only-password docker compose config --format json > /tmp/compose-config.json
+          if grep -q 'careertracker:careertracker@' docker-compose.yml; then
+            echo "Weak hard-coded database credentials found in docker-compose.yml"
+            exit 1
+          fi
+          if env -u POSTGRES_PASSWORD docker compose config >/tmp/compose-without-password.yml 2>&1; then
+            echo "docker compose config unexpectedly succeeded without POSTGRES_PASSWORD"
+            exit 1
+          fi
+          grep -Eiq '^#[[:space:]]*POSTGRES_PASSWORD=.*placeholder' .env.example
