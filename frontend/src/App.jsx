@@ -121,8 +121,8 @@ function App() {
     try {
       const [me, pending, catalog] = await Promise.all([
         api.request("/auth/me", { token: authToken }),
-        api.request("/skills/suggestions?status=pending", { token: authToken }),
-        api.request("/skills", { token: authToken }),
+        api.requestAll("/skills/suggestions?status=pending", { token: authToken }),
+        api.requestAll("/skills", { token: authToken }),
       ]);
       setUser(me);
       setSuggestions(pending);

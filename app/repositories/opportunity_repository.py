@@ -1,6 +1,7 @@
 from sqlalchemy import func
 
 from app.models.opportunity import Opportunity
+from app.pagination import paginate_query
 
 
 def create_opportunity(db, opportunity_data, user_id):
@@ -14,11 +15,21 @@ def create_opportunity(db, opportunity_data, user_id):
     return new_opportunity
 
 
-def get_all_opportunities(db, user_id):
+def get_all_opportunities(db, user_id, limit=50, offset=0):
+    return paginate_query(
+        db.query(Opportunity).filter(Opportunity.user_id == user_id),
+        order_by=Opportunity.id,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def iter_opportunities(db, user_id, batch_size=500):
     return (
         db.query(Opportunity)
         .filter(Opportunity.user_id == user_id)
-        .all()
+        .order_by(Opportunity.id)
+        .yield_per(batch_size)
     )
 
 
@@ -81,14 +92,19 @@ def get_dashboard_stats(db, user_id):
     )
 
     by_status_dict = dict(by_status)
+    normalized_status_counts = {}
+    turkish_i_fold = str.maketrans({"İ": "i", "ı": "i"})
+    for status, count in by_status:
+        if status is not None:
+            key = status.strip().translate(turkish_i_fold).casefold()
+            normalized_status_counts[key] = normalized_status_counts.get(key, 0) + count
 
-    interview_count = (
-        by_status_dict.get("Ön görüşme", 0)
-        + by_status_dict.get("Teknik mülakat", 0)
-        + by_status_dict.get("Son mülakat", 0)
+    interview_count = sum(
+        normalized_status_counts.get(label.translate(turkish_i_fold).casefold(), 0)
+        for label in ("Ön görüşme", "Teknik mülakat", "Son mülakat")
     )
-    offer_count = by_status_dict.get("Teklif", 0)
-    rejected_count = by_status_dict.get("Reddedildi", 0)
+    offer_count = normalized_status_counts.get("Teklif".casefold(), 0)
+    rejected_count = normalized_status_counts.get("Reddedildi".casefold(), 0)
     rejection_rate = rejected_count / total * 100 if total > 0 else 0
 
     return {

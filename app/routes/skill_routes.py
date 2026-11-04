@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.models.skills import Skill
+from app.pagination import pagination_params, paginate_query, set_total_count
 from app.services import skill_match_service
 from app.services import skill_service as service
 from app.services.skill_normalizer import find_skill
@@ -35,8 +36,20 @@ router = APIRouter()
 
 
 @router.get("/skills", response_model=list[SkillResponse])
-def list_skills(db: Session = Depends(get_db), current_user: User | None = Depends(get_optional_current_user)):
-    return visible_skills(db, current_user.id if current_user else None).order_by(Skill.name, Skill.id).all()
+def list_skills(
+    response: Response,
+    pagination: tuple[int, int] = Depends(pagination_params),
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    items, total = paginate_query(
+        visible_skills(db, current_user.id if current_user else None),
+        order_by=Skill.id,
+        limit=pagination[0],
+        offset=pagination[1],
+    )
+    set_total_count(response, total)
+    return items
 
 
 @router.post(
@@ -75,15 +88,21 @@ def submit_skill_suggestion(
     response_model=list[SkillSuggestionResponse],
 )
 def list_skill_suggestions(
+    response: Response,
     status: str | None = Query(default=None, pattern="^(pending|accepted|rejected)$"),
+    pagination: tuple[int, int] = Depends(pagination_params),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return skill_suggestion_service.list_suggestions(
+    items, total = skill_suggestion_service.list_suggestions(
         db,
         user_id=current_user.id,
         status=status,
+        limit=pagination[0],
+        offset=pagination[1],
     )
+    set_total_count(response, total)
+    return items
 
 
 @router.patch(
@@ -240,15 +259,21 @@ def attach_skill(
 )
 def list_opportunity_skills(
     opportunity_id: int,
+    response: Response,
+    pagination: tuple[int, int] = Depends(pagination_params),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return opportunity_skill_service.list_skills(
+        items, total = opportunity_skill_service.list_skills(
             db,
             opportunity_id,
             user_id=current_user.id,
+            limit=pagination[0],
+            offset=pagination[1],
         )
+        set_total_count(response, total)
+        return items
     except opportunity_skill_service.OpportunityNotFoundError as error:
         return JSONResponse(
             status_code=404,
@@ -289,13 +314,19 @@ def add_profile_skill(
     response_model=list[UserSkillResponse],
 )
 def list_profile_skills(
+    response: Response,
+    pagination: tuple[int, int] = Depends(pagination_params),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return user_skill_service.list_skills(
+    items, total = user_skill_service.list_skills(
         db,
         user_id=current_user.id,
+        limit=pagination[0],
+        offset=pagination[1],
     )
+    set_total_count(response, total)
+    return items
     
 @router.patch(
     "/users/me/skills/{user_skill_id}",

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database.session import get_db
 from app.models.users import User
+from app.pagination import pagination_params, set_total_count
 from app.schemas.tasks import TaskCreate, TaskResponse, TaskUpdate
 from app.services import task_service as service
 
@@ -31,10 +32,16 @@ def create_task(
 
 @router.get("/tasks", response_model=list[TaskResponse])
 def get_all_tasks(
+    response: Response,
+    pagination: tuple[int, int] = Depends(pagination_params),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_all_tasks(db, user_id=current_user.id)
+    items, total = service.get_all_tasks(
+        db, user_id=current_user.id, limit=pagination[0], offset=pagination[1]
+    )
+    set_total_count(response, total)
+    return items
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)

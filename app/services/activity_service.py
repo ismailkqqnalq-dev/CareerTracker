@@ -40,8 +40,8 @@ def create_activity(db, activity_data, user_id):
     return ap.create_activity(db, activity_data, user_id=user_id)
 
 
-def get_all_activities(db, user_id):
-    return ap.get_all_activities(db, user_id=user_id)
+def get_all_activities(db, user_id, limit=50, offset=0):
+    return ap.get_all_activities(db, user_id=user_id, limit=limit, offset=offset)
 
 
 def get_activity_by_id(db, activity_id, user_id):

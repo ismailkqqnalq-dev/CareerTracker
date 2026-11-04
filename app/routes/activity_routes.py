@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database.session import get_db
 from app.models.users import User
+from app.pagination import pagination_params, set_total_count
 from app.schemas.activities import (
     ActivityCreate,
     ActivityResponse,
@@ -35,10 +36,16 @@ def create_activity(
 
 @router.get("/activities", response_model=list[ActivityResponse])
 def get_all_activities(
+    response: Response,
+    pagination: tuple[int, int] = Depends(pagination_params),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_all_activities(db, user_id=current_user.id)
+    items, total = service.get_all_activities(
+        db, user_id=current_user.id, limit=pagination[0], offset=pagination[1]
+    )
+    set_total_count(response, total)
+    return items
 
 
 @router.get("/activities/{activity_id:int}", response_model=ActivityResponse)

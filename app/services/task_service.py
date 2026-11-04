@@ -26,8 +26,8 @@ def create_task(db, task_data, user_id):
     return tr.create_task(db, task_data, user_id=user_id)
 
 
-def get_all_tasks(db, user_id):
-    return tr.get_all_tasks(db, user_id=user_id)
+def get_all_tasks(db, user_id, limit=50, offset=0):
+    return tr.get_all_tasks(db, user_id=user_id, limit=limit, offset=offset)
 
 
 def get_task_by_id(db, task_id, user_id):

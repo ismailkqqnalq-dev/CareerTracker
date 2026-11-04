@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.skills import Skill, SkillAliases, SkillSuggestion, PersonalSkillAlias
 from app.services.skill_access import get_visible_skill, visible_skills
 from app.services.skill_normalizer import find_skill, normalize_text
+from app.pagination import paginate_query
 
 
 _CANDIDATE_TEXT_ALIASES = {
@@ -73,14 +74,21 @@ def list_suggestions(
     *,
     user_id: int,
     status: str | None = None,
-) -> list[SkillSuggestion]:
+    limit: int = 50,
+    offset: int = 0,
+):
     query = (
         db.query(SkillSuggestion)
         .filter(SkillSuggestion.user_id == user_id)
     )
     if status is not None:
         query = query.filter(SkillSuggestion.status == status)
-    return query.order_by(SkillSuggestion.id).all()
+    return paginate_query(
+        query,
+        order_by=SkillSuggestion.id,
+        limit=limit,
+        offset=offset,
+    )
 
 
 def resolve_suggestion(

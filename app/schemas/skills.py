@@ -4,20 +4,28 @@ from pydantic import BaseModel, ConfigDict, StringConstraints, Field, field_vali
 
 
 class SkillBase(BaseModel):
-    name: Annotated[str,StringConstraints(strip_whitespace=True, min_length=1)]
-    category: Optional[str]= None 
+    name: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=120),
+    ]
+    category: Annotated[str | None, StringConstraints(max_length=100)] = None
     
 
 class SkillCreate(SkillBase):
     pass
 
 
-class SkillResponse(SkillBase):
+class SkillResponse(BaseModel):
+    name: str
+    category: str | None
     id: int
     model_config = ConfigDict(from_attributes=True)
    
 class AliasCreate(BaseModel):
-    alias: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    alias: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=120),
+    ]
 
 
 class AliasResponse(BaseModel):
@@ -28,7 +36,10 @@ class AliasResponse(BaseModel):
 
 
 class OpportunitySkillAdd(BaseModel):
-    skill: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    skill: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=120),
+    ]
     
 
 

@@ -10,6 +10,23 @@ function response(status, body) {
 }
 
 describe("createApiClient", () => {
+  it("loads all pages without changing the list response contract", async () => {
+    const fetchMock = vi.fn(async (url) => {
+      const offset = Number(new URL(url, "http://localhost").searchParams.get("offset"));
+      const items = offset === 0 ? [{ id: 1 }, { id: 2 }] : [{ id: 3 }];
+      return response(200, items);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const api = createApiClient();
+
+    const items = await api.requestAll("/skills", { pageSize: 2, token: "test" });
+
+    expect(items).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.map(([url]) => new URL(url, "http://localhost").searchParams.get("offset")))
+      .toEqual(["0", "2"]);
+  });
+
   it("exposes error_code without using detail as a decision value", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
       response(409, {

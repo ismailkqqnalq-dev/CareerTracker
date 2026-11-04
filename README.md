@@ -64,6 +64,21 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Dashboard | `GET /dashboard` | Evet | Kullanıcının fırsat istatistiklerini döndürür |
 | CSV | `GET /opportunities/export` | Evet | Kullanıcının fırsatlarını CSV olarak indirir |
 
+Koleksiyon liste uç noktaları `limit` (varsayılan `50`, en fazla `200`) ve
+`offset` (varsayılan `0`) parametrelerini kabul eder. Yanıt biçimi JSON listesi
+olarak kalır; filtre uygulanmış toplam kayıt sayısı `X-Total-Count` başlığında
+döner. `GET /skills/suggestions/{id}/candidates` kendi `limit` sınırını kullanır.
+
+CSV dışa aktarma kayıtları akışlı üretir. Elektronik tablo formülü olarak
+yorumlanabilecek metin hücrelerinin başına tek tırnak eklenir; güvenlik için bu,
+dışa aktarılan hücre içeriğini değiştirir. Türkçe UTF-8 BOM korunur.
+
+CRM yazma şemaları alan uzunluklarını sınırlar. Fırsat `job_link` ve kişi
+`linkedin` alanları boş olabilir; doluysa yalnızca HTTP/HTTPS URL kabul edilir.
+Maaş 0 ile PostgreSQL `INTEGER` üst sınırı arasında olmalıdır. `type` ve `status`
+serbest metin olarak kalır; yanıt şemaları eski verilerle uyum için uzunluk kısıtı
+uygulamaz.
+
 ### İstek sınırları
 
 Kimlik doğrulama ve kaynak tüketen işlemler için süreç içi, bellek tabanlı
@@ -179,6 +194,7 @@ python -m pip install -e ".[dev]"
 
 ```bash
 python -m alembic upgrade head
+python -m app.seed_skill_catalog
 python -m uvicorn app.main:app --reload
 ```
 
@@ -214,11 +230,20 @@ Docker ve Docker Compose kurulu olmalı. Depoyu klonladıktan sonra:
 Copy-Item .env.example .env
 ```
 
-Docker Compose içindeki PostgreSQL servisine bağlanmak için `.env` dosyasındaki `DATABASE_URL` değerini şu şekilde ayarla:
+`.env` içinde PostgreSQL parolası için güçlü, URL'de güvenle kullanılabilecek
+rastgele bir değer belirle ve aynı değeri iki yerde kullan:
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
 ```text
-DATABASE_URL=postgresql://careertracker:careertracker@db:5432/careertracker
+POSTGRES_PASSWORD=<rastgele-güçlü-değer>
+DATABASE_URL=postgresql://careertracker:<aynı-değer>@db:5432/careertracker
 ```
+
+`POSTGRES_PASSWORD` eksikse Compose başlamaz. Bu değerleri `.env.example` veya
+depodaki başka bir dosyaya yazma.
 
 Sentetik ilan metni analizi ölçümünü bellekteki SQLite kataloğunda çalıştır:
 
@@ -235,6 +260,7 @@ Ardından uygulama ve veritabanını başlat, migration'ları uygula:
 ```powershell
 docker compose up --build -d
 docker compose exec app alembic upgrade head
+docker compose exec app python -m app.seed_skill_catalog
 ```
 
 API: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). Servisleri durdurmak için `docker compose down` kullan. Veritabanı verileri `postgres_data` volume'unda saklanır.
@@ -310,7 +336,8 @@ backend testlerini, migration kontrollerini, frontend testlerini ve frontend bui
 
 ## Migration oluşturma
 
-Boş bir veritabanını kurmak için `python -m alembic upgrade head` yeterlidir. İlk migration
+Boş bir veritabanında tabloları kurmak için `python -m alembic upgrade head`, ortak beceri
+kataloğunu eklemek için `python -m app.seed_skill_catalog` çalıştır. İlk migration
 fırsat, kişi, aktivite ve görev tablolarını; sonraki migration skill tablolarını
 oluşturur. `init_db.py`, Alembic geçmişini kaydetmediği için normal kurulum adımı değildir.
 

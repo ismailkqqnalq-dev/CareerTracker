@@ -5,8 +5,12 @@ def create_opportunity(db, opportunity_data, user_id):
     return op.create_opportunity(db, opportunity_data, user_id)
 
 
-def get_all_opportunities(db, user_id):
-    return op.get_all_opportunities(db, user_id)
+def get_all_opportunities(db, user_id, limit=50, offset=0):
+    return op.get_all_opportunities(db, user_id, limit, offset)
+
+
+def iter_opportunities(db, user_id, batch_size=500):
+    return op.iter_opportunities(db, user_id, batch_size)
 
 
 def get_opportunity_by_id(db, opportunity_id, user_id):
