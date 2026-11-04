@@ -39,7 +39,7 @@ if [[ "$startup_status" == "0" || "$startup_status" == "124" || "$startup_status
 fi
 if ! grep -Fq 'JWT_SECRET_KEY must be a non-placeholder value of at least 32 bytes.' "$TEMP_DIR/startup.log"; then
   echo "Image failed without JWT_SECRET_KEY but did not report the expected configuration error. Startup output:"
-  sed -n '1,20p' "$TEMP_DIR/startup.log"
+  sed -n '1,50p' "$TEMP_DIR/startup.log"
   exit 1
 fi
 
