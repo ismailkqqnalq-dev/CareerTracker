@@ -13,6 +13,7 @@ RUN apk upgrade --no-cache \
     && python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir . \
     && python -m pip uninstall --yes setuptools \
+    && if apk info -e py3-setuptools >/dev/null 2>&1; then apk del py3-setuptools; fi \
     && find /usr /root /tmp /opt -iname '*setuptools*' -exec rm -rf {} + \
     && rm -rf /root/.cache /tmp/pip-* /tmp/build* \
     && find /usr /root /tmp /opt -type f -name '*.whl' -delete \
