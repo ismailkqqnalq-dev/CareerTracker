@@ -1,23 +1,31 @@
-from pydantic import BaseModel, ConfigDict
 from datetime import date
-from typing import Optional
+from typing import Annotated
 
-class TaskBase(BaseModel):
-    
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+
+Description = Annotated[str, StringConstraints(max_length=2000)]
+
+
+class TaskCreate(BaseModel):
     opportunity_id: int
-    description: str
+    description: Description
     due_date: date
-    is_completed:bool=False
-    
-class TaskCreate(TaskBase):
-    pass
+    is_completed: bool = False
 
-class TaskResponse(TaskBase):
-    id: int 
+
+class TaskResponse(BaseModel):
+    opportunity_id: int
+    description: str | None
+    due_date: date | None
+    is_completed: bool | None
+    id: int
+
     model_config = ConfigDict(from_attributes=True)
-        
+
+
 class TaskUpdate(BaseModel):
-    opportunity_id:Optional[int]=None
-    description: Optional[str]=None
-    due_date: Optional[date]=None
-    is_completed: Optional[bool] = None
+    opportunity_id: int | None = None
+    description: Description | None = None
+    due_date: date | None = None
+    is_completed: bool | None = None

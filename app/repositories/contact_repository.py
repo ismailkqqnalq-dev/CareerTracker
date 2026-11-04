@@ -1,4 +1,5 @@
 from app.models.contacts import Contact
+from app.pagination import paginate_query
 
 
 def create_contact(db, contact_data, user_id):
@@ -11,11 +12,12 @@ def create_contact(db, contact_data, user_id):
     return contact
 
 
-def get_all_contacts(db, user_id):
-    return (
-        db.query(Contact)
-        .filter(Contact.user_id == user_id)
-        .all()
+def get_all_contacts(db, user_id, limit=50, offset=0):
+    return paginate_query(
+        db.query(Contact).filter(Contact.user_id == user_id),
+        order_by=Contact.id,
+        limit=limit,
+        offset=offset,
     )
 
 

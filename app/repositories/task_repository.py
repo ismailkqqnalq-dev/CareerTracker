@@ -1,4 +1,5 @@
 from app.models.tasks import Task
+from app.pagination import paginate_query
 
 
 def create_task(db, task_data, user_id):
@@ -11,11 +12,12 @@ def create_task(db, task_data, user_id):
     return task
 
 
-def get_all_tasks(db, user_id):
-    return (
-        db.query(Task)
-        .filter(Task.user_id == user_id)
-        .all()
+def get_all_tasks(db, user_id, limit=50, offset=0):
+    return paginate_query(
+        db.query(Task).filter(Task.user_id == user_id),
+        order_by=Task.id,
+        limit=limit,
+        offset=offset,
     )
 
 

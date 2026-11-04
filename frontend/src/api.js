@@ -39,5 +39,26 @@ export function createApiClient({ onUnauthorized } = {}) {
     return body;
   }
 
-  return { request };
+  async function requestAll(path, { token, pageSize = 200, ...options } = {}) {
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 200) {
+      throw new RangeError("pageSize must be between 1 and 200");
+    }
+
+    const [pathname, search = ""] = path.split("?", 2);
+    const params = new URLSearchParams(search);
+    const items = [];
+    let offset = 0;
+
+    while (true) {
+      params.set("limit", String(pageSize));
+      params.set("offset", String(offset));
+      const page = await request(`${pathname}?${params}`, { ...options, token });
+      if (!Array.isArray(page)) throw new TypeError("Expected a paginated list response");
+      items.push(...page);
+      if (page.length < pageSize) return items;
+      offset += pageSize;
+    }
+  }
+
+  return { request, requestAll };
 }

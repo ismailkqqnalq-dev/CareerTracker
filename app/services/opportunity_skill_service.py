@@ -4,6 +4,7 @@ from app.models.skills import Skill
 from app.services.skill_normalizer import find_skill
 from app.services.skill_suggestion_service import submit_suggestion
 from app.services.skill_access import visible_skills
+from app.pagination import paginate_query
 
 
 class OpportunityNotFoundError(LookupError):
@@ -65,13 +66,16 @@ def attach_skill(
         raise
 
 
-def list_skills(db, opportunity_id: int, user_id: int) -> list[Skill]:
+def list_skills(
+    db, opportunity_id: int, user_id: int, limit: int = 50, offset: int = 0
+):
     _get_opportunity(db, opportunity_id, user_id)
 
-    return (
+    query = (
         visible_skills(db, user_id)
         .join(OpportunitySkill, OpportunitySkill.skill_id == Skill.id)
         .filter(OpportunitySkill.opportunity_id == opportunity_id)
-        .order_by(Skill.name)
-        .all()
+    )
+    return paginate_query(
+        query, order_by=Skill.id, limit=limit, offset=offset
     )

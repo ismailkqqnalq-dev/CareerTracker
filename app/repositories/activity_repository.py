@@ -1,4 +1,5 @@
 from app.models.activities import Activity
+from app.pagination import paginate_query
 
 
 def create_activity(db, activity_data, user_id):
@@ -11,11 +12,12 @@ def create_activity(db, activity_data, user_id):
     return activity
 
 
-def get_all_activities(db, user_id):
-    return (
-        db.query(Activity)
-        .filter(Activity.user_id == user_id)
-        .all()
+def get_all_activities(db, user_id, limit=50, offset=0):
+    return paginate_query(
+        db.query(Activity).filter(Activity.user_id == user_id),
+        order_by=Activity.id,
+        limit=limit,
+        offset=offset,
     )
 
 

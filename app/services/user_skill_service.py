@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.skills import Skill, UserSkill
+from app.pagination import paginate_query
 from app.services.skill_access import get_visible_skill
 
 
@@ -42,12 +43,12 @@ def add_skill(
         raise
 
 
-def list_skills(db: Session, user_id: int) -> list[UserSkill]:
-    return (
-        db.query(UserSkill)
-        .filter(UserSkill.user_id == user_id)
-        .order_by(UserSkill.id)
-        .all()
+def list_skills(db: Session, user_id: int, limit: int = 50, offset: int = 0):
+    return paginate_query(
+        db.query(UserSkill).filter(UserSkill.user_id == user_id),
+        order_by=UserSkill.id,
+        limit=limit,
+        offset=offset,
     )
     
 def update_skill(

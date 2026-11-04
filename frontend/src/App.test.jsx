@@ -15,7 +15,7 @@ function setupLoggedInApp() {
   const fetchMock = vi.fn(async (url) => {
     if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
     if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
-    if (url.endsWith("/skills")) return jsonResponse(200, []);
+    if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
     throw new Error(`Unexpected request: ${url}`);
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -37,7 +37,7 @@ function setupSuggestionReviewApp(patchResponse) {
         created_at: "2026-10-25T00:00:00Z",
       }] : []);
     }
-    if (url.endsWith("/skills")) return jsonResponse(200, [{ id: 5, name: "Python", category: "language" }]);
+    if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, [{ id: 5, name: "Python", category: "language" }]);
     if (url.includes("/skills/suggestions/2/candidates")) {
       return jsonResponse(200, [{ id: 5, name: "Python", category: "language", score: 0.9 }]);
     }
@@ -74,7 +74,7 @@ describe("skill suggestion input", () => {
       }
       if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
       if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
-      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
       throw new Error(`Unexpected request: ${url}`);
     });
 
@@ -92,7 +92,7 @@ describe("skill suggestion input", () => {
       }
       if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
       if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
-      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
       throw new Error(`Unexpected request: ${url}`);
     });
 
@@ -111,7 +111,7 @@ describe("skill suggestion input", () => {
       }
       if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
       if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
-      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
       throw new Error(`Unexpected request: ${url}`);
     });
 
@@ -136,7 +136,7 @@ describe("skill suggestion input", () => {
       }
       if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
       if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
-      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
       throw new Error(`Unexpected request: ${url}`);
     });
 
@@ -159,7 +159,7 @@ describe("skill suggestion input", () => {
       }
       if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
       if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
-      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
       throw new Error(`Unexpected request: ${url}`);
     });
 
@@ -181,7 +181,7 @@ describe("skill suggestion input", () => {
       }
       if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
       if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
-      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
       throw new Error(`Unexpected request: ${url}`);
     });
 
@@ -244,7 +244,7 @@ describe("skill suggestion input", () => {
       if (url.endsWith("/skills/suggestions") && options.method === "POST") return request.promise;
       if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
       if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
-      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
       throw new Error(`Unexpected request: ${url}`);
     });
     fireEvent.change(await screen.findByLabelText("Beceri adı"), { target: { value: "Rust" } });
@@ -296,7 +296,7 @@ describe("job text analysis", () => {
     fetchMock.mockImplementation(async (url) => {
       if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
       if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
-      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
       if (url.endsWith("/job-analysis")) {
         return jsonResponse(200, {
           role: "Backend Engineer",
@@ -331,7 +331,7 @@ describe("job text analysis", () => {
     fetchMock.mockImplementation(async (url) => {
       if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
       if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
-      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
       if (url.endsWith("/job-analysis")) return jsonResponse(413, {
         detail: "Job text exceeds the 100 KB limit.",
         error_code: "job_text_too_large",

@@ -68,7 +68,7 @@ describe("authenticated API requests", () => {
       if (url.includes("/skills/suggestions?status=pending")) {
         return jsonResponse(200, [{ id: 2, raw_name: "Pyton", normalized_name: "pyton", status: "pending", created_at: "2026-10-25T00:00:00Z" }]);
       }
-      if (url.endsWith("/skills")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
       if (url.includes("/candidates")) return jsonResponse(503, { detail: "private backend detail" });
       throw new Error(`Unexpected request: ${url}`);
     }));

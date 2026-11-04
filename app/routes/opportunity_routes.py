@@ -1,13 +1,14 @@
 import csv
 import io
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database.session import get_db
 from app.models.users import User
+from app.pagination import pagination_params, set_total_count
 from app.schemas.opportunity import (
     OpportunityCreate,
     OpportunityResponse,
@@ -34,10 +35,60 @@ def create_opportunity(
 
 @router.get("/opportunities", response_model=list[OpportunityResponse])
 def get_all_opportunities(
+    response: Response,
+    pagination: tuple[int, int] = Depends(pagination_params),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.get_all_opportunities(db, user_id=current_user.id)
+    items, total = service.get_all_opportunities(
+        db, user_id=current_user.id, limit=pagination[0], offset=pagination[1]
+    )
+    set_total_count(response, total)
+    return items
+
+
+def _safe_csv_cell(value):
+    if not isinstance(value, str):
+        return value
+    first_after_spaces = value.lstrip(" ")[:1]
+    first_non_whitespace = value.lstrip()[:1]
+    if (
+        first_after_spaces in {"\t", "\r", "\n"}
+        or first_non_whitespace in {"=", "+", "-", "@"}
+    ):
+        return "'" + value
+    return value
+
+
+def _csv_rows(opportunities):
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer)
+    yield "\ufeff"
+    writer.writerow([
+        "id", "company", "position", "type", "status", "salary",
+        "location", "application_date",
+    ])
+    yield buffer.getvalue()
+    buffer.seek(0)
+    buffer.truncate(0)
+
+    for opportunity in opportunities:
+        writer.writerow([
+            _safe_csv_cell(value)
+            for value in (
+                opportunity.id,
+                opportunity.company,
+                opportunity.position,
+                opportunity.type,
+                opportunity.status,
+                opportunity.salary,
+                opportunity.location,
+                opportunity.application_date,
+            )
+        ])
+        yield buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
 
 
 @router.get("/opportunities/export")
@@ -45,40 +96,8 @@ def export_opportunities_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    opportunities = service.get_all_opportunities(
-        db,
-        user_id=current_user.id,
-    )
-
-    output = io.StringIO()
-    output.write("\ufeff")
-    writer = csv.writer(output)
-    writer.writerow([
-        "id",
-        "company",
-        "position",
-        "type",
-        "status",
-        "salary",
-        "location",
-        "application_date",
-    ])
-
-    for opportunity in opportunities:
-        writer.writerow([
-            opportunity.id,
-            opportunity.company,
-            opportunity.position,
-            opportunity.type,
-            opportunity.status,
-            opportunity.salary,
-            opportunity.location,
-            opportunity.application_date,
-        ])
-
-    output.seek(0)
     return StreamingResponse(
-        output,
+        _csv_rows(service.iter_opportunities(db, user_id=current_user.id)),
         media_type="text/csv",
         headers={
             "Content-Disposition":
