@@ -42,17 +42,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$HOME/.cache/trivy:/root/.cache/" \
-            -v "$RUNNER_TEMP:/reports" \
             aquasec/trivy:0.76.1 image \
-            --format json --exit-code 0 --severity HIGH,CRITICAL \
-            --vuln-type os,library --output /reports/trivy-report.json "$IMAGE_REF"
-          docker run --rm --entrypoint sh "$IMAGE_REF" -c 'find /usr/local/lib/python3.11 -iname "*setuptools*" -print; python -m pip show setuptools' || true
-          jq -c '.Results[]? | select(.Vulnerabilities != null) | . as $r | .Vulnerabilities[] | select(.VulnerabilityID == "CVE-2025-47273") | {target:$r.Target, vulnerability:.}' "$RUNNER_TEMP/trivy-report.json"
-          aquasec/trivy:0.76.1 image \
-            --format json --exit-code 0 --severity HIGH,CRITICAL \
-            --vuln-type os,library --output /tmp/trivy-report.json "$IMAGE_REF"
-          jq -r '.Results[]? | select(.Vulnerabilities != null) | . as $r | .Vulnerabilities[] | select(.VulnerabilityID == "CVE-2025-47273") | "DIAGNOSTIC target=\($r.Target) package=\(.PkgName) version=\(.InstalledVersion) path=\(.PkgPath // "unknown")"' /tmp/trivy-report.json
-          aquasec/trivy:0.76.1 image \
             --format table --exit-code 1 --severity HIGH,CRITICAL \
             --vuln-type os,library "$IMAGE_REF"
 
