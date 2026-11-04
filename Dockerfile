@@ -3,6 +3,7 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
+    && if dpkg-query -W -f='${Status}' python3-setuptools 2>/dev/null | grep -q 'install ok installed'; then apt-get purge -y python3-setuptools; fi \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
