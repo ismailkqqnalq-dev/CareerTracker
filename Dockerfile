@@ -17,7 +17,7 @@ COPY migrations/ ./migrations/
 
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir . \
-    && python -c 'import ensurepip, pathlib; [p.unlink() for p in pathlib.Path(ensurepip.__path__[0], "_bundled").glob("setuptools-*.whl")]' \
+    && find /usr/lib /usr/local/lib -path '*/ensurepip/_bundled/setuptools-*.whl' -delete \
     && groupadd --system app \
     && useradd --system --gid app --home-dir /app --no-create-home --shell /usr/sbin/nologin app \
     && chown -R app:app /app
