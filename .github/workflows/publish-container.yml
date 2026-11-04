@@ -17,21 +17,37 @@ jobs:
   container-validation:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Build and inspect release image without publishing
+      - name: Create synthetic excluded data
         run: |
-          printf 'synthetic sentinel\n' > .env
-          printf 'synthetic sentinel\n' > careertracker.db
-          docker build --tag careertracker-release-check .
-          docker run --rm --entrypoint sh careertracker-release-check -c \
-            'test ! -e /app/.env && test ! -e /app/careertracker.db && test "$(id -u)" -ne 0'
+          printf 'CI_ONLY_SECRET_SENTINEL\n' > .env
+          printf 'CI_ONLY_DATABASE_SENTINEL\n' > careertracker.db
+          printf 'CI_ONLY_BACKUP_SENTINEL\n' > careertracker.db.bak-ci
+          printf 'CI_ONLY_SQLITE_SENTINEL\n' > scratch.sqlite
+      - name: Build candidate image
+        run: docker build --tag careertracker-release-check .
+      - name: Audit image contents, runtime identity, startup, and history
+        run: bash scripts/audit_container_image.sh careertracker-release-check CI_ONLY_SECRET_SENTINEL
+      - name: Scan candidate image (HIGH/CRITICAL fail)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: careertracker-release-check
+          format: table
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          vuln-type: os,library
+          version: v0.76.1
 
   publish:
     if: github.event_name == 'release' && !github.event.release.prerelease
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
@@ -40,7 +56,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Validate release and determine image name
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Validate release and determine image reference
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           REPOSITORY: ${{ github.repository }}
@@ -51,23 +69,77 @@ jobs:
             exit 1
           fi
           git merge-base --is-ancestor HEAD origin/main
-          echo "IMAGE=ghcr.io/${REPOSITORY,,}:$RELEASE_TAG" >> "$GITHUB_ENV"
-      - name: Build and inspect image
+          echo "IMAGE=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+      - name: Create synthetic excluded data
+        run: |
+          printf 'CI_ONLY_SECRET_SENTINEL\n' > .env
+          printf 'CI_ONLY_DATABASE_SENTINEL\n' > careertracker.db
+          printf 'CI_ONLY_BACKUP_SENTINEL\n' > careertracker.db.bak-ci
+          printf 'CI_ONLY_SQLITE_SENTINEL\n' > scratch.sqlite
+      - name: Build local candidate for pre-publish checks
         env:
           REPOSITORY: ${{ github.repository }}
         run: |
-          docker build --tag "$IMAGE" \
+          docker build --tag "careertracker-release-audit:${GITHUB_RUN_ID}" \
             --label "org.opencontainers.image.source=https://github.com/$REPOSITORY" \
             --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" .
-          docker run --rm --entrypoint sh "$IMAGE" -c \
-            'test ! -e /app/.env && test ! -e /app/careertracker.db && test "$(id -u)" -ne 0'
-      - name: Publish to GHCR
+          echo "LOCAL_IMAGE=careertracker-release-audit:${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+      - name: Audit candidate image
+        run: bash scripts/audit_container_image.sh "$LOCAL_IMAGE" CI_ONLY_SECRET_SENTINEL
+      - name: Scan candidate image (HIGH/CRITICAL fail)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: careertracker-release-audit:${{ github.run_id }}
+          format: table
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          vuln-type: os,library
+          version: v0.76.1
+      - name: Log in to GHCR
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
         run: |
           set -euo pipefail
-          trap 'docker logout ghcr.io' EXIT
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
-          docker push "$IMAGE"
-          echo "Published $IMAGE" >> "$GITHUB_STEP_SUMMARY"
+      - name: Refuse to overwrite an existing release image tag
+        run: |
+          set -euo pipefail
+          result="$RUNNER_TEMP/registry-inspect.txt"
+          if docker buildx imagetools inspect "$IMAGE:$RELEASE_TAG" >"$result" 2>&1; then
+            echo "Refusing to overwrite an existing versioned image tag."
+            exit 1
+          fi
+          if ! grep -Eiq 'manifest unknown|no such manifest|name unknown|not found' "$result"; then
+            echo "Could not safely determine whether the release image tag already exists; aborting."
+            exit 1
+          fi
+      - name: Publish image with SBOM and provenance
+        id: image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.RELEASE_TAG }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+      - name: Verify the published artifact by immutable digest
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Build did not return a valid image digest."
+            exit 1
+          fi
+          PUBLISHED_IMAGE="$IMAGE@$IMAGE_DIGEST"
+          echo "PUBLISHED_IMAGE=$PUBLISHED_IMAGE" >> "$GITHUB_ENV"
+          echo "Published image digest: $PUBLISHED_IMAGE" >> "$GITHUB_STEP_SUMMARY"
+          PULL_IMAGE=1 bash scripts/audit_container_image.sh "$PUBLISHED_IMAGE" CI_ONLY_SECRET_SENTINEL
+      - name: Log out from GHCR
+        if: always()
+        run: docker logout ghcr.io || true
