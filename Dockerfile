@@ -1,4 +1,4 @@
-FROM python:3.11.18-alpine3.23 AS app-build
+FROM python:3.12.16-alpine3.23 AS app-build
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
