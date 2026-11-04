@@ -14,7 +14,7 @@ COPY app/ ./app/
 COPY alembic.ini ./
 COPY migrations/ ./migrations/
 
-RUN python3 -m pip install --break-system-packages --no-cache-dir . \
+RUN python3 -m pip install --break-system-packages --no-cache-dir --ignore-installed --target /opt/python-packages . \
     && apk del .build-deps \
     && find /usr /root /tmp /opt -iname '*setuptools*' -exec rm -rf {} + \
     && rm -rf /root/.cache /tmp/pip-* /tmp/build* \
@@ -29,7 +29,8 @@ COPY --from=app-build / /
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/opt/python-packages
 
 USER app
 
