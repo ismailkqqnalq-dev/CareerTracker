@@ -22,6 +22,10 @@ RUN apk upgrade --no-cache \
     && adduser -S -D -G app -h /app -s /sbin/nologin app \
     && chown -R app:app /app
 
+RUN echo "Remaining setuptools package records:" \
+    && (apk info | grep -i setuptools || true) \
+    && (find / -iname '*setuptools*' -print 2>/dev/null || true)
+
 # Copy the cleaned merged filesystem into a fresh image so vulnerable packages
 # from the Python base image's lower layers are not retained in the runtime.
 FROM scratch
