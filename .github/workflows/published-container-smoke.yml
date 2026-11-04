@@ -1,0 +1,39 @@
+name: Published container smoke
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  published-container-smoke:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # v0.1.0: verify the registry artifact, not a local rebuild.
+      IMAGE: ghcr.io/ismailkqqnalq-dev/careertracker@sha256:a2d887dfcbab46f30e253c1ca7d69573940228c59ea67cc9ad28131b930fe4b2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Download released image
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          trap 'docker logout ghcr.io' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
+          docker pull "$IMAGE"
+      - name: Verify runtime identity and excluded data
+        run: |
+          docker run --rm --network none --entrypoint sh "$IMAGE" -c \
+            'test "$(id -u)" -ne 0 && test ! -e /app/.env && test ! -e /app/careertracker.db'
+      - name: Start and exercise released server
+        run: |
+          docker run --rm -i --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,size=128m \
+            --entrypoint python "$IMAGE" - < scripts/smoke_published_container.py
