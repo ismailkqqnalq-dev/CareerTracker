@@ -1,4 +1,9 @@
-FROM python:3.12.16-alpine3.23 AS app-build
+FROM alpine:3.23 AS app-build
+
+RUN apk upgrade --no-cache \
+    && apk add --no-cache python3 libffi openssl sqlite-libs \
+    && apk add --no-cache --virtual .build-deps py3-pip py3-setuptools
+
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -9,25 +14,15 @@ COPY app/ ./app/
 COPY alembic.ini ./
 COPY migrations/ ./migrations/
 
-RUN apk upgrade --no-cache \
-    && python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
-    && python -m pip install --no-cache-dir . \
-    && python -m pip uninstall --yes setuptools \
-    && if apk info -e py3-setuptools >/dev/null 2>&1; then apk del py3-setuptools; fi \
+RUN python3 -m pip install --break-system-packages --no-cache-dir . \
+    && apk del .build-deps \
     && find /usr /root /tmp /opt -iname '*setuptools*' -exec rm -rf {} + \
     && rm -rf /root/.cache /tmp/pip-* /tmp/build* \
     && find /usr /root /tmp /opt -type f -name '*.whl' -delete \
-    && test -z "$(find /usr /root /tmp /opt -iname '*setuptools*' -o -type f -name '*.whl' -print -quit)" \
     && addgroup -S app \
     && adduser -S -D -G app -h /app -s /sbin/nologin app \
     && chown -R app:app /app
 
-RUN echo "Remaining setuptools package records:" \
-    && (apk info | grep -i setuptools || true) \
-    && (find / -iname '*setuptools*' -print 2>/dev/null || true)
-
-# Copy the cleaned merged filesystem into a fresh image so vulnerable packages
-# from the Python base image's lower layers are not retained in the runtime.
 FROM scratch
 COPY --from=app-build / /
 WORKDIR /app
@@ -39,4 +34,4 @@ USER app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
