@@ -42,7 +42,6 @@ jobs:
           exit-code: "1"
           severity: HIGH,CRITICAL
           vuln-type: os,library
-          version: v0.76.1
 
   publish:
     if: github.event_name == 'release' && !github.event.release.prerelease
@@ -95,7 +94,6 @@ jobs:
           exit-code: "1"
           severity: HIGH,CRITICAL
           vuln-type: os,library
-          version: v0.76.1
       - name: Log in to GHCR
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
