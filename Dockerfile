@@ -1,4 +1,4 @@
-FROM python:3.11.18-alpine3.23
+FROM python:3.11.18-alpine3.23 AS app-build
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,6 +16,15 @@ RUN apk upgrade --no-cache \
     && addgroup -S app \
     && adduser -S -D -G app -h /app -s /sbin/nologin app \
     && chown -R app:app /app
+
+# Copy the cleaned merged filesystem into a fresh image so vulnerable packages
+# from the Python base image's lower layers are not retained in the runtime.
+FROM scratch
+COPY --from=app-build / /
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 USER app
 
