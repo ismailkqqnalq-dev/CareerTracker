@@ -14,7 +14,9 @@ RUN apk upgrade --no-cache \
     && python -m pip install --no-cache-dir . \
     && python -m pip uninstall --yes setuptools \
     && find /usr /root /tmp /opt -iname '*setuptools*' -exec rm -rf {} + \
-    && test -z "$(find /usr /root /tmp /opt -iname '*setuptools*' -print -quit)" \
+    && rm -rf /root/.cache /tmp/pip-* /tmp/build* \
+    && find /usr /root /tmp /opt -type f -name '*.whl' -delete \
+    && test -z "$(find /usr /root /tmp /opt -iname '*setuptools*' -o -type f -name '*.whl' -print -quit)" \
     && addgroup -S app \
     && adduser -S -D -G app -h /app -s /sbin/nologin app \
     && chown -R app:app /app
