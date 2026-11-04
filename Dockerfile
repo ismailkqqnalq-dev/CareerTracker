@@ -12,6 +12,7 @@ COPY migrations/ ./migrations/
 RUN apk upgrade --no-cache \
     && python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir . \
+    && find / -type f -name 'setuptools-*.whl' -delete \
     && addgroup -S app \
     && adduser -S -D -G app -h /app -s /sbin/nologin app \
     && chown -R app:app /app
