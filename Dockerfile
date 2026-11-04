@@ -19,6 +19,7 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir . \
     && find /usr /root /tmp /opt -iname '*setuptools*' -exec rm -rf {} + \
     && rm -rf /root/.cache /tmp/pip-* /tmp/build* \
     && find /usr /root /tmp /opt -type f -name '*.whl' -delete \
+    && ln -sf /usr/bin/python3 /usr/bin/python \
     && addgroup -S app \
     && adduser -S -D -G app -h /app -s /sbin/nologin app \
     && chown -R app:app /app
