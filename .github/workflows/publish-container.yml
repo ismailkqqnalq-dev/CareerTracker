@@ -42,14 +42,6 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$HOME/.cache/trivy:/root/.cache/" \
-            -v "$RUNNER_TEMP:/reports" \
-            aquasec/trivy:0.76.1 image \
-            --format json --list-all-pkgs --exit-code 0 --severity HIGH,CRITICAL \
-            --vuln-type os,library --output /reports/trivy.json "$IMAGE_REF"
-          jq -c '.Results[]?.Packages[]? | select(.Name == "setuptools")' "$RUNNER_TEMP/trivy.json"
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$HOME/.cache/trivy:/root/.cache/" \
             aquasec/trivy:0.76.1 image \
             --format table --exit-code 1 --severity HIGH,CRITICAL \
             --vuln-type os,library "$IMAGE_REF"
@@ -102,14 +94,6 @@ jobs:
           IMAGE_REF: careertracker-release-audit:${{ github.run_id }}
         run: |
           mkdir -p "$HOME/.cache/trivy"
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$HOME/.cache/trivy:/root/.cache/" \
-            -v "$RUNNER_TEMP:/reports" \
-            aquasec/trivy:0.76.1 image \
-            --format json --list-all-pkgs --exit-code 0 --severity HIGH,CRITICAL \
-            --vuln-type os,library --output /reports/trivy.json "$IMAGE_REF"
-          jq -c '.Results[]?.Packages[]? | select(.Name == "setuptools")' "$RUNNER_TEMP/trivy.json"
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$HOME/.cache/trivy:/root/.cache/" \
