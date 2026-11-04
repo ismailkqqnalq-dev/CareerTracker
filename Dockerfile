@@ -13,7 +13,8 @@ RUN apk upgrade --no-cache \
     && python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir . \
     && python -m pip uninstall --yes setuptools \
-    && find / -type f -name 'setuptools-*.whl' -delete \
+    && find /usr/local/lib/python3.11 -iname '*setuptools*' -exec rm -rf {} + \
+    && find /usr/local/lib/python3.11 -type f -name 'setuptools-*.whl' -delete \
     && addgroup -S app \
     && adduser -S -D -G app -h /app -s /sbin/nologin app \
     && chown -R app:app /app
