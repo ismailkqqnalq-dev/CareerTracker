@@ -347,3 +347,108 @@ describe("job text analysis", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("100 KB");
   });
 });
+
+describe("OCR image upload", () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("extracts image text and lets the user send it to job analysis", async () => {
+    const fetchMock = setupLoggedInApp();
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
+      if (url.endsWith("/ocr/extract")) {
+        return jsonResponse(200, {
+          text: "Pozisyon: Backend Engineer\nPython ve FastAPI",
+          width: 1200,
+          height: 800,
+          image_format: "PNG",
+        });
+      }
+      if (url.endsWith("/job-analysis")) {
+        return jsonResponse(200, {
+          role: "Backend Engineer",
+          skills: [{
+            skill_id: 7,
+            name: "Python",
+            category: "language",
+            occurrences: [{ line_number: 2, matched_text: "Python", section: "unspecified" }],
+          }],
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const file = new File([new Uint8Array([1, 2, 3])], "posting.png", { type: "image/png" });
+    fireEvent.change(await screen.findByLabelText("İlan görseli"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Görselden metin çıkar" }));
+
+    const extractedText = await screen.findByLabelText("Çıkarılan metin");
+    expect(extractedText.value).toContain("Python ve FastAPI");
+    expect(fetchMock).toHaveBeenCalledWith("/api/ocr/extract", expect.objectContaining({
+      method: "POST",
+      body: file,
+      headers: expect.any(Headers),
+    }));
+    const [, ocrOptions] = fetchMock.mock.calls.find(([url]) => url.endsWith("/ocr/extract"));
+    expect(ocrOptions.headers.get("Content-Type")).toBe("image/png");
+    expect(ocrOptions.headers.get("Authorization")).toBe("Bearer temporary-test-token");
+
+    fireEvent.click(screen.getByRole("button", { name: "Analiz alanına aktar" }));
+    const jobText = screen.getByLabelText("İlan metni");
+    expect(jobText.value).toBe(extractedText.value);
+    fireEvent.click(screen.getByRole("button", { name: "Metni analiz et" }));
+    expect(await screen.findByRole("heading", { name: "Bulunan beceriler" })).toBeTruthy();
+    expect(screen.getByText("Python")).toBeTruthy();
+  });
+
+  it("rejects a non-PNG/JPEG file before sending a request", async () => {
+    const fetchMock = setupLoggedInApp();
+    const file = new File([new Uint8Array([1, 2, 3])], "posting.gif", { type: "image/gif" });
+
+    fireEvent.change(await screen.findByLabelText("İlan görseli"), {
+      target: { files: [file] },
+    });
+
+    expect((await screen.findByRole("alert")).textContent).toContain("PNG veya JPEG");
+    expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/ocr/extract"))).toBe(false);
+  });
+
+  it("rejects a file over 10 MiB before sending it", async () => {
+    const fetchMock = setupLoggedInApp();
+    const file = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "posting.png", { type: "image/png" });
+
+    fireEvent.change(await screen.findByLabelText("İlan görseli"), {
+      target: { files: [file] },
+    });
+
+    expect((await screen.findByRole("alert")).textContent).toContain("10 MiB");
+    expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/ocr/extract"))).toBe(false);
+  });
+
+  it("uses the shared login flow when the OCR request returns 401", async () => {
+    const fetchMock = setupLoggedInApp();
+    fetchMock.mockImplementation(async (url) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
+      if (url.endsWith("/ocr/extract")) return jsonResponse(401, { detail: "expired" });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const file = new File([new Uint8Array([1])], "posting.png", { type: "image/png" });
+    fireEvent.change(await screen.findByLabelText("İlan görseli"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Görselden metin çıkar" }));
+
+    expect(await screen.findByRole("heading", { name: "Hesabına giriş yap" })).toBeTruthy();
+    expect(sessionStorage.getItem("careertracker_token")).toBeNull();
+  });
+});

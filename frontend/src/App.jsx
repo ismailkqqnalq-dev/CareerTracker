@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient } from "./api.js";
 
 const authApi = createApiClient();
+const MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024;
+const OCR_IMAGE_TYPES = new Set(["image/png", "image/jpeg"]);
 
 function errorMessage(error, context = "İstek") {
   if (context === "Kayıt" && error.errorCode === "registration_disabled") {
@@ -15,6 +17,21 @@ function errorMessage(error, context = "İstek") {
   }
   if (error.errorCode === "invalid_job_text") {
     return "İlan metni okunamadı. Metni kontrol edip tekrar deneyin.";
+  }
+  if (error.errorCode === "image_too_large") {
+    return "Görsel 10 MiB sınırını aşıyor.";
+  }
+  if (error.errorCode === "unsupported_image_type") {
+    return "Yalnızca PNG veya JPEG görselleri yükleyebilirsin.";
+  }
+  if (error.errorCode === "invalid_image" || error.errorCode === "empty_image") {
+    return "Görsel okunamadı. Geçerli ve boş olmayan bir PNG veya JPEG seç.";
+  }
+  if (error.errorCode === "ocr_engine_unavailable" || error.errorCode === "ocr_engine_initialization_failed") {
+    return "OCR motoru şu anda kullanılamıyor. Lütfen daha sonra tekrar dene.";
+  }
+  if (error.errorCode === "ocr_busy" || error.errorCode === "rate_limited") {
+    return "OCR isteği şu anda işlenemiyor. Biraz bekleyip tekrar dene.";
   }
   if (error.status === 401 && context === "Giriş") {
     return "E-posta veya şifre geçersiz.";
@@ -105,12 +122,17 @@ function App() {
   const [jobText, setJobText] = useState("");
   const [jobAnalysis, setJobAnalysis] = useState(null);
   const [analyzingJob, setAnalyzingJob] = useState(false);
+  const [jobImage, setJobImage] = useState(null);
+  const [ocrResult, setOcrResult] = useState(null);
+  const [extractingText, setExtractingText] = useState(false);
 
   const logout = useCallback(() => {
     sessionStorage.removeItem("careertracker_token");
     setToken(null);
     setUser(null);
     setSuggestions([]);
+    setJobImage(null);
+    setOcrResult(null);
   }, []);
 
   const api = useMemo(() => createApiClient({ onUnauthorized: logout }), [logout]);
@@ -263,6 +285,52 @@ function App() {
     }
   }
 
+  function selectJobImage(event) {
+    const file = event.target.files?.[0] || null;
+    setJobImage(file);
+    setOcrResult(null);
+    setError("");
+    setNotice("");
+    if (!file) return;
+    if (!OCR_IMAGE_TYPES.has(file.type)) {
+      setError("Yalnızca PNG veya JPEG görselleri yükleyebilirsin.");
+    } else if (file.size > MAX_OCR_IMAGE_BYTES) {
+      setError("Görsel 10 MiB sınırını aşıyor.");
+    }
+  }
+
+  async function extractImageText(event) {
+    event.preventDefault();
+    if (!jobImage || !OCR_IMAGE_TYPES.has(jobImage.type) || jobImage.size > MAX_OCR_IMAGE_BYTES) return;
+    setExtractingText(true);
+    setOcrResult(null);
+    setError("");
+    setNotice("");
+    try {
+      const result = await api.request("/ocr/extract", {
+        method: "POST",
+        token,
+        headers: { "Content-Type": jobImage.type },
+        body: jobImage,
+      });
+      setOcrResult(result);
+      setNotice(result.text.trim()
+        ? "Görseldeki metin çıkarıldı. İstersen ilan analizine aktarabilirsin."
+        : "Görsel işlendi ancak okunabilir metin bulunamadı.");
+    } catch (ocrError) {
+      if (ocrError.status !== 401) setError(errorMessage(ocrError, "Görselden metin çıkarma"));
+    } finally {
+      setExtractingText(false);
+    }
+  }
+
+  function useExtractedText() {
+    if (!ocrResult?.text.trim()) return;
+    setJobText(ocrResult.text);
+    setJobAnalysis(null);
+    setNotice("Çıkarılan metin ilan analizi alanına aktarıldı.");
+  }
+
   if (!token) return <AuthScreen onAuthenticated={setToken} />;
 
   return (
@@ -281,6 +349,46 @@ function App() {
           </div>
           <div className="count-card"><span className="count-number">{pendingCount}</span><span>bekleyen öneri</span></div>
         </div>
+
+        <section className="ocr-card" aria-labelledby="ocr-title">
+          <div className="ocr-heading">
+            <h2 id="ocr-title">İlan görselinden metin çıkar</h2>
+            <p className="muted">PNG veya JPEG, en fazla 10 MiB. Görsel ve OCR sonucu sunucuda saklanmaz.</p>
+          </div>
+          <form className="ocr-form" onSubmit={extractImageText}>
+            <label htmlFor="job-image">İlan görseli</label>
+            <input
+              id="job-image"
+              type="file"
+              accept="image/png,image/jpeg"
+              disabled={extractingText}
+              onChange={selectJobImage}
+            />
+            <button
+              className="button button-primary"
+              disabled={!jobImage || !OCR_IMAGE_TYPES.has(jobImage.type) || jobImage.size > MAX_OCR_IMAGE_BYTES || extractingText}
+            >
+              {extractingText ? "Metin çıkarılıyor…" : "Görselden metin çıkar"}
+            </button>
+          </form>
+          {ocrResult && (
+            <div className="ocr-result" aria-live="polite">
+              <label htmlFor="ocr-text">Çıkarılan metin</label>
+              <textarea id="ocr-text" readOnly rows={5} value={ocrResult.text} />
+              <div className="ocr-result-footer">
+                <span>{ocrResult.image_format} · {ocrResult.width} × {ocrResult.height}</span>
+                <button
+                  className="button button-quiet"
+                  type="button"
+                  disabled={!ocrResult.text.trim()}
+                  onClick={useExtractedText}
+                >
+                  Analiz alanına aktar
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
 
         <section className="analysis-card" aria-labelledby="job-analysis-title">
           <div className="analysis-heading">

@@ -21,7 +21,7 @@ export class ApiError extends Error {
 export function createApiClient({ onUnauthorized } = {}) {
   async function request(path, { token, ...options } = {}) {
     const headers = new Headers(options.headers || {});
-    if (options.body && !(options.body instanceof URLSearchParams)) {
+    if (options.body && !(options.body instanceof URLSearchParams) && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
     if (token) headers.set("Authorization", `Bearer ${token}`);

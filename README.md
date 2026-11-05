@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml)
 
-İş, staj ve freelance fırsatlarını takip etmek için geliştirilen bir kariyer CRM'idir. FastAPI ve SQLAlchemy REST API'si, SQLite ile yerel ve PostgreSQL ile Docker ortamında çalışabilir. `frontend/` dizininde beceri önerileri için sınırlı bir React MVP'si bulunur; tam CRM arayüzü değildir.
+İş, staj ve freelance fırsatlarını takip etmek için geliştirilen bir kariyer CRM'idir. FastAPI ve SQLAlchemy REST API'si, SQLite ile yerel ve PostgreSQL ile Docker ortamında çalışabilir. `frontend/` dizininde beceri önerileri, OCR görsel yükleme ve ilan metni analizi için sınırlı bir React MVP'si bulunur; tam CRM arayüzü değildir.
 ## Vizyon
 
 CareerTracker, başvuru takibinden öteye geçmeyi hedefliyor: **Career Tracker AI**. Farklı platformlardan (LinkedIn, Indeed, Upwork, Fiverr) gelen iş ve freelance fırsatlarını tek yerde toplayıp ilanlardan yapılandırılmış veri çıkaran, kullanıcının becerileriyle karşılaştıran ve zamanla piyasa trendlerini analiz eden bir kariyer istihbarat platformu.
@@ -323,6 +323,13 @@ Vite'ın verdiği yerel adresi aç. Geliştirme proxy'si `/api` isteklerini vars
 olarak `http://127.0.0.1:8000` adresine yönlendirir. Başka API adresi için Vite'ı
 başlatmadan önce `CAREERTRACKER_API_URL` ortam değişkenini ayarla.
 
+İlan görseli için PNG/JPEG dosyası seçip **Görselden metin çıkar**'a bas. Çıkan
+metni gözden geçir; **Analiz alanına aktar** metni ilan analiz kutusuna kopyalar,
+ardından analizi ayrıca başlatırsın. Görsel ve OCR sonucu veritabanına veya
+tarayıcı depolamasına yazılmaz; OCR isteği kimlik doğrulamalı API'ye gönderilir.
+OCR motoru isteğe bağlıdır; kurulumu ve yerel kullanım adımları için
+[`docs/ocr-baseline.md`](docs/ocr-baseline.md) belgesine bak.
+
 ## Testler
 
 Backend testleri ve migration kontrolleri için:
@@ -427,7 +434,7 @@ tests/             # pytest testleri
 - **Tamamlandı — Faz 1:** Fırsat, kişi, aktivite ve görev backend CRUD'ları.
 - **Tamamlandı — Faz 2:** Dashboard, CSV dışa aktarma, PostgreSQL/Docker, Alembic ve CI.
 - **Tamamlandı — Faz 2.5:** Skill modelleri ve API'si, seed katalogu, kişisel skill/alias ve öneri eşleştirme temeli.
-- **Kısmi — Faz 3:** Görsel doğrulama/OCR servis baseline'ı ve kimlik doğrulamalı ham metin çıkarma API'si var; OCR sonucunu analiz ekranına aktaran otomatik akış ve kalıcı ilan akışı yok.
+- **Kısmi — Faz 3:** Görsel doğrulama/OCR servis baseline'ı, kimlik doğrulamalı ham metin çıkarma API'si ve sonucu kullanıcı onayıyla Faz 4 analiz alanına aktaran arayüz var; sonuç saklanmaz ve gerçek ilanlarda OCR kalitesi kapsamlı ölçülmedi.
 - **Kısmi — Faz 4:** Yapıştırılan ilan metninden görünür katalog becerilerini, açık rol etiketini ve tanınan gereksinim bölüm başlıklarını bulan kural tabanlı servis, API, MVP arayüzü ve sentetik değerlendirme betiği var; gerçek ilanları temsil eden ölçüm ve kapsamlı çıkarım tamamlanmadı.
 - **Kısmi — Faz 5:** Normalizasyon, seed alias'ları, kişisel alias'lar ve metin benzerliğine dayalı aday sıralaması var; kapsamlı beceri normalizasyonu tamamlanmadı.
 - **Kısmi — Faz 6:** Kullanıcı skill profili ve fırsat skill-match/gap endpoint'i var; tam eşleştirme ürünü ve arayüzü tamamlanmadı.
@@ -439,11 +446,12 @@ Fazlar doğrusal ilerlemez. Faz 5, 6 ve 11'in bazı altyapı parçaları OCR/NLP
 ## Durum
 
 Faz 1, 2 ve 2.5 tamamlandı. Faz 3 OCR baseline aşamasında; görsel yükleme için
-kimlik doğrulamalı ve sonuç saklamayan API eklendi. Faz 4'te metin analizi için
+kimlik doğrulamalı API ve sonucu ilan analiz alanına aktaran MVP arayüzü eklendi.
+Faz 4'te metin analizi için
 ilk kural tabanlı API ve arayüz eklendi. Faz 5, 6 ve 11'den bazı parçalar erken
 teslim edildi ancak bu fazların bütünü tamamlanmış değildir. Arayüz beceri
-önerilerini yönetmenin yanında yapıştırılmış ilan metni için temel beceri
-eşleştirmesi de sunar.
+önerilerini yönetmenin yanında görselden OCR ile metin çıkarma ve yapıştırılmış
+ilan metni için temel beceri eşleştirmesi de sunar.
 
 ## Bilinen sınırlar
 
