@@ -55,6 +55,63 @@ SYNTHETIC_CASES = (
         "expected": ("Python", "FastAPI", "JavaScript", "C#", "C++"),
         "unknown_terms": ("UncataloguedSkill",),
     },
+    {
+        "id": "turkish-concept-aliases",
+        "text": (
+            "Makine öğrenmesi, derin öğrenme, doğal dil işleme ve "
+            "bilgisayarlı görü; ayrıca veri analizi ve veri bilimi."
+        ),
+        "expected": (
+            "Machine Learning",
+            "Deep Learning",
+            "Natural Language Processing",
+            "Computer Vision",
+            "Data Analysis",
+            "Data Science",
+        ),
+        "unknown_terms": ("UncataloguedSkill",),
+    },
+    {
+        "id": "folded-headings-and-sections",
+        "text": (
+            "Pozisyon: Veri Mühendisi\n"
+            "İş İçin Gerekli Beceriler:\nPython\n"
+            "Öne Çıkan Özellikler:\nPostgreSQL\n"
+            "Hakkımızda:\nFastAPI"
+        ),
+        "expected": ("Python", "PostgreSQL", "FastAPI"),
+        "unknown_terms": ("UncataloguedSkill",),
+    },
+    {
+        "id": "ambiguous-short-terms",
+        "text": (
+            "C programming experience.\n"
+            "R programlama dili deneyimi.\n"
+            "Go programming language experience.\n"
+            "Go board games.\nR&D team.\nC-level communication."
+        ),
+        "expected": ("C", "R", "Go"),
+        "unknown_terms": ("UncataloguedSkill",),
+    },
+    {
+        "id": "phrase-overlap",
+        "text": "React Native and React; SQL Server and PostgreSQL; C# and C++.",
+        "expected": (
+            "React Native",
+            "React",
+            "Microsoft SQL Server",
+            "PostgreSQL",
+            "C#",
+            "C++",
+        ),
+        "unknown_terms": ("UncataloguedSkill",),
+    },
+    {
+        "id": "unknown-terms",
+        "text": "DefinitelyUncataloguedTerm; FastAP1; Kubernetes.",
+        "expected": ("Kubernetes",),
+        "unknown_terms": ("DefinitelyUncataloguedTerm", "FastAP1"),
+    },
 )
 
 
@@ -133,7 +190,8 @@ def evaluate(analyzer=analyze_job_text) -> dict:
             },
             "cases": rows,
             "limitations": [
-                "The synthetic sample is not representative of real job descriptions.",
+                "This small, hand-written synthetic sample is not representative of real job descriptions.",
+                "Scores are regression signals for known cases, not estimates of real-world accuracy.",
                 "OCR-like spelling noise is included to expose misses; no correction model is used.",
                 "Unresolved terms are reported only and are not persisted as suggestions.",
             ],
