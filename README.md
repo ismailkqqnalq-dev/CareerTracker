@@ -18,7 +18,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Fırsatları CSV olarak dışa aktarma (Türkçe karakter desteği)
 - Alembic veritabanı migration'ları
 - GitHub Actions ile otomatik test çalıştırma
-- Ortak seed skill kataloğu, kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
+- 180 becerilik ortak teknik seed kataloğu, kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
 - Fırsatlara skill bağlama ve bağlı skill'leri listeleme
 - Kullanıcıya özel bekleyen beceri önerilerini gözden geçirip mevcut katalogla eşleştirme (`frontend/` MVP arayüzü)
 
@@ -286,6 +286,11 @@ kişi, aktivite ve görevleri yönetmek için tam CRM arayüzü içermez.
 - Giriş yapan kullanıcı ortak katalogu ve kendi skill/alias kayıtlarını görür.
   Tokensız `GET /skills` ve `GET /skills/resolve` yalnızca ortak kayıtları gösterir.
   Başka kullanıcının özel kayıtları çözümleme ve aday listelerinde görünmez.
+- Seed kataloğu yazılım, veri bilimi/ML, web, veritabanı, bulut ve DevOps
+  alanlarından seçilmiş teknik beceriler içerir. `Skill.category` serbest metin
+  alanıdır; sabit enum veya yeni migration gerektirmez. Seed'in çalışması ortak
+  kataloğa beceri ve global alias ekler; komut tekrar çalıştırılabilir ve kişisel
+  skill/alias kayıtlarını değiştirmez.
 
 ### Aday sıralaması ve eşleştirme
 
@@ -450,9 +455,13 @@ eşleştirmesi de sunar.
 - Aday sıralaması yazım/metin benzerliği heuristiğidir. Kısa veya sembollü adlarda
   skorlar anlamsal doğruluk anlamına gelmez.
 - Bir fırsata bağlanan skill'i kaldırmak için endpoint yoktur; yalnızca profil skill'i silinebilir.
+- Fırsat silinince ona bağlı kişiler, görevler, aktiviteler ve fırsat-skill
+  bağlantıları veritabanı `CASCADE` kurallarıyla silinir. Kişi silinince aktivite
+  kaydı korunur ve `contact_id` boşaltılır (`SET NULL`).
 - İlan analizi yalnızca ortak katalogu, kullanıcının kendi skill'lerini ve kişisel eşleştirmelerini görür. Katalog dışında kalan terimleri otomatik olarak öneri veya alias yapmaz.
 - İlan analizi ML değildir: becerileri ad/alias sözlüğü ve sözcük sınırlarıyla arar. Rolü yalnızca açık `Pozisyon:` / `Role:` benzeri etiketlerden, gereksinim türünü yalnızca tanınan bölüm başlıklarından alır; serbest başlık tahmini yapmaz.
-- Eşleşme başarısı mevcut katalog kapsamına bağlıdır. Türkçe ekler ve OCR kaynaklı yazım bozulmaları için anlamsal düzeltme yapılmaz; eşleşmeyen veya bozuk yazılan beceriler kaçabilir.
+- Ortak katalog küratörlü ve sınırlıdır; beceri dışarıda kalabilir. Yeni global alias eklemeden önce hem `normalize_text` hem ilan analizindeki Türkçe/OCR katlama sonrası çakışmalar denetlenmelidir. Genel sözcükler (`spring`, `spark`, `excel`, `word`, `dash`) tek başına alias yapılmaz; kısa `C`, `R`, `Go` adları yalnızca bağlam filtresini geçen satırlarda eşleşir.
+- İlan analizi Türkçe/OCR katlaması uygular, ancak Unicode birleşik/NFD yazımları NFC biçimine dönüştürmez. OCR harf hatalarını ve Türkçe ekleri anlamsal olarak düzeltmez; bu nedenle gerçek ilanlarda beceri kaçırabilir veya metne göre istenmeyen eşleşmeler olabilir.
 - Değerlendirme betiği yalnızca küçük, sentetik örnekler kullanır; precision/recall/F1 sonuçları gerçek iş ilanlarına genellenemez.
 
 

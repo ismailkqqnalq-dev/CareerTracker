@@ -24,8 +24,8 @@ SYNTHETIC_CASES = (
             "Aranan Nitelikler:\nPython ve FastAPI deneyimi\n"
             "Tercihen:\nPostgreSQL'e aşinalık ve Redis bilgisi"
         ),
-        "expected": ("Python", "FastAPI", "PostgreSQL"),
-        "unknown_terms": ("Redis",),
+        "expected": ("Python", "FastAPI", "PostgreSQL", "Redis"),
+        "unknown_terms": ("UncataloguedSkill",),
     },
     {
         "id": "en-clean",
@@ -35,25 +35,25 @@ SYNTHETIC_CASES = (
             "Nice to have: Kubernetes"
         ),
         "expected": ("React", "TypeScript", "Node.js", "Kubernetes"),
-        "unknown_terms": ("Redis",),
+        "unknown_terms": ("UncataloguedSkill",),
     },
     {
         "id": "symbols-and-short-name",
         "text": "C# programming experience; C++ is preferred; R notları",
         "expected": ("C#", "C++"),
-        "unknown_terms": ("Terraform",),
+        "unknown_terms": ("UncataloguedSkill",),
     },
     {
         "id": "ocr-like-noise",
         "text": "FastAP1 ile REST API; Postgre SQL deneyimi",
-        "expected": ("FastAPI", "PostgreSQL"),
-        "unknown_terms": ("Redis",),
+        "expected": ("FastAPI", "REST API", "PostgreSQL"),
+        "unknown_terms": ("FastAP1",),
     },
     {
         "id": "turkish-ascii-ocr-folding",
         "text": "Pythön, FastAPI, JavaScript, C# ve C++",
         "expected": ("Python", "FastAPI", "JavaScript", "C#", "C++"),
-        "unknown_terms": ("Redis",),
+        "unknown_terms": ("UncataloguedSkill",),
     },
 )
 

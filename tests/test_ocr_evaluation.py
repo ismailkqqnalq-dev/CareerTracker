@@ -36,6 +36,13 @@ def test_term_recall_normalizes_output_and_catalog_terms():
     }
 
 
+def test_term_recall_does_not_count_c_inside_symbolic_languages():
+    metrics = term_recall("C# and C++", ("C", "C#", "C++"))
+
+    assert metrics["matched"] == ["C#", "C++"]
+    assert metrics["missing"] == ["C"]
+
+
 def test_dataset_is_deterministic_and_in_memory():
     first, second = synthetic_cases(), synthetic_cases()
     assert len(first) >= 10
@@ -43,7 +50,7 @@ def test_dataset_is_deterministic_and_in_memory():
     assert all(isinstance(case["image"], bytes) for case in first)
     catalog_case = next(case for case in first if case["id"] == "tr-catalog-terms")
     assert catalog_case["skill_terms"] == tuple(item["name"] for item in SKILL_CATALOG)
-    assert catalog_case["reference"].count("\n") == 4
+    assert catalog_case["reference"].count("\n") == (len(SKILL_CATALOG) + 2) // 3
     assert catalog_case["width"] < 1200
 
 
