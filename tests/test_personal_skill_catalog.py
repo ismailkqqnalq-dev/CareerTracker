@@ -132,11 +132,17 @@ def test_personal_alias_does_not_influence_other_users_candidates(authenticated_
     other = second_headers(client)
     own = client.post('/skills/suggestions', json={'skill': 'zzqqvv'}).json()['id']
     theirs = client.post('/skills/suggestions', json={'skill': 'zzqqvv'}, headers=other).json()['id']
+    other_candidates_before = client.get(
+        f'/skills/suggestions/{theirs}/candidates', headers=other
+    ).json()
     assert client.post(f'/skills/{skill_id}/aliases', json={'alias': 'zzqqvv'}).status_code == 201
     candidates = client.get(f'/skills/suggestions/{own}/candidates').json()
     assert candidates[0]['id'] == skill_id
     assert candidates[0]['score'] == 1
-    assert client.get(f'/skills/suggestions/{theirs}/candidates', headers=other).json() == []
+    other_candidates_after = client.get(
+        f'/skills/suggestions/{theirs}/candidates', headers=other
+    ).json()
+    assert other_candidates_after == other_candidates_before
     generator.close()
 
 

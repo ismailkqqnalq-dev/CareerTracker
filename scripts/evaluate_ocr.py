@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import platform
 import random
+import re
 import statistics
 import string
 import sys
@@ -97,7 +98,15 @@ def term_recall(output, terms):
     from app.services.skill_normalizer import normalize_text
 
     normalized_output = normalize_text(output)
-    matched = [term for term in terms if normalize_text(term) in normalized_output]
+    def contains_term(term):
+        normalized_term = normalize_text(term)
+        right_boundary = r"[\w+#]" if normalized_term == "c" else r"\w"
+        pattern = re.compile(
+            r"(?<!\w)" + re.escape(normalized_term) + r"(?!" + right_boundary + r")"
+        )
+        return pattern.search(normalized_output) is not None
+
+    matched = [term for term in terms if contains_term(term)]
     expected = len(terms)
     return {
         "expected": expected,
