@@ -106,6 +106,13 @@ included). ONNX inference cannot be cancelled once running, so after a 504 or cl
 cancellation the worker keeps the slot until its own `finally` releases it. With
 multiple Uvicorn workers the limit is per worker, not global.
 
+The React MVP also offers an authenticated PNG/JPEG upload (10 MiB client-side
+guard, repeated by server-side validation), displays the extracted text, and lets
+the user copy it into the job-analysis field. The image and OCR result stay in
+component memory and are not written to browser storage or the database. The
+client-side type and size checks are convenience checks; the server validates
+the actual image bytes and enforces the authoritative limits.
+
 OpenAPI declares PNG/JPEG raw binary request bodies. In Swagger UI, open
 `/docs` → `POST /ocr/extract` → **Try it out**, select a PNG/JPEG file, authorize
 with a Bearer token, and **Execute**. The intended request body is the image bytes;

@@ -67,4 +67,24 @@ describe("createApiClient", () => {
       .rejects.toMatchObject({ status: 401 });
     expect(onUnauthorized).toHaveBeenCalledOnce();
   });
+
+  it("preserves an explicitly supplied content type for binary request bodies", async () => {
+    const file = new File([new Uint8Array([1, 2, 3])], "posting.png", { type: "image/png" });
+    const fetchMock = vi.fn().mockResolvedValue(response(200, { text: "Python" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const api = createApiClient();
+
+    await api.request("/ocr/extract", {
+      method: "POST",
+      token: "test-token",
+      headers: { "Content-Type": "image/png" },
+      body: file,
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/ocr/extract");
+    expect(options.body).toBe(file);
+    expect(options.headers.get("Content-Type")).toBe("image/png");
+    expect(options.headers.get("Authorization")).toBe("Bearer test-token");
+  });
 });
