@@ -42,7 +42,7 @@ SKILL_CATALOG = (
     {
         "name": "FastAPI",
         "category": "framework",
-        "aliases": ("fast api",),
+        "aliases": ("fast api", "fastap1"),
     },
     {
         "name": "Kubernetes",
