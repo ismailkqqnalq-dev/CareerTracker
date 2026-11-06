@@ -483,3 +483,56 @@ describe("profile and opportunity matching navigation", () => {
     expect(fetchMock.mock.calls.some(([url]) => url.includes("/opportunities?limit=200"))).toBe(true);
   });
 });
+
+describe("application analytics navigation", () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("opens the monthly application analytics panel for the signed-in user", async () => {
+    sessionStorage.setItem("careertracker_token", "temporary-test-token");
+    const fetchMock = vi.fn(async (url) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
+      if (url.includes("/analytics/applications?months=12")) {
+        return jsonResponse(200, {
+          months: 12,
+          start_month: "2026-01",
+          end_month: "2026-12",
+          total_applications: 1,
+          applications_by_month: [{ month: "2026-12", count: 1 }],
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Başvuru analizi" }));
+
+    expect(await screen.findByRole("heading", { name: "Aylık başvurular" })).toBeTruthy();
+    expect(await screen.findByRole("listitem", { name: "2026-12: 1 başvuru" })).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([url]) => url.includes("/analytics/applications?months=12"))).toBe(true);
+  });
+
+  it("uses the shared logout flow when analytics returns 401", async () => {
+    sessionStorage.setItem("careertracker_token", "temporary-test-token");
+    const fetchMock = vi.fn(async (url) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
+      if (url.includes("/analytics/applications?months=12")) return jsonResponse(401, { detail: "expired" });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Başvuru analizi" }));
+
+    expect(await screen.findByRole("heading", { name: "Hesabına giriş yap" })).toBeTruthy();
+    expect(sessionStorage.getItem("careertracker_token")).toBeNull();
+  });
+});

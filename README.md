@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml)
 
-İş, staj ve freelance fırsatlarını takip etmek için geliştirilen bir kariyer CRM'idir. FastAPI ve SQLAlchemy REST API'si, SQLite ile yerel ve PostgreSQL ile Docker ortamında çalışabilir. `frontend/` dizininde beceri önerileri, OCR, ilan metni analizi ve profil beceri eşleşmesi için sınırlı bir React MVP'si bulunur; tam CRM arayüzü değildir.
+İş, staj ve freelance fırsatlarını takip etmek için geliştirilen bir kariyer CRM'idir. FastAPI ve SQLAlchemy REST API'si, SQLite ile yerel ve PostgreSQL ile Docker ortamında çalışabilir. `frontend/` dizininde beceri önerileri, OCR, ilan metni analizi, profil beceri eşleşmesi ve aylık başvuru analizi için sınırlı bir React MVP'si bulunur; tam CRM arayüzü değildir.
 ## Vizyon
 
 CareerTracker, başvuru takibinden öteye geçmeyi hedefliyor: **Career Tracker AI**. Farklı platformlardan (LinkedIn, Indeed, Upwork, Fiverr) gelen iş ve freelance fırsatlarını tek yerde toplayıp ilanlardan yapılandırılmış veri çıkaran, kullanıcının becerileriyle karşılaştıran ve zamanla piyasa trendlerini analiz eden bir kariyer istihbarat platformu.
@@ -23,6 +23,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Fırsatlara skill bağlama ve bağlı skill'leri listeleme
 - Profil becerilerini yönetme, fırsat gereksinimlerine katalog becerisi ekleme ve profil/fırsat eşleşmesini görme (`frontend/` MVP arayüzü)
 - Kullanıcıya özel bekleyen beceri önerilerini gözden geçirip mevcut katalogla eşleştirme (`frontend/` MVP arayüzü)
+- Kullanıcının aylık başvuru adetlerini seçilen dönemde görselleştirme (`frontend/` MVP arayüzü)
 
 ## Teknoloji
 
@@ -441,7 +442,7 @@ tests/             # pytest testleri
 - **Kısmi — Faz 4:** Yapıştırılan ilan metninden görünür katalog becerilerini, açık rol etiketini ve tanınan gereksinim bölüm başlıklarını bulan kural tabanlı servis, API, MVP arayüzü ve sentetik değerlendirme betiği var; gerçek ilanları temsil eden ölçüm ve kapsamlı çıkarım tamamlanmadı.
 - **Kısmi — Faz 5:** Normalizasyon, seed alias'ları, kişisel alias'lar ve metin benzerliğine dayalı aday sıralaması var; kapsamlı beceri normalizasyonu tamamlanmadı.
 - **Kısmi — Faz 6:** Profil becerilerini yönetme, fırsat becerisi ekleme ve eşleşen/eksik becerileri gösteren MVP arayüzü ile backend endpoint'leri var; tam eşleştirme ürünü tamamlanmadı.
-- **Kısmi — Faz 7:** Kullanıcıya özel, son 1–60 takvim ayı için aylık başvuru sayısı API'si var; bu betimleyici sayım tahmin veya piyasa analizi değildir. Görsel dashboard/ileri metrikler tamamlanmadı.
+- **Kısmi — Faz 7:** Kullanıcıya özel, son 1–60 takvim ayı için aylık başvuru sayısı API'si ve aylık dağılımı gösteren React ekranı var; bu betimleyici sayım tahmin veya piyasa analizi değildir. İleri metrikler, dönüşüm analizi ve piyasa analizi tamamlanmadı.
 - **Planlandı — Faz 8–10:** Semantic similarity, makine öğrenmesi ve deep learning/computer vision çalışmaları.
 - **Kısmi — Faz 11:** JWT kimlik doğrulaması ve beceri önerileri için React MVP'si var; deployment ve tam CRM arayüzü tamamlanmadı.
 
