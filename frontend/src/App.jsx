@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient } from "./api.js";
 import ProfileMatchPanel from "./ProfileMatchPanel.jsx";
+import ApplicationAnalyticsPanel from "./ApplicationAnalyticsPanel.jsx";
 
 const authApi = createApiClient();
 const MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -346,8 +347,8 @@ function App() {
         <div className="page-heading">
           <div>
             <p className="eyebrow">KİŞİSEL BECERİ KATALOĞUN</p>
-            <h1>{activeView === "suggestions" ? "Beceri önerileri" : "Profil ve fırsat eşleşmesi"}</h1>
-            <p className="muted heading-copy">{activeView === "suggestions" ? "Sistemin tanımadığı becerileri mevcut katalogdaki doğru beceriyle eşleştir." : "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır."}</p>
+            <h1>{activeView === "suggestions" ? "Beceri önerileri" : activeView === "profile" ? "Profil ve fırsat eşleşmesi" : "Başvuru analizi"}</h1>
+            <p className="muted heading-copy">{activeView === "suggestions" ? "Sistemin tanımadığı becerileri mevcut katalogdaki doğru beceriyle eşleştir." : activeView === "profile" ? "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır." : "Başvurularının aylara göre dağılımını incele."}</p>
           </div>
           {activeView === "suggestions" && <div className="count-card"><span className="count-number">{pendingCount}</span><span>bekleyen öneri</span></div>}
         </div>
@@ -355,9 +356,12 @@ function App() {
         <nav className="app-section-nav" aria-label="CareerTracker bölümleri">
           <button type="button" aria-current={activeView === "suggestions" ? "page" : undefined} onClick={() => setActiveView("suggestions")}>Beceri önerileri</button>
           <button type="button" aria-current={activeView === "profile" ? "page" : undefined} onClick={() => setActiveView("profile")}>Profil ve eşleşme</button>
+          <button type="button" aria-current={activeView === "analytics" ? "page" : undefined} onClick={() => setActiveView("analytics")}>Başvuru analizi</button>
         </nav>
 
-        {activeView === "profile" ? (
+        {activeView === "analytics" ? (
+          <ApplicationAnalyticsPanel api={api} token={token} />
+        ) : activeView === "profile" ? (
           <ProfileMatchPanel api={api} token={token} skills={skills} />
         ) : (
           <>
