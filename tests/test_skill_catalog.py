@@ -68,6 +68,21 @@ def test_catalog_covers_common_technical_skills_and_stays_manageable():
     } <= names
 
 
+def test_turkish_machine_learning_alias_resolves_and_is_extracted(db_session):
+    seed_skill_catalog(db_session)
+
+    skill = find_skill(db_session, "Makine öğrenmesi")
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text="Makine öğrenmesi deneyimi",
+    )
+
+    assert skill is not None
+    assert skill.name == "Machine Learning"
+    assert [item["name"] for item in result["skills"]] == ["Machine Learning"]
+
+
 def test_catalog_aliases_do_not_collide_across_skills_after_normalization_or_folding():
     normalized_owners = {}
     folded_owners = {}

@@ -57,7 +57,7 @@ SKILL_CATALOG = (
     {
         "name": "Machine Learning",
         "category": "concept",
-        "aliases": ("ml", "machine-learning"),
+        "aliases": ("ml", "machine-learning", "makine öğrenmesi"),
     },
 )
 
