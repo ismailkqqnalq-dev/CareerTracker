@@ -53,7 +53,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Beceri önerileri | `POST /skills/suggestions` | Evet | Tanınmayan skill adı için öneri oluşturur veya mevcut öneriyi döndürür |
 | Beceri önerileri | `GET /skills/suggestions` | Evet | Kullanıcının önerilerini listeler; `status` ile süzülebilir |
 | Beceri önerisi | `PATCH /skills/suggestions/{suggestion_id}` | Evet | Öneriyi görünür bir skill ile kişisel olarak eşleştirir |
-| Adaylar | `GET /skills/suggestions/{suggestion_id}/candidates` | Evet | Bekleyen öneri için benzer adları sıralar |
+| Adaylar | `GET /skills/suggestions/{suggestion_id}/candidates` | Evet | Bekleyen öneri için `strategy=lexical` (varsayılan) veya isteğe bağlı `strategy=semantic` ile adayları sıralar |
 | Profil skill'leri | `GET, POST /users/me/skills` | Evet | Profil skill'lerini listeler veya ekler |
 | Profil skill'i | `PATCH, DELETE /users/me/skills/{user_skill_id}` | Evet | Profil kaydını günceller veya siler |
 | Fırsat skill'leri | `POST, GET /opportunities/{opportunity_id}/skills` | Evet | Fırsata skill bağlar veya bağlı skill'leri listeler |
@@ -120,6 +120,8 @@ JSON hata gövdesindeki sabit kodlar:
 |---|---|---|
 | `skill_not_found` | `GET /skills/resolve` | Görünür katalogda bu adla skill bulunamadı (404) |
 | `skill_already_recognized` | `POST /skills/suggestions` | Skill zaten tanınıyor; öneri yerine katalogdaki skill kullanılmalı (409) |
+| `semantic_engine_unavailable` | `GET /skills/suggestions/{suggestion_id}/candidates?strategy=semantic` | İsteğe bağlı FastEmbed kurulmamış veya model yerel önbellekte yok (503) |
+| `semantic_engine_failed` | `GET /skills/suggestions/{suggestion_id}/candidates?strategy=semantic` | Yerel embedding motoru çıkarım yapamadı (502) |
 | `opportunity_not_found` | `POST, GET /opportunities/{opportunity_id}/skills`; `GET /opportunities/{opportunity_id}/skill-match` | Fırsat bulunamadı veya kullanıcıya ait değil (404) |
 | `unknown_skill` | `POST /opportunities/{opportunity_id}/skills` | Skill tanınmadı (404); öneri kaydedildiyse gövdede `suggestion_id` de bulunur |
 
@@ -298,10 +300,14 @@ kişi, aktivite ve görevleri yönetmek için tam CRM arayüzü içermez.
 
 ### Aday sıralaması ve eşleştirme
 
-Aday sıralaması `difflib.SequenceMatcher` metin benzerliği ve token örtüşmesi kullanan
-kural tabanlı bir heuristiktir. Skor yazım/metin benzerliğini gösterir; ML sonucu,
-doğruluk olasılığı veya aynı beceri olduğuna dair güven ölçüsü değildir. `C#` ve
-`C++` gibi sembollü adlar için yazım eşlemeleri bulunsa da skor yine benzerliktir.
+Aday sıralamasında varsayılan `lexical` stratejisi `difflib.SequenceMatcher` metin
+benzerliği ve token örtüşmesi kullanan bir heuristiktir. `semantic` stratejisi,
+isteğe bağlı yerel FastEmbed/ONNX çok dilli embedding modelini kullanır. İki skor
+da benzerliktir; doğruluk olasılığı veya becerilerin aynı olduğuna dair güven ölçüsü
+değildir. Model CareerTracker verisiyle eğitilmemiştir. `C#` ve `C++` gibi sembollü
+adlar için yazım eşlemeleri yalnızca varsayılan lexical stratejide kullanılır.
+Semantik model kurulumu ve küçük sentetik değerlendirme için
+[semantik aday sıralama notlarına](docs/semantic-candidates.md) bak.
 `skill-match` endpoint'i de ML kullanmaz: fırsat becerilerini kullanıcının profil
 beceri ID'leriyle karşılaştırır ve eşleşen/eksik becerileri döndürür.
 
@@ -443,7 +449,8 @@ tests/             # pytest testleri
 - **Kısmi — Faz 5:** Normalizasyon, seed alias'ları, kişisel alias'lar ve metin benzerliğine dayalı aday sıralaması var; kapsamlı beceri normalizasyonu tamamlanmadı.
 - **Kısmi — Faz 6:** Profil becerilerini yönetme, fırsat becerisi ekleme ve eşleşen/eksik becerileri gösteren MVP arayüzü ile backend endpoint'leri var; tam eşleştirme ürünü tamamlanmadı.
 - **Kısmi — Faz 7:** Kullanıcıya özel, son 1–60 takvim ayı için aylık başvuru sayısı API'si ve aylık dağılımı gösteren React ekranı var; bu betimleyici sayım tahmin veya piyasa analizi değildir. İleri metrikler, dönüşüm analizi ve piyasa analizi tamamlanmadı.
-- **Planlandı — Faz 8–10:** Semantic similarity, makine öğrenmesi ve deep learning/computer vision çalışmaları.
+- **Kısmi — Faz 8:** Beceri önerileri için isteğe bağlı, yerel embedding tabanlı semantik aday stratejisi var; varsayılan lexical davranış korunur. Değerlendirme küçük sentetik kümeyle sınırlıdır.
+- **Planlandı — Faz 9–10:** Makine öğrenmesi ve deep learning/computer vision çalışmaları.
 - **Kısmi — Faz 11:** JWT kimlik doğrulaması ve beceri önerileri için React MVP'si var; deployment ve tam CRM arayüzü tamamlanmadı.
 
 Fazlar doğrusal ilerlemez. Faz 5, 6 ve 11'in bazı altyapı parçaları OCR/NLP başlamadan önce geliştirildi; bu fazlar tamamlandı anlamına gelmez.
@@ -465,8 +472,9 @@ akışlarını sunar.
   eşleştirebilir.
 - Kabul edilmiş önerinin hedef skill'i silinirse foreign key `resolved_skill_id`'yi
   boş bırakır; önerinin durumu `accepted` kalır. Bu davranış testle belgelenmiştir.
-- Aday sıralaması yazım/metin benzerliği heuristiğidir. Kısa veya sembollü adlarda
-  skorlar anlamsal doğruluk anlamına gelmez.
+- Aday sıralamasının varsayılanı yazım/metin benzerliği heuristiğidir. İsteğe bağlı
+  semantik model küçük sentetik kümede denenmiştir; gerçek kullanıcı/ilan verisinde
+  başarı ölçümü değildir. Her iki stratejinin skoru doğruluk olasılığı değildir.
 - Bir fırsata bağlanan skill'i kaldırmak için endpoint yoktur; yalnızca profil skill'i silinebilir.
 - Fırsat silinince ona bağlı kişiler, görevler, aktiviteler ve fırsat-skill
   bağlantıları veritabanı `CASCADE` kurallarıyla silinir. Kişi silinince aktivite

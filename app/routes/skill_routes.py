@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -11,6 +13,13 @@ from app.services.skill_normalizer import find_skill
 from app.services import opportunity_skill_service
 from app.services import user_skill_service
 from app.services import skill_suggestion_service
+from app.services.semantic_skill_candidate_service import (
+    SemanticEngineFailed,
+    SemanticModelUnavailable,
+    SemanticEmbedder,
+    get_semantic_embedder,
+    rank_semantic_skill_candidates,
+)
 from app.services.skill_access import visible_skills
 
 from app.schemas.skills import (
@@ -133,20 +142,55 @@ def resolve_skill_suggestion(
 def get_skill_suggestion_candidates(
     suggestion_id: int,
     limit: int = Query(default=5, ge=1, le=10),
+    strategy: Literal["lexical", "semantic"] = Query(
+        default="lexical",
+        description=(
+            "lexical uses the default spelling heuristic; semantic uses the "
+            "optional locally cached embedding model. Similarity is not a probability."
+        ),
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    semantic_embedder: SemanticEmbedder = Depends(get_semantic_embedder),
 ):
     try:
-        candidates = skill_suggestion_service.rank_skill_candidates(
-            db,
-            user_id=current_user.id,
-            suggestion_id=suggestion_id,
-            limit=limit,
-        )
+        if strategy == "semantic":
+            candidates = rank_semantic_skill_candidates(
+                db,
+                user_id=current_user.id,
+                suggestion_id=suggestion_id,
+                limit=limit,
+                embedder=semantic_embedder,
+            )
+        else:
+            candidates = skill_suggestion_service.rank_skill_candidates(
+                db,
+                user_id=current_user.id,
+                suggestion_id=suggestion_id,
+                limit=limit,
+            )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
+    except SemanticModelUnavailable:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": (
+                    "Install the optional semantic extra and download its local model first."
+                ),
+                "error_code": "semantic_engine_unavailable",
+            },
+        )
+    except SemanticEngineFailed:
+        return JSONResponse(
+            status_code=502,
+            content={
+                "detail": "The semantic candidate engine failed to encode text.",
+                "error_code": "semantic_engine_failed",
+            },
+        )
 
     return [
         SkillSuggestionCandidate(
