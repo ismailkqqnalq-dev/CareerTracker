@@ -27,3 +27,7 @@ def delete_opportunity(db, opportunity_id, user_id):
 
 def get_dashboard_stats(db, user_id):
     return op.get_dashboard_stats(db, user_id)
+
+
+def get_application_analytics(db, user_id, months):
+    return op.get_application_analytics(db, user_id, months)
