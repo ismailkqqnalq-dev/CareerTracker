@@ -469,7 +469,7 @@ ilan metni için temel beceri eşleştirmesi de sunar.
 - İlan analizi yalnızca ortak katalogu, kullanıcının kendi skill'lerini ve kişisel eşleştirmelerini görür. Katalog dışında kalan terimleri otomatik olarak öneri veya alias yapmaz.
 - İlan analizi ML değildir: becerileri ad/alias sözlüğü ve sözcük sınırlarıyla arar. Rolü yalnızca açık `Pozisyon:` / `Role:` benzeri etiketlerden, gereksinim türünü yalnızca tanınan bölüm başlıklarından alır; serbest başlık tahmini yapmaz.
 - Ortak katalog küratörlü ve sınırlıdır; beceri dışarıda kalabilir. Yeni global alias eklemeden önce hem `normalize_text` hem ilan analizindeki Türkçe/OCR katlama sonrası çakışmalar denetlenmelidir. Genel sözcükler (`spring`, `spark`, `excel`, `word`, `dash`) tek başına alias yapılmaz; kısa `C`, `R`, `Go` adları yalnızca bağlam filtresini geçen satırlarda eşleşir.
-- İlan analizi Türkçe/OCR katlaması uygular, ancak Unicode birleşik/NFD yazımları NFC biçimine dönüştürmez. OCR harf hatalarını ve Türkçe ekleri anlamsal olarak düzeltmez; bu nedenle gerçek ilanlarda beceri kaçırabilir veya metne göre istenmeyen eşleşmeler olabilir.
+- İlan analizi eşleştirme sırasında Unicode NFC/NFD eşdeğerlerini kanonikleştirir ve `matched_text` alanında kaynak metindeki özgün yazımı korur. OCR harf hatalarını ve Türkçe ekleri anlamsal olarak düzeltmez; bu nedenle gerçek ilanlarda beceri kaçırabilir veya metne göre istenmeyen eşleşmeler olabilir.
 - Değerlendirme betiği yalnızca küçük, sentetik örnekler kullanır; precision/recall/F1 sonuçları gerçek iş ilanlarına genellenemez.
 
 

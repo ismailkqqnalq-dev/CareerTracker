@@ -5,6 +5,7 @@ an in-memory SQLite database and writes its JSON report to stdout only.
 """
 
 import json
+import unicodedata
 
 from sqlalchemy.orm import Session
 
@@ -53,6 +54,17 @@ SYNTHETIC_CASES = (
         "id": "turkish-ascii-ocr-folding",
         "text": "Pythön, FastAPI, JavaScript, C# ve C++",
         "expected": ("Python", "FastAPI", "JavaScript", "C#", "C++"),
+        "unknown_terms": ("UncataloguedSkill",),
+    },
+    {
+        "id": "unicode-decomposed-text",
+        "text": unicodedata.normalize(
+            "NFD",
+            "Pozisyon: Veri Mühendisi\n"
+            "İş İçin Gerekli Beceriler:\n"
+            "Makine öğrenmesi deneyimi",
+        ),
+        "expected": ("Machine Learning",),
         "unknown_terms": ("UncataloguedSkill",),
     },
     {

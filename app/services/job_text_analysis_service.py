@@ -1,6 +1,7 @@
 """Conservative, rule-based extraction from job-description text."""
 
 import re
+import unicodedata
 
 from sqlalchemy.orm import Session
 
@@ -54,10 +55,81 @@ _MATCH_FOLD_TRANSLATION = str.maketrans(
 
 
 def _fold_for_matching(value: str) -> str:
-    """Fold supported Turkish/OCR variants one character at a time."""
+    """Canonicalize Unicode, then fold supported Turkish/OCR variants."""
     # Translate dotted capital İ before lower(): its default lower() expands to
     # two code points, which would invalidate offsets into the original line.
-    return value.translate(_MATCH_FOLD_TRANSLATION).lower()
+    return unicodedata.normalize("NFC", value).translate(_MATCH_FOLD_TRANSLATION).lower()
+
+
+def _hangul_jamo_type(char: str) -> str | None:
+    codepoint = ord(char)
+    if 0x1100 <= codepoint <= 0x115F or 0xA960 <= codepoint <= 0xA97C:
+        return "L"
+    if 0x1160 <= codepoint <= 0x11A7 or 0xD7B0 <= codepoint <= 0xD7C6:
+        return "V"
+    if 0x11A8 <= codepoint <= 0x11FF or 0xD7CB <= codepoint <= 0xD7FB:
+        return "T"
+    if 0xAC00 <= codepoint <= 0xD7A3 and (codepoint - 0xAC00) % 28 == 0:
+        return "LV"
+    return None
+
+
+def _fold_for_matching_with_offsets(
+    value: str,
+) -> tuple[str, list[tuple[int, int]] | None]:
+    """Return the folded form plus source spans for each folded code point."""
+    normalized_value = unicodedata.normalize("NFC", value)
+    folded_value = _fold_for_matching(normalized_value)
+    if normalized_value == value and len(folded_value) == len(value):
+        # Most input lines are already NFC and the supported Turkish folding is
+        # one-to-one, so keep the hot path offset-free.
+        return folded_value, None
+
+    folded_parts = []
+    source_spans: list[tuple[int, int]] = []
+    cluster_start = 0
+
+    def append_cluster(start: int, end: int) -> None:
+        source_cluster = value[start:end]
+        folded_cluster = _fold_for_matching(source_cluster)
+        folded_parts.append(folded_cluster)
+        source_spans.extend([(start, end)] * len(folded_cluster))
+
+    for index, char in enumerate(value):
+        if index == cluster_start:
+            continue
+        is_mark = unicodedata.combining(char) != 0 or unicodedata.category(char).startswith("M")
+        if is_mark:
+            continue
+
+        normalized_cluster = unicodedata.normalize("NFC", value[cluster_start:index])
+        previous_hangul_type = _hangul_jamo_type(normalized_cluster[-1])
+        current_hangul_type = _hangul_jamo_type(char)
+        joins_hangul = (
+            previous_hangul_type == "L" and current_hangul_type == "V"
+        ) or (
+            previous_hangul_type == "LV" and current_hangul_type == "T"
+        )
+        if joins_hangul:
+            continue
+
+        append_cluster(cluster_start, index)
+        cluster_start = index
+
+    if cluster_start < len(value):
+        append_cluster(cluster_start, len(value))
+
+    return "".join(folded_parts), source_spans
+
+
+def _source_span(
+    source_spans: list[tuple[int, int]] | None,
+    start: int,
+    end: int,
+) -> tuple[int, int]:
+    if source_spans is None:
+        return start, end
+    return source_spans[start][0], source_spans[end - 1][1]
 
 
 def _visible_aliases(db: Session, user_id: int) -> dict[str, int]:
@@ -158,33 +230,40 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
         if is_heading:
             continue
 
-        folded_line = _fold_for_matching(line)
+        folded_line, source_spans = _fold_for_matching_with_offsets(line)
         line_matches = []
         for alias, skill_id, pattern in patterns:
             if skill_id is not None and skill_id not in visible:
                 continue
             for match in pattern.finditer(folded_line):
                 if alias in _SHORT_AMBIGUOUS_ALIASES:
-                    context = line[max(0, match.start() - 16):match.end() + 16]
+                    source_start, source_end = _source_span(
+                        source_spans, match.start(), match.end()
+                    )
+                    context = line[max(0, source_start - 16):source_end + 16]
                     if not _SHORT_ALIAS_CONTEXT.search(_fold_for_matching(context)):
                         continue
-                line_matches.append((match, alias, skill_id))
+                else:
+                    source_start, source_end = _source_span(
+                        source_spans, match.start(), match.end()
+                    )
+                line_matches.append((match, alias, skill_id, source_start, source_end))
 
         # Prefer the longest catalog phrase when aliases overlap (for example,
         # a skill named "C" must not also match the "C" in "C#" or "C++").
         accepted_matches = []
-        for match, alias, skill_id in sorted(
+        for match, alias, skill_id, source_start, source_end in sorted(
             line_matches,
             key=lambda item: (-(item[0].end() - item[0].start()), item[0].start()),
         ):
             if any(
-                match.start() < accepted.end() and accepted.start() < match.end()
-                for accepted, _, _ in accepted_matches
+                source_start < accepted[4] and accepted[3] < source_end
+                for accepted in accepted_matches
             ):
                 continue
-            accepted_matches.append((match, alias, skill_id))
+            accepted_matches.append((match, alias, skill_id, source_start, source_end))
 
-        for match, _alias, skill_id in accepted_matches:
+        for match, _alias, skill_id, source_start, source_end in accepted_matches:
             if skill_id is None:
                 # An ambiguous longer folded phrase blocks shorter overlaps,
                 # but is never attributed to either skill.
@@ -200,14 +279,14 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
                     "_seen": set(),
                 },
             )
-            key = (line_number, match.start(), match.end())
+            key = (line_number, source_start, source_end)
             if key in entry["_seen"]:
                 continue
             entry["_seen"].add(key)
             entry["occurrences"].append(
                 {
                     "line_number": line_number,
-                    "matched_text": line[match.start():match.end()],
+                    "matched_text": line[source_start:source_end],
                     "section": section,
                 }
             )

@@ -7,6 +7,7 @@ REQUIRED_SYNTHETIC_CASES = {
     "symbols-and-short-name",
     "ocr-like-noise",
     "turkish-ascii-ocr-folding",
+    "unicode-decomposed-text",
     "turkish-concept-aliases",
     "folded-headings-and-sections",
     "ambiguous-short-terms",
@@ -38,6 +39,7 @@ def test_evaluator_exposes_false_positives_and_unresolved_terms():
     cases = {case["id"]: case for case in report["cases"]}
 
     assert report["aggregate_micro"]["false_positive"] == 0
+    assert report["aggregate_micro"]["false_negative"] == 0
 
     ambiguous = cases["ambiguous-short-terms"]
     assert ambiguous["predicted"] == ["C", "Go", "R"]
