@@ -1,7 +1,7 @@
 import csv
 import io
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -9,6 +9,7 @@ from app.auth import get_current_user
 from app.database.session import get_db
 from app.models.users import User
 from app.pagination import pagination_params, set_total_count
+from app.schemas.analytics import ApplicationAnalyticsResponse
 from app.schemas.opportunity import (
     OpportunityCreate,
     OpportunityResponse,
@@ -165,4 +166,26 @@ def get_dashboard_stats(
     current_user: User = Depends(get_current_user),
 ):
     return service.get_dashboard_stats(db, user_id=current_user.id)
+
+
+@router.get(
+    "/analytics/applications",
+    response_model=ApplicationAnalyticsResponse,
+    summary="Get monthly application counts",
+)
+def get_application_analytics(
+    months: int = Query(
+        default=12,
+        ge=1,
+        le=60,
+        description="Number of calendar months, including the current month.",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return service.get_application_analytics(
+        db,
+        user_id=current_user.id,
+        months=months,
+    )
     

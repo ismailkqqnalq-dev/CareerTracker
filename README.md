@@ -15,6 +15,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Görüşme ve diğer aktiviteleri kaydetme
 - Takip görevleri ve hatırlatmalar
 - Başvuru istatistiklerini sunan dashboard
+- Kullanıcıya özel, seçilen dönem için aylık başvuru hacmi analizi
 - Fırsatları CSV olarak dışa aktarma (Türkçe karakter desteği)
 - Alembic veritabanı migration'ları
 - GitHub Actions ile otomatik test çalıştırma
@@ -63,6 +64,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
 | Görevler | `GET, POST /tasks`; `GET, PATCH, DELETE /tasks/{id}` | Evet | Kullanıcının görevlerini yönetir |
 | Dashboard | `GET /dashboard` | Evet | Kullanıcının fırsat istatistiklerini döndürür |
+| Analitik | `GET /analytics/applications?months=12` | Evet | Sunucunun geçerli takvim ayı dahil son 1–60 aydaki başvuru sayılarını döndürür; boş aylar sıfırdır |
 | CSV | `GET /opportunities/export` | Evet | Kullanıcının fırsatlarını CSV olarak indirir |
 
 Koleksiyon liste uç noktaları `limit` (varsayılan `50`, en fazla `200`) ve
@@ -439,7 +441,8 @@ tests/             # pytest testleri
 - **Kısmi — Faz 4:** Yapıştırılan ilan metninden görünür katalog becerilerini, açık rol etiketini ve tanınan gereksinim bölüm başlıklarını bulan kural tabanlı servis, API, MVP arayüzü ve sentetik değerlendirme betiği var; gerçek ilanları temsil eden ölçüm ve kapsamlı çıkarım tamamlanmadı.
 - **Kısmi — Faz 5:** Normalizasyon, seed alias'ları, kişisel alias'lar ve metin benzerliğine dayalı aday sıralaması var; kapsamlı beceri normalizasyonu tamamlanmadı.
 - **Kısmi — Faz 6:** Profil becerilerini yönetme, fırsat becerisi ekleme ve eşleşen/eksik becerileri gösteren MVP arayüzü ile backend endpoint'leri var; tam eşleştirme ürünü tamamlanmadı.
-- **Planlandı — Faz 7–10:** Analitik, semantic similarity, makine öğrenmesi ve deep learning/computer vision çalışmaları.
+- **Kısmi — Faz 7:** Kullanıcıya özel, son 1–60 takvim ayı için aylık başvuru sayısı API'si var; bu betimleyici sayım tahmin veya piyasa analizi değildir. Görsel dashboard/ileri metrikler tamamlanmadı.
+- **Planlandı — Faz 8–10:** Semantic similarity, makine öğrenmesi ve deep learning/computer vision çalışmaları.
 - **Kısmi — Faz 11:** JWT kimlik doğrulaması ve beceri önerileri için React MVP'si var; deployment ve tam CRM arayüzü tamamlanmadı.
 
 Fazlar doğrusal ilerlemez. Faz 5, 6 ve 11'in bazı altyapı parçaları OCR/NLP başlamadan önce geliştirildi; bu fazlar tamamlandı anlamına gelmez.
