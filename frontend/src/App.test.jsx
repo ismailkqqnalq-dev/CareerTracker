@@ -452,3 +452,34 @@ describe("OCR image upload", () => {
     expect(sessionStorage.getItem("careertracker_token")).toBeNull();
   });
 });
+
+describe("profile and opportunity matching navigation", () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("opens the profile and matching panel and loads only the signed-in user's data", async () => {
+    const fetchMock = setupLoggedInApp();
+    fetchMock.mockImplementation(async (url) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) {
+        return jsonResponse(200, [{ id: 1, name: "Python", category: "language" }]);
+      }
+      if (url.includes("/users/me/skills?")) return jsonResponse(200, []);
+      if (url.includes("/opportunities?")) {
+        return jsonResponse(200, [{ id: 17, company: "Örnek AŞ", position: "Backend Developer" }]);
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Profil ve eşleşme" }));
+
+    expect(await screen.findByRole("heading", { name: "Profil becerilerim" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /#17 · Örnek AŞ/ })).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([url]) => url.includes("/users/me/skills?limit=200"))).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => url.includes("/opportunities?limit=200"))).toBe(true);
+  });
+});

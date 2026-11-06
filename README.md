@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml)
 
-İş, staj ve freelance fırsatlarını takip etmek için geliştirilen bir kariyer CRM'idir. FastAPI ve SQLAlchemy REST API'si, SQLite ile yerel ve PostgreSQL ile Docker ortamında çalışabilir. `frontend/` dizininde beceri önerileri, OCR görsel yükleme ve ilan metni analizi için sınırlı bir React MVP'si bulunur; tam CRM arayüzü değildir.
+İş, staj ve freelance fırsatlarını takip etmek için geliştirilen bir kariyer CRM'idir. FastAPI ve SQLAlchemy REST API'si, SQLite ile yerel ve PostgreSQL ile Docker ortamında çalışabilir. `frontend/` dizininde beceri önerileri, OCR, ilan metni analizi ve profil beceri eşleşmesi için sınırlı bir React MVP'si bulunur; tam CRM arayüzü değildir.
 ## Vizyon
 
 CareerTracker, başvuru takibinden öteye geçmeyi hedefliyor: **Career Tracker AI**. Farklı platformlardan (LinkedIn, Indeed, Upwork, Fiverr) gelen iş ve freelance fırsatlarını tek yerde toplayıp ilanlardan yapılandırılmış veri çıkaran, kullanıcının becerileriyle karşılaştıran ve zamanla piyasa trendlerini analiz eden bir kariyer istihbarat platformu.
@@ -20,6 +20,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - GitHub Actions ile otomatik test çalıştırma
 - 180 becerilik ortak teknik seed kataloğu, kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
 - Fırsatlara skill bağlama ve bağlı skill'leri listeleme
+- Profil becerilerini yönetme, fırsat gereksinimlerine katalog becerisi ekleme ve profil/fırsat eşleşmesini görme (`frontend/` MVP arayüzü)
 - Kullanıcıya özel bekleyen beceri önerilerini gözden geçirip mevcut katalogla eşleştirme (`frontend/` MVP arayüzü)
 
 ## Teknoloji
@@ -437,7 +438,7 @@ tests/             # pytest testleri
 - **Kısmi — Faz 3:** Görsel doğrulama/OCR servis baseline'ı, kimlik doğrulamalı ham metin çıkarma API'si ve sonucu kullanıcı onayıyla Faz 4 analiz alanına aktaran arayüz var; sonuç saklanmaz ve gerçek ilanlarda OCR kalitesi kapsamlı ölçülmedi.
 - **Kısmi — Faz 4:** Yapıştırılan ilan metninden görünür katalog becerilerini, açık rol etiketini ve tanınan gereksinim bölüm başlıklarını bulan kural tabanlı servis, API, MVP arayüzü ve sentetik değerlendirme betiği var; gerçek ilanları temsil eden ölçüm ve kapsamlı çıkarım tamamlanmadı.
 - **Kısmi — Faz 5:** Normalizasyon, seed alias'ları, kişisel alias'lar ve metin benzerliğine dayalı aday sıralaması var; kapsamlı beceri normalizasyonu tamamlanmadı.
-- **Kısmi — Faz 6:** Kullanıcı skill profili ve fırsat skill-match/gap endpoint'i var; tam eşleştirme ürünü ve arayüzü tamamlanmadı.
+- **Kısmi — Faz 6:** Profil becerilerini yönetme, fırsat becerisi ekleme ve eşleşen/eksik becerileri gösteren MVP arayüzü ile backend endpoint'leri var; tam eşleştirme ürünü tamamlanmadı.
 - **Planlandı — Faz 7–10:** Analitik, semantic similarity, makine öğrenmesi ve deep learning/computer vision çalışmaları.
 - **Kısmi — Faz 11:** JWT kimlik doğrulaması ve beceri önerileri için React MVP'si var; deployment ve tam CRM arayüzü tamamlanmadı.
 
@@ -447,11 +448,11 @@ Fazlar doğrusal ilerlemez. Faz 5, 6 ve 11'in bazı altyapı parçaları OCR/NLP
 
 Faz 1, 2 ve 2.5 tamamlandı. Faz 3 OCR baseline aşamasında; görsel yükleme için
 kimlik doğrulamalı API ve sonucu ilan analiz alanına aktaran MVP arayüzü eklendi.
-Faz 4'te metin analizi için
-ilk kural tabanlı API ve arayüz eklendi. Faz 5, 6 ve 11'den bazı parçalar erken
-teslim edildi ancak bu fazların bütünü tamamlanmış değildir. Arayüz beceri
-önerilerini yönetmenin yanında görselden OCR ile metin çıkarma ve yapıştırılmış
-ilan metni için temel beceri eşleştirmesi de sunar.
+Faz 4'te metin analizi için ilk kural tabanlı API ve arayüz eklendi. Faz 5, 6 ve
+11'den bazı parçalar erken teslim edildi ancak bu fazların bütünü tamamlanmış
+değildir. Arayüz beceri önerilerini yönetmenin yanında OCR, ilan metni analizi,
+profil becerisi yönetimi ve seçilen fırsat için eşleşen/eksik becerileri gösterme
+akışlarını sunar.
 
 ## Bilinen sınırlar
 

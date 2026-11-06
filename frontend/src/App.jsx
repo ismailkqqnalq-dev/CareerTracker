@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient } from "./api.js";
+import ProfileMatchPanel from "./ProfileMatchPanel.jsx";
 
 const authApi = createApiClient();
 const MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -125,6 +126,7 @@ function App() {
   const [jobImage, setJobImage] = useState(null);
   const [ocrResult, setOcrResult] = useState(null);
   const [extractingText, setExtractingText] = useState(false);
+  const [activeView, setActiveView] = useState("suggestions");
 
   const logout = useCallback(() => {
     sessionStorage.removeItem("careertracker_token");
@@ -344,12 +346,21 @@ function App() {
         <div className="page-heading">
           <div>
             <p className="eyebrow">KİŞİSEL BECERİ KATALOĞUN</p>
-            <h1>Beceri önerileri</h1>
-            <p className="muted heading-copy">Sistemin tanımadığı becerileri mevcut katalogdaki doğru beceriyle eşleştir.</p>
+            <h1>{activeView === "suggestions" ? "Beceri önerileri" : "Profil ve fırsat eşleşmesi"}</h1>
+            <p className="muted heading-copy">{activeView === "suggestions" ? "Sistemin tanımadığı becerileri mevcut katalogdaki doğru beceriyle eşleştir." : "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır."}</p>
           </div>
-          <div className="count-card"><span className="count-number">{pendingCount}</span><span>bekleyen öneri</span></div>
+          {activeView === "suggestions" && <div className="count-card"><span className="count-number">{pendingCount}</span><span>bekleyen öneri</span></div>}
         </div>
 
+        <nav className="app-section-nav" aria-label="CareerTracker bölümleri">
+          <button type="button" aria-current={activeView === "suggestions" ? "page" : undefined} onClick={() => setActiveView("suggestions")}>Beceri önerileri</button>
+          <button type="button" aria-current={activeView === "profile" ? "page" : undefined} onClick={() => setActiveView("profile")}>Profil ve eşleşme</button>
+        </nav>
+
+        {activeView === "profile" ? (
+          <ProfileMatchPanel api={api} token={token} skills={skills} />
+        ) : (
+          <>
         <section className="ocr-card" aria-labelledby="ocr-title">
           <div className="ocr-heading">
             <h2 id="ocr-title">İlan görselinden metin çıkar</h2>
@@ -494,6 +505,8 @@ function App() {
           </section>
         )}
         <p className="privacy-note"><span>🔒</span> Beceri eşleştirmelerin kişiseldir; genel skill kataloğuna otomatik alias eklenmez.</p>
+          </>
+        )}
       </main>
     </div>
   );
