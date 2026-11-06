@@ -108,9 +108,9 @@ SYNTHETIC_CASES = (
     },
     {
         "id": "unknown-terms",
-        "text": "DefinitelyUncataloguedTerm; FastAP1; Kubernetes.",
+        "text": "DefinitelyUncataloguedTerm; UnknownFrameworkX; Kubernetes.",
         "expected": ("Kubernetes",),
-        "unknown_terms": ("DefinitelyUncataloguedTerm", "FastAP1"),
+        "unknown_terms": ("DefinitelyUncataloguedTerm", "UnknownFrameworkX"),
     },
 )
 

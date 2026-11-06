@@ -37,6 +37,8 @@ def test_evaluator_exposes_false_positives_and_unresolved_terms():
     report = evaluate()
     cases = {case["id"]: case for case in report["cases"]}
 
+    assert report["aggregate_micro"]["false_positive"] == 0
+
     ambiguous = cases["ambiguous-short-terms"]
     assert ambiguous["predicted"] == ["C", "Go", "R"]
     assert ambiguous["scores"]["false_positive"] == 0

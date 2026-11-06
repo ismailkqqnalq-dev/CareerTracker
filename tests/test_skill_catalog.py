@@ -83,6 +83,21 @@ def test_turkish_machine_learning_alias_resolves_and_is_extracted(db_session):
     assert [item["name"] for item in result["skills"]] == ["Machine Learning"]
 
 
+def test_fastapi_ocr_digit_one_alias_resolves_and_is_extracted(db_session):
+    seed_skill_catalog(db_session)
+
+    skill = find_skill(db_session, "FastAP1")
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text="FastAP1 deneyimi",
+    )
+
+    assert skill is not None
+    assert skill.name == "FastAPI"
+    assert [item["name"] for item in result["skills"]] == ["FastAPI"]
+
+
 def test_catalog_aliases_do_not_collide_across_skills_after_normalization_or_folding():
     normalized_owners = {}
     folded_owners = {}
