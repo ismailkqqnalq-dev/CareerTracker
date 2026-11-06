@@ -263,3 +263,75 @@ def test_folded_heading_over_200_characters_is_not_classified():
 
     assert len(long_heading) > 200
     assert _line_section(long_heading, "unspecified") == ("unspecified", False)
+
+
+def test_analyzer_matches_nfd_text_and_preserves_original_match(authenticated_client):
+    import unicodedata
+
+    client = authenticated_client
+    _add_private_skill(client, "Café", "concept")
+    decomposed = unicodedata.normalize("NFD", "Café")
+
+    response = client.post(
+        "/job-analysis",
+        json={"text": f"Experience with {decomposed}."},
+    )
+
+    assert response.status_code == 200
+    skills = response.json()["skills"]
+    assert [skill["name"] for skill in skills] == ["Café"]
+    assert skills[0]["occurrences"][0]["matched_text"] == decomposed
+
+
+def test_analyzer_matches_composed_text_to_nfd_personal_alias(authenticated_client):
+    import unicodedata
+
+    client = authenticated_client
+    skill = _add_private_skill(client, "Cafe Tool", "tool")
+    decomposed_alias = unicodedata.normalize("NFD", "Café")
+    alias_response = client.post(
+        f"/skills/{skill['id']}/aliases",
+        json={"alias": decomposed_alias},
+    )
+    assert alias_response.status_code == 201
+
+    response = client.post("/job-analysis", json={"text": "Café"})
+
+    assert response.status_code == 200
+    assert [item["name"] for item in response.json()["skills"]] == ["Cafe Tool"]
+    assert response.json()["skills"][0]["occurrences"][0]["matched_text"] == "Café"
+
+
+def test_analyzer_classifies_nfd_turkish_heading(authenticated_client):
+    import unicodedata
+
+    client = authenticated_client
+    _add_private_skill(client, "Python", "language")
+    heading = unicodedata.normalize("NFD", "İş İçin Gerekli Beceriler:")
+
+    response = client.post(
+        "/job-analysis",
+        json={"text": f"{heading}\nPython"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["skills"][0]["occurrences"][0]["section"] == "required"
+
+
+def test_analyzer_treats_composed_and_nfd_aliases_as_ambiguous(authenticated_client):
+    import unicodedata
+
+    client = authenticated_client
+    _add_private_skill(client, "Café", "concept")
+    other_skill = _add_private_skill(client, "Coffee Tool", "tool")
+    decomposed_alias = unicodedata.normalize("NFD", "Café")
+    alias_response = client.post(
+        f"/skills/{other_skill['id']}/aliases",
+        json={"alias": decomposed_alias},
+    )
+    assert alias_response.status_code == 201
+
+    response = client.post("/job-analysis", json={"text": "Café"})
+
+    assert response.status_code == 200
+    assert response.json()["skills"] == []
