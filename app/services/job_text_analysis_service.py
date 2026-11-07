@@ -139,6 +139,30 @@ _CONTEXTUAL_ALIAS_CONTEXT = {
         r"\b(?:aws|amazon|lambda|glue|athena|emr)\b",
         re.IGNORECASE,
     ),
+    "spark": re.compile(
+        r"\b(?:apache|pyspark|spark[ -]+sql|lakehouse|data[ -]+(?:lake|processing)|"
+        r"distributed[ -]+(?:computing|processing)|big[ -]+data)\b",
+        re.IGNORECASE,
+    ),
+    "iceberg": re.compile(
+        r"\b(?:apache|lakehouse|data[ -]+lake|table[ -]+format|"
+        r"iceberg[ -]+tables?|open[ -]+table[ -]+formats?)\b",
+        re.IGNORECASE,
+    ),
+    "airflow": re.compile(
+        r"\b(?:apache|workflow|orchestrat\w*|pipeline\w*|mwaa|dag)\b",
+        re.IGNORECASE,
+    ),
+    "redshift": re.compile(
+        r"\b(?:aws|amazon|data[ -]+warehouse|analytic(?:al|s?)[ -]+database|"
+        r"warehouse|snowflake|s3|redshift[ -]+cluster|olap)\b",
+        re.IGNORECASE,
+    ),
+    "modal": re.compile(
+        r"\b(?:machine[ -]+learning|ml|model[ -]+serving|inference|gpu|"
+        r"training|pytorch|tensorflow|llm)\b",
+        re.IGNORECASE,
+    ),
 }
 _NEUTRAL_HEADING = re.compile(
     r"(?:about(?:[ \t]+(?:us|the company))?|"
