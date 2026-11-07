@@ -73,6 +73,9 @@ def test_alias_automaton_cache_reuses_catalog_and_has_a_fixed_bound(db_session):
         ("Technical Skills", "required"),
         ("What You Will Bring With You", "required"),
         ("What We Look For", "required"),
+        ("YOU MIGHT BE A FIT IF YOU HAVE:", "required"),
+        ("You might be a good fit if you:", "required"),
+        ("Helpful (not required)", "preferred"),
         ("YOU'LL BRING THESE QUALIFICATIONS:", "required"),
         ("YOU\u2019LL BRING THESE QUALIFICATIONS AS A SENIOR ENGINEER:", "required"),
         ("THESE QUALIFICATIONS WOULD BE NICE TO HAVE:", "preferred"),
@@ -768,3 +771,28 @@ def test_official_rocket_lab_qualification_headings_separate_required_and_nice_t
     extracted = {skill["name"]: skill for skill in response.json()["skills"]}
     assert extracted["C++"]["occurrences"][0]["section"] == "required"
     assert extracted["Python"]["occurrences"][0]["section"] == "preferred"
+
+
+def test_fit_if_heading_is_required_and_helpful_not_required_is_preferred(
+    authenticated_client,
+):
+    client = authenticated_client
+    _add_private_skill(client, "AWS", "cloud")
+    _add_private_skill(client, "Rust", "language")
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "YOU MIGHT BE A FIT IF YOU HAVE:\n"
+                "AWS infrastructure experience\n"
+                "Helpful (not required)\n"
+                "Rust experience"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    assert extracted["AWS"]["occurrences"][0]["section"] == "required"
+    assert extracted["Rust"]["occurrences"][0]["section"] == "preferred"
