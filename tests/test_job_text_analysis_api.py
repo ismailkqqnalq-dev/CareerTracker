@@ -70,6 +70,7 @@ def test_alias_automaton_cache_reuses_catalog_and_has_a_fixed_bound(db_session):
         ("Essential Skills:", "required"),
         ("What You Bring:", "required"),
         ("What We're Looking For:", "required"),
+        ("Technical Skills", "required"),
         ("Gerekli Yetkinlikler:", "required"),
         ("Aranan Yetkinlikler:", "required"),
         ("Temel Nitelikler:", "required"),
@@ -679,3 +680,31 @@ def test_compensation_heading_resets_requirement_section(authenticated_client):
     extracted = {skill["name"]: skill for skill in response.json()["skills"]}
     assert extracted["Python"]["occurrences"][0]["section"] == "required"
     assert extracted["Docker"]["occurrences"][0]["section"] == "unspecified"
+
+
+def test_official_genai_posting_technical_skills_heading_preserves_requirement_context(
+    authenticated_client,
+):
+    client = authenticated_client
+    _add_private_skill(client, "Python", "language")
+    _add_private_skill(client, "PyTorch", "framework")
+    _add_private_skill(client, "Azure", "cloud")
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "Qualifications:\n"
+                "Technical Skills:\n"
+                "Python, PyTorch\n"
+                "Preferred:\n"
+                "Azure"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    assert extracted["Python"]["occurrences"][0]["section"] == "required"
+    assert extracted["PyTorch"]["occurrences"][0]["section"] == "required"
+    assert extracted["Azure"]["occurrences"][0]["section"] == "preferred"
