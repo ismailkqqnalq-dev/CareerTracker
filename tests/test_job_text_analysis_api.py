@@ -43,6 +43,10 @@ def _add_private_skill(client, name, category):
         ("Preferred Experience:", "preferred"),
         ("Any of the following would be a bonus", "preferred"),
         ("Any of the following would be a bonus.", "preferred"),
+        ("The Essentials", "required"),
+        ("To Be Successful, You'll Need", "required"),
+        ("Bonus Points If You Have", "preferred"),
+        ("Bonus Points For", "preferred"),
         ("Tercih Edilen Yetkinlikler:", "preferred"),
         ("Artı Sayılan Özellikler:", "preferred"),
     ],
@@ -130,6 +134,24 @@ def test_analyzer_does_not_infer_a_role_from_a_later_body_line(db_session):
     assert result["role"] is None
 
 
+@pytest.mark.parametrize(
+    "headline",
+    [
+        "Backend Engineer — Data Platform",
+        "Lead Data Engineer - Databricks",
+        "Senior Backend Software Engineer - Python",
+    ],
+)
+def test_analyzer_recognizes_public_job_titles_with_specialization_suffixes(
+    db_session, headline
+):
+    result = analyze_job_text(db_session, user_id=1, text=headline)
+
+    assert result["role"] == headline
+    assert result["role_line_number"] == 1
+    assert result["role_source"] == "headline"
+
+
 def test_analyzer_handles_symbolic_names_and_avoids_bare_short_matches(authenticated_client):
     client = authenticated_client
     _add_private_skill(client, "C", "language")
@@ -149,6 +171,33 @@ def test_analyzer_handles_symbolic_names_and_avoids_bare_short_matches(authentic
     assert len(skills["R"]["occurrences"]) == 1
     assert skills["R"]["occurrences"][0]["matched_text"] == "R"
     assert [item["matched_text"] for item in skills["Go"]["occurrences"]] == ["Go"]
+
+
+def test_analyzer_classifies_observed_frontend_job_section_labels(authenticated_client):
+    client = authenticated_client
+    _add_private_skill(client, "React", "framework")
+    _add_private_skill(client, "TypeScript", "language")
+    _add_private_skill(client, "Playwright", "testing")
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "Frontend Engineer\n"
+                "The Essentials:\nReact\n"
+                "To Be Successful, You'll Need:\nTypeScript\n"
+                "Bonus Points If You Have:\nPlaywright"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    skills = {skill["name"]: skill for skill in payload["skills"]}
+    assert payload["role"] == "Frontend Engineer"
+    assert skills["React"]["occurrences"][0]["section"] == "required"
+    assert skills["TypeScript"]["occurrences"][0]["section"] == "required"
+    assert skills["Playwright"]["occurrences"][0]["section"] == "preferred"
 
 
 def test_analyzer_does_not_expose_another_users_private_skill(authenticated_client):
