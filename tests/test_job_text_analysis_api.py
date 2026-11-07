@@ -71,6 +71,8 @@ def test_alias_automaton_cache_reuses_catalog_and_has_a_fixed_bound(db_session):
         ("What You Bring:", "required"),
         ("What We're Looking For:", "required"),
         ("Technical Skills", "required"),
+        ("What You Will Bring With You", "required"),
+        ("What We Look For", "required"),
         ("Gerekli Yetkinlikler:", "required"),
         ("Aranan Yetkinlikler:", "required"),
         ("Temel Nitelikler:", "required"),
@@ -708,3 +710,32 @@ def test_official_genai_posting_technical_skills_heading_preserves_requirement_c
     assert extracted["Python"]["occurrences"][0]["section"] == "required"
     assert extracted["PyTorch"]["occurrences"][0]["section"] == "required"
     assert extracted["Azure"]["occurrences"][0]["section"] == "preferred"
+
+
+def test_official_infrastructure_posting_bring_and_look_for_headings_are_required(
+    authenticated_client,
+):
+    client = authenticated_client
+    _add_private_skill(client, "Docker", "tool")
+    _add_private_skill(client, "Kubernetes", "tool")
+    _add_private_skill(client, "Python", "language")
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "What you will do\n"
+                "Docker\n"
+                "What you will bring with you\n"
+                "Kubernetes\n"
+                "What we look for\n"
+                "Python"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    assert extracted["Docker"]["occurrences"][0]["section"] == "unspecified"
+    assert extracted["Kubernetes"]["occurrences"][0]["section"] == "required"
+    assert extracted["Python"]["occurrences"][0]["section"] == "required"
