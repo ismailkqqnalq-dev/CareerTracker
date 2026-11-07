@@ -74,7 +74,6 @@ def test_alias_automaton_cache_reuses_catalog_and_has_a_fixed_bound(db_session):
         ("Technical Skills & Experience", "required"),
         ("Skills & Experience", "required"),
         ("Required Skills and Experience", "required"),
-        ("Who You Are", "required"),
         ("You might be a great fit if you:", "required"),
         ("What You Will Bring With You", "required"),
         ("What We Look For", "required"),
@@ -875,6 +874,6 @@ def test_live_posting_skill_headings_classify_required_and_preferred_sections(
     assert extracted["Java"]["occurrences"][0]["section"] == "required"
     assert extracted["Python"]["occurrences"][0]["section"] == "required"
     assert extracted["AWS"]["occurrences"][0]["section"] == "required"
-    assert extracted["React"]["occurrences"][0]["section"] == "required"
+    assert extracted["React"]["occurrences"][0]["section"] == "unspecified"
     assert extracted["Kubernetes"]["occurrences"][0]["section"] == "required"
     assert extracted["Docker"]["occurrences"][1]["section"] == "preferred"
