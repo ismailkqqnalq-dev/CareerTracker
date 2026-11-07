@@ -549,3 +549,85 @@ def test_analyzer_treats_composed_and_nfd_aliases_as_ambiguous(authenticated_cli
 
     assert response.status_code == 200
     assert response.json()["skills"] == []
+
+
+@pytest.mark.parametrize(
+    ("heading", "current_section", "expected_section"),
+    [
+        ("What You Will Need", "unspecified", "required"),
+        ("Who We Are Looking For", "unspecified", "required"),
+        ("About You", "unspecified", "required"),
+        ("Who You Are:", "preferred", "unspecified"),
+        ("Location Requirement", "required", "unspecified"),
+        ("About Open Intelligence", "required", "unspecified"),
+        ("What You'll Be Doing:", "preferred", "unspecified"),
+        ("What We'll Give You:", "required", "unspecified"),
+    ],
+)
+def test_public_job_posting_headings_classify_or_reset_sections(
+    heading, current_section, expected_section
+):
+    assert _line_section(heading, current_section) == (expected_section, True)
+
+
+def test_about_experience_prose_is_not_mistaken_for_a_heading():
+    assert _line_section("About ten years of experience", "required") == (
+        "required",
+        False,
+    )
+
+
+def test_public_posting_heading_sequence_drives_profile_match_sections(
+    authenticated_client,
+):
+    client = authenticated_client
+    skills = {
+        name: _add_private_skill(client, name, category)
+        for name, category in (
+            ("Python", "language"),
+            ("SQL", "language"),
+            ("Apache Spark", "tool"),
+            ("Docker", "tool"),
+        )
+    }
+    spark_alias = client.post(
+        f"/skills/{skills['Apache Spark']['id']}/aliases",
+        json={"alias": "spark"},
+    )
+    assert spark_alias.status_code == 201
+
+    added = client.post(
+        "/users/me/skills",
+        json={"skill_id": skills["Python"]["id"]},
+    )
+    assert added.status_code == 201
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "What You'll Be Doing:\nPython\n"
+                "Who We Are Looking For\nDocker\n"
+                "What You Will Need\nSQL\n"
+                "Nice to Have\nLanguages: Python, Spark\n"
+                "Who You Are:\nDocker"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    extracted = {skill["name"]: skill for skill in body["skills"]}
+    assert extracted["Python"]["occurrences"][0]["section"] == "unspecified"
+    assert extracted["SQL"]["occurrences"][0]["section"] == "required"
+    assert extracted["Apache Spark"]["occurrences"][0]["section"] == "preferred"
+    assert [
+        occurrence["section"]
+        for occurrence in extracted["Docker"]["occurrences"]
+    ] == ["required", "unspecified"]
+    assert body["profile_match"]["required"]["missing_skills"] == [
+        "Docker",
+        "SQL",
+    ]
+    assert body["profile_match"]["preferred"]["missing_skills"] == ["Apache Spark"]
+    assert body["profile_match"]["unspecified"]["match_percentage"] == 50.0

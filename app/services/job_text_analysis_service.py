@@ -90,6 +90,8 @@ _REQUIRED_HEADING = re.compile(
     r"expected[ \t]+(?:skills?|qualifications?|experience)|"
     r"(?:minimum|basic)[ \t]+(?:requirements?|qualifications?)|qualifications?|"
     r"essential[ \t]+(?:skills?|qualifications?)|skills?[ \t]+required|"
+    r"about[ \t]+you|who[ \t]+we[ \t]+are[ \t]+looking[ \t]+for|"
+    r"what you will need(?:[ \t]+to[ \t]+(?:succeed|be[ \t]+successful))?|"
     r"what you(?:'|\u2019)ll[ \t]+(?:"
     r"need(?:[ \t]+to[ \t]+(?:succeed|be[ \t]+successful))?|bring)|"
     r"to[ \t]+be[ \t]+successful,[ \t]+you(?:'|\u2019)ll[ \t]+need|"
@@ -200,8 +202,13 @@ _CONTEXTUAL_ALIAS_CONTEXT = {
         re.IGNORECASE,
     ),
 }
+_ABOUT_ORGANIZATION_HEADING = re.compile(
+    r"About[ \t]+(?:(?:the|our)[ \t]+)?[A-Z][\w&'-]*"
+    r"(?:[ \t]+(?:[A-Z][\w&'-]*|and|of|the)){0,3}[ \t]*[:\uff1a]?"
+)
 _NEUTRAL_HEADING = re.compile(
-    r"(?:about(?:[ \t]+(?:us|you|the company))?|"
+    r"(?:about(?:[ \t]+(?:us|the company|our company|the role|this role|our team|the team))?|"
+    r"location[ \t]+requirement|"
     r"(?:the[ \t]+)?role(?:[ \t]+overview)?|"
     r"(?:position|job)[ \t]+overview|"
     r"(?:your[ \t]+|(?:key[ \t]+|job[ \t]+)?)responsibilities|"
@@ -445,6 +452,8 @@ def _line_section(line: str, current: str) -> tuple[str, bool]:
         return "required", True
     if _PREFERRED_HEADING.fullmatch(folded_line):
         return "preferred", True
+    if _ABOUT_ORGANIZATION_HEADING.fullmatch(clean_line):
+        return "unspecified", True
     if _NEUTRAL_HEADING.fullmatch(folded_line):
         return "unspecified", True
     if len(clean_line) < 80 and clean_line.endswith(":"):

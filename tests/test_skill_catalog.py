@@ -222,7 +222,7 @@ def test_public_ml_nlp_posting_stack_resolves_and_is_extracted(db_session):
     )
 
 
-def test_real_posting_headings_reset_sections_and_parse_language_list(db_session):
+def test_real_posting_headings_classify_sections_and_parse_language_list(db_session):
     seed_skill_catalog(db_session)
 
     result = analyze_job_text(
@@ -242,7 +242,7 @@ def test_real_posting_headings_reset_sections_and_parse_language_list(db_session
     assert skills["Python"]["occurrences"][0]["section"] == "required"
     assert skills["JavaScript"]["occurrences"][0]["section"] == "unspecified"
     assert skills["FastAPI"]["occurrences"][0]["section"] == "preferred"
-    assert skills["PyTorch"]["occurrences"][0]["section"] == "unspecified"
+    assert skills["PyTorch"]["occurrences"][0]["section"] == "required"
     assert skills["LangGraph"]["occurrences"][0]["section"] == "preferred"
     assert skills["Apache Spark"]["occurrences"][0]["section"] == "unspecified"
 
