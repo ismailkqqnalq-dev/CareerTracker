@@ -74,6 +74,11 @@ def test_alias_automaton_cache_reuses_catalog_and_has_a_fixed_bound(db_session):
         ("Technical Skills & Experience", "required"),
         ("Skills & Experience", "required"),
         ("Required Skills and Experience", "required"),
+        ("Required Skills and Qualifications:", "required"),
+        ("Required Skills & Qualifications:", "required"),
+        ("Skills and Qualifications:", "required"),
+        ("Essential:", "required"),
+        ("What We're Looking For (Required):", "required"),
         ("You might be a great fit if you:", "required"),
         ("What You Will Bring With You", "required"),
         ("What We Look For", "required"),
@@ -877,3 +882,33 @@ def test_live_posting_skill_headings_classify_required_and_preferred_sections(
     assert extracted["React"]["occurrences"][0]["section"] == "unspecified"
     assert extracted["Kubernetes"]["occurrences"][0]["section"] == "required"
     assert extracted["Docker"]["occurrences"][1]["section"] == "preferred"
+
+
+def test_required_qualification_heading_variants_keep_preferred_sections_distinct(
+    authenticated_client,
+):
+    client = authenticated_client
+    _add_private_skill(client, "Java", "language")
+    _add_private_skill(client, "Python", "language")
+    _add_private_skill(client, "AWS", "cloud")
+    _add_private_skill(client, "React", "framework")
+    _add_private_skill(client, "Rust", "language")
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "What We're Looking For (Required):\nJava\n"
+                "Skills and Qualifications:\nPython\n"
+                "Essential:\nAWS\n"
+                "Required Skills & Qualifications:\nReact\n"
+                "Nice to have:\nRust"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    for name in ("Java", "Python", "AWS", "React"):
+        assert extracted[name]["occurrences"][0]["section"] == "required"
+    assert extracted["Rust"]["occurrences"][0]["section"] == "preferred"
