@@ -79,6 +79,12 @@ def test_alias_automaton_cache_reuses_catalog_and_has_a_fixed_bound(db_session):
         ("Skills and Qualifications:", "required"),
         ("Essential:", "required"),
         ("What We're Looking For (Required):", "required"),
+        ("What You Have:", "required"),
+        ("What It Takes:", "required"),
+        ("What It Takes to Be Successful:", "required"),
+        ("Have You Got What It Takes?", "required"),
+        ("What We Require:", "required"),
+        ("Qualifications You Will Bring:", "required"),
         ("You might be a great fit if you:", "required"),
         ("What You Will Bring With You", "required"),
         ("What We Look For", "required"),
@@ -912,3 +918,37 @@ def test_required_qualification_heading_variants_keep_preferred_sections_distinc
     for name in ("Java", "Python", "AWS", "React"):
         assert extracted[name]["occurrences"][0]["section"] == "required"
     assert extracted["Rust"]["occurrences"][0]["section"] == "preferred"
+
+
+def test_what_it_takes_and_what_you_have_headings_classify_requirements(
+    authenticated_client,
+):
+    client = authenticated_client
+    _add_private_skill(client, "Python", "language")
+    _add_private_skill(client, "FastAPI", "framework")
+    _add_private_skill(client, "AWS", "cloud")
+    _add_private_skill(client, "Docker", "tool")
+    _add_private_skill(client, "Kubernetes", "tool")
+    _add_private_skill(client, "TypeScript", "language")
+    _add_private_skill(client, "React", "framework")
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "What You Have:\nPython\n"
+                "What It Takes:\nFastAPI\n"
+                "Have You Got What It Takes?\nAWS\n"
+                "What We Require:\nDocker\n"
+                "Qualifications You Will Bring:\nKubernetes\n"
+                "What It Takes to Be Successful:\nTypeScript\n"
+                "Bonus Points:\nReact"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    for name in ("Python", "FastAPI", "AWS", "Docker", "Kubernetes", "TypeScript"):
+        assert extracted[name]["occurrences"][0]["section"] == "required"
+    assert extracted["React"]["occurrences"][0]["section"] == "preferred"
