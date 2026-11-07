@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+from collections import defaultdict
 
 import pytest
 
@@ -47,7 +48,7 @@ def test_seed_skill_catalog_is_idempotent(db_session):
 def test_catalog_covers_common_technical_skills_and_stays_manageable():
     names = {entry["name"] for entry in SKILL_CATALOG}
 
-    assert 120 <= len(SKILL_CATALOG) <= 240
+    assert 120 <= len(SKILL_CATALOG) <= 260
     assert {
         "Python",
         "pandas",
@@ -75,6 +76,30 @@ def test_catalog_covers_common_technical_skills_and_stays_manageable():
         "Swagger",
         "GitHub",
     } <= names
+
+
+def test_catalog_aliases_have_no_normalized_or_folded_cross_skill_collisions():
+    normalized_owners = defaultdict(set)
+    folded_owners = defaultdict(set)
+
+    for entry in SKILL_CATALOG:
+        for alias in (entry["name"], *entry["aliases"]):
+            normalized_owners[normalize_text(alias)].add(entry["name"])
+            folded_owners[_fold_for_matching(alias)].add(entry["name"])
+
+    normalized_collisions = {
+        alias: sorted(names)
+        for alias, names in normalized_owners.items()
+        if len(names) > 1
+    }
+    folded_collisions = {
+        alias: sorted(names)
+        for alias, names in folded_owners.items()
+        if len(names) > 1
+    }
+
+    assert normalized_collisions == {}
+    assert folded_collisions == {}
 
 
 def test_catalog_covers_unmapped_technologies_observed_in_public_job_posts():
@@ -143,6 +168,74 @@ def test_real_data_posting_orchestration_stack_resolves_and_is_extracted(db_sess
     }
     assert {skill["name"] for skill in result["skills"]} == expected_skills
     assert set(result["profile_match"]["unspecified"]["missing_skills"]) == expected_skills
+
+
+def test_public_ml_nlp_posting_stack_resolves_and_is_extracted(db_session):
+    seed_skill_catalog(db_session)
+
+    expected_aliases = {
+        "Amazon Comprehend Medical": "Amazon Comprehend Medical",
+        "Google Cloud NLP": "Google Cloud Natural Language",
+        "Jupyter": "Jupyter Notebook",
+        "BERT": "BERT",
+        "BART": "BART",
+        "LLMs": "Large Language Models",
+        "embeddings": "Text Embeddings",
+        "vector databases": "Vector Database",
+        "FAISS": "FAISS",
+        "JAX": "JAX",
+        "vLLM": "vLLM",
+        "LangGraph": "LangGraph",
+        "LangSmith": "LangSmith",
+        "Braintrust": "Braintrust",
+        "OpenSearch": "OpenSearch",
+        "SageMaker": "Amazon SageMaker",
+        "Vertex AI": "Vertex AI",
+        "Azure ML": "Azure Machine Learning",
+        "semantic search": "Semantic Search",
+        "query understanding": "Query Understanding",
+        "reranking": "Reranking",
+        "spelling correction": "Spelling Correction",
+    }
+    for alias, canonical_name in expected_aliases.items():
+        skill = find_skill(db_session, alias)
+        assert skill is not None, alias
+        assert skill.name == canonical_name, alias
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "NLP stack: Hugging Face Transformers, BERT, BART, LLMs, embeddings, "
+            "vector databases, Jupyter, JAX, FAISS\n"
+            "LLM tools: vLLM, LangGraph, LangSmith, Braintrust, OpenSearch\n"
+            "Search capabilities: semantic search, query understanding, "
+            "reranking, spelling correction\n"
+            "Cloud APIs: Amazon Comprehend Medical, Google Cloud NLP, "
+            "SageMaker, Vertex AI, Azure ML"
+        ),
+    )
+    found = {skill["name"] for skill in result["skills"]}
+    assert set(expected_aliases.values()) <= found
+    assert set(expected_aliases.values()) <= set(
+        result["profile_match"]["unspecified"]["missing_skills"]
+    )
+
+
+def test_ambiguous_ml_terms_need_model_or_search_context(db_session):
+    seed_skill_catalog(db_session)
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "Bert and Bart are fictional names in a story.\n"
+            "The word embeddings can describe relationships in a metaphor.\n"
+            "JAX is the airport code used in the travel itinerary."
+        ),
+    )
+
+    assert result["skills"] == []
 
 
 def test_ambiguous_orchestration_stack_words_need_technical_context(db_session):
