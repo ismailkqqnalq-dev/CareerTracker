@@ -3,6 +3,8 @@ import time
 import pytest
 
 from app.models.skills import PersonalSkillAlias, SkillSuggestion
+from app.services import job_text_analysis_service as job_analysis_service
+from app.services.skill_catalog_service import seed_skill_catalog
 from app.services.job_text_analysis_service import (
     _fold_for_matching,
     _line_section,
@@ -17,6 +19,40 @@ def _add_private_skill(client, name, category):
     )
     assert response.status_code == 201
     return response.json()
+
+
+def test_reuses_compiled_alias_patterns_between_analyses(db_session, monkeypatch):
+    seed_skill_catalog(db_session)
+    cached_compiler = getattr(job_analysis_service, "_compile_alias_pattern", None)
+    if cached_compiler is not None:
+        cached_compiler.cache_clear()
+
+    original_compile = job_analysis_service.re.compile
+    compile_calls = []
+
+    def count_compile_calls(pattern, flags=0):
+        compile_calls.append(pattern)
+        return original_compile(pattern, flags)
+
+    monkeypatch.setattr(job_analysis_service.re, "compile", count_compile_calls)
+    try:
+        job_analysis_service.analyze_job_text(
+            db_session,
+            user_id=1,
+            text="Python, PostgreSQL and FastAPI",
+        )
+        first_count = len(compile_calls)
+        compile_calls.clear()
+        job_analysis_service.analyze_job_text(
+            db_session,
+            user_id=1,
+            text="Python, PostgreSQL and FastAPI",
+        )
+        assert first_count > 0
+        assert len(compile_calls) < first_count
+    finally:
+        if cached_compiler is not None:
+            cached_compiler.cache_clear()
 
 
 @pytest.mark.parametrize(
