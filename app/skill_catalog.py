@@ -276,4 +276,15 @@ SKILL_CATALOG += (
         "Swagger", "tool", "swagger ui", "swagger editor", "swagger codegen"
     ),
     _entry("GitHub", "platform", "github platform", "github.com"),
+
+    # Unambiguous technologies observed in recent public job postings.
+    _entry("Amazon S3", "cloud", "aws s3", "s3", "s3 bucket", "s3 object storage"),
+    _entry("Unity Catalog", "platform", "databricks unity catalog"),
+    _entry("Delta Lake", "database", "delta lakehouse"),
+    _entry("DuckLake", "database", "duck lake"),
+    _entry("Material UI", "framework", "mui", "material-ui", "material ui react"),
+    _entry("Turborepo", "tool", "turbo repo", "turborepo monorepo"),
+    _entry("Yarn Workspaces", "tool", "yarn workspace"),
+    _entry("tRPC", "api"),
+    _entry("RabbitMQ", "tool", "rabbit mq", "rabbit message queue"),
 )
