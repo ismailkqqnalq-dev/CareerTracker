@@ -121,6 +121,57 @@ def test_semantic_candidates_still_require_authentication(client):
     assert response.status_code == 401
 
 
+def test_semantic_candidate_requests_are_rate_limited_per_user(
+    authenticated_client, monkeypatch
+):
+    from app.rate_limits import get_rate_limit_settings
+
+    monkeypatch.setenv("RATE_LIMIT_SEMANTIC_CANDIDATES_PER_USER_PER_MINUTE", "1")
+    get_rate_limit_settings.cache_clear()
+    client = authenticated_client
+    _create_skill(client, "FastAPI")
+    suggestion_id = _pending_suggestion(client, "web api services")
+    _use_embedder(FakeSemanticEmbedder())
+
+    try:
+        first = client.get(
+            f"/skills/suggestions/{suggestion_id}/candidates?strategy=semantic"
+        )
+        second = client.get(
+            f"/skills/suggestions/{suggestion_id}/candidates?strategy=semantic"
+        )
+        lexical = client.get(
+            f"/skills/suggestions/{suggestion_id}/candidates?strategy=lexical"
+        )
+
+        assert client.post(
+            "/auth/register",
+            json={"email": "second@example.com", "password": "StrongPass123"},
+        ).status_code == 201
+        second_token = client.post(
+            "/auth/token",
+            data={"username": "second@example.com", "password": "StrongPass123"},
+        ).json()["access_token"]
+        client.headers["Authorization"] = f"Bearer {second_token}"
+        _create_skill(client, "React")
+        second_suggestion_id = _pending_suggestion(
+            client, "web api services", "second@example.com"
+        )
+        other_user = client.get(
+            f"/skills/suggestions/{second_suggestion_id}/candidates?strategy=semantic"
+        )
+    finally:
+        app.dependency_overrides.pop(get_semantic_embedder, None)
+        get_rate_limit_settings.cache_clear()
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 429
+    assert second.json()["error_code"] == "rate_limited"
+    assert int(second.headers["Retry-After"]) >= 1
+    assert lexical.status_code == 200, lexical.text
+    assert other_user.status_code == 200, other_user.text
+
+
 def test_default_candidate_strategy_remains_lexical_without_semantic_model(
     authenticated_client,
 ):

@@ -89,14 +89,17 @@ Kimlik doğrulama ve kaynak tüketen işlemler için süreç içi, bellek tabanl
 sınırlar uygulanır. Varsayılanlar: girişte IP başına 30/dakika ve IP+e-posta
 çifti başına 8/dakika; kayıtta IP başına 5/saat; OCR ve ilan analizinde kullanıcı
 başına 10/dakika ve her işlem türü için aynı kullanıcının aynı anda en fazla bir
-isteği. Aşımda `429`, `{"detail","error_code":"rate_limited"}` ve
+isteği. Semantik skill adayı araması yalnızca `strategy=semantic` seçildiğinde
+kullanıcı başına varsayılan 10/dakikadır; lexical sıralama bu sınırdan etkilenmez.
+Aşımda `429`, `{"detail","error_code":"rate_limited"}` ve
 `Retry-After` döner. OCR'ın mevcut süreç-geneli eşzamanlılık sınırı doluysa
 `503 ocr_busy` davranışı korunur.
 
 Sınırlar ve bellek anahtarı üst sınırı `.env` içindeki
 `RATE_LIMIT_LOGIN_IP_PER_MINUTE`, `RATE_LIMIT_LOGIN_IP_EMAIL_PER_MINUTE`,
 `RATE_LIMIT_REGISTER_IP_PER_HOUR`, `RATE_LIMIT_OCR_PER_USER_PER_MINUTE`,
-`RATE_LIMIT_JOB_ANALYSIS_PER_USER_PER_MINUTE` ve
+`RATE_LIMIT_JOB_ANALYSIS_PER_USER_PER_MINUTE`,
+`RATE_LIMIT_SEMANTIC_CANDIDATES_PER_USER_PER_MINUTE` ve
 `RATE_LIMIT_MAX_TRACKED_KEYS` ile ayarlanabilir. Limiter e-posta adreslerini
 saklamaz; IP ve e-posta bileşimlerini tek yönlü özetlerle anahtarlar. Süresi
 dolmuş anahtarlar yeni isteklerde temizlenir. Bellek anahtar sınırına ulaşıldığında
