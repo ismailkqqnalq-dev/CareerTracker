@@ -122,6 +122,19 @@ _SHORT_ALIAS_CONTEXT = re.compile(
     r"dili|programlama|deneyim|tecrube|beceri)\b",
     re.IGNORECASE,
 )
+_NEUTRAL_HEADING = re.compile(
+    r"(?:about(?:[ \t]+(?:us|the company))?|"
+    r"(?:the[ \t]+)?role(?:[ \t]+overview)?|"
+    r"(?:position|job)[ \t]+overview|"
+    r"(?:key[ \t]+|job[ \t]+)?responsibilities|"
+    r"what you(?:'|\u2019)ll do|what you will do|"
+    r"some things you might work on|"
+    r"(?:our[ \t]+)?(?:tech|technical)[ \t]+stack|"
+    r"technical environment|"
+    r"(?:the[ \t]+)?(?:rewards package|benefits)|"
+    r"why join us|what we offer)[ \t]*[:\uff1a]?",
+    re.IGNORECASE,
+)
 _HEADLINE_ROLE_SUFFIX = re.compile(
     r"\b(?:engineers?|developers?|scientists?|analysts?|architects?|designers?|"
     r"managers?|consultants?|specialists?|administrators?|technicians?|"
@@ -280,6 +293,8 @@ def _line_section(line: str, current: str) -> tuple[str, bool]:
         return "required", True
     if _PREFERRED_HEADING.fullmatch(folded_line):
         return "preferred", True
+    if _NEUTRAL_HEADING.fullmatch(folded_line):
+        return "unspecified", True
     if len(clean_line) < 80 and clean_line.endswith(":"):
         return "unspecified", True
     return current, False
