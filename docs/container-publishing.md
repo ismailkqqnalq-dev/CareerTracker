@@ -39,3 +39,13 @@ ghcr.io/ismailkqqnalq-dev/careertracker@sha256:a2d887dfcbab46f30e253c1ca7d695739
 ```
 
 Pulling by tag requires registry authentication while the package is private. Use a version tag for convenience or the digest for exact identity.
+
+### API response security headers
+
+Backend responses handled by the middleware include `X-Content-Type-Options: nosniff`,
+`X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `Cache-Control: no-store`.
+This covers normal responses and handled errors, including body-size rejections.
+Unhandled server errors produced outside the user middleware need equivalent headers
+at the reverse proxy. The frontend is served separately and requires its own header
+configuration. HTTPS/HSTS, frontend CSP, proxy host restrictions, encrypted backups,
+and restore drills remain deployment tasks; these headers do not establish production readiness.
