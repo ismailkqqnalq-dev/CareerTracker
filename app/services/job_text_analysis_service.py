@@ -131,6 +131,14 @@ _CONTEXTUAL_ALIAS_CONTEXT = {
         r"vision[ -]+models?)\b",
         re.IGNORECASE,
     ),
+    "feast": re.compile(
+        r"\b(?:feature[ -]+stores?|feature[ -]+store[ -]+platform)\b",
+        re.IGNORECASE,
+    ),
+    "step functions": re.compile(
+        r"\b(?:aws|amazon|lambda|glue|athena|emr)\b",
+        re.IGNORECASE,
+    ),
 }
 _NEUTRAL_HEADING = re.compile(
     r"(?:about(?:[ \t]+(?:us|the company))?|"
