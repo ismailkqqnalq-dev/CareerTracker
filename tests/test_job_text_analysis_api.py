@@ -1,7 +1,13 @@
 import time
 
+import pytest
+
 from app.models.skills import PersonalSkillAlias, SkillSuggestion
-from app.services.job_text_analysis_service import _fold_for_matching, analyze_job_text
+from app.services.job_text_analysis_service import (
+    _fold_for_matching,
+    _line_section,
+    analyze_job_text,
+)
 
 
 def _add_private_skill(client, name, category):
@@ -11,6 +17,35 @@ def _add_private_skill(client, name, category):
     )
     assert response.status_code == 201
     return response.json()
+
+
+@pytest.mark.parametrize(
+    ("heading", "expected_section"),
+    [
+        ("Skills Required:", "required"),
+        ("Qualifications:", "required"),
+        ("Basic Qualifications:", "required"),
+        ("Essential Skills:", "required"),
+        ("What You Bring:", "required"),
+        ("What We're Looking For:", "required"),
+        ("Gerekli Yetkinlikler:", "required"),
+        ("Aranan Yetkinlikler:", "required"),
+        ("Temel Nitelikler:", "required"),
+        ("İstenen Yetkinlikler:", "required"),
+        ("Desired Qualifications:", "preferred"),
+        ("Desirable Skills:", "preferred"),
+        ("Good to Have:", "preferred"),
+        ("Nice-to-haves:", "preferred"),
+        ("A Plus:", "preferred"),
+        ("Preferred Experience:", "preferred"),
+        ("Tercih Edilen Yetkinlikler:", "preferred"),
+        ("Artı Sayılan Özellikler:", "preferred"),
+    ],
+)
+def test_common_job_ad_headings_classify_requirement_sections(
+    heading, expected_section
+):
+    assert _line_section(heading, "unspecified") == (expected_section, True)
 
 
 def test_analyze_text_finds_visible_skills_and_conservative_sections(authenticated_client):
