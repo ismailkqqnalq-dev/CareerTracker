@@ -124,6 +124,14 @@ _SHORT_ALIAS_CONTEXT = re.compile(
     r"dili|programlama|deneyim|tecrube|beceri)\b",
     re.IGNORECASE,
 )
+_CONTEXTUAL_ALIAS_CONTEXT = {
+    "yolo": re.compile(
+        r"\b(?:computer[ -]+vision|object[ -]+detection|"
+        r"detection[ -]+networks?|image[ -]+classification|"
+        r"vision[ -]+models?)\b",
+        re.IGNORECASE,
+    ),
+}
 _NEUTRAL_HEADING = re.compile(
     r"(?:about(?:[ \t]+(?:us|the company))?|"
     r"(?:the[ \t]+)?role(?:[ \t]+overview)?|"
@@ -445,7 +453,18 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
             if skill_id is not None and skill_id not in visible:
                 continue
             for match in pattern.finditer(folded_line):
-                if alias in _SHORT_AMBIGUOUS_ALIASES:
+                if alias in _CONTEXTUAL_ALIAS_CONTEXT:
+                    source_start, source_end = _source_span(
+                        source_spans, match.start(), match.end()
+                    )
+                    context = line[
+                        max(0, source_start - 80):min(len(line), source_end + 80)
+                    ]
+                    if not _CONTEXTUAL_ALIAS_CONTEXT[alias].search(
+                        _fold_for_matching(context)
+                    ):
+                        continue
+                elif alias in _SHORT_AMBIGUOUS_ALIASES:
                     source_start, source_end = _source_span(
                         source_spans, match.start(), match.end()
                     )
