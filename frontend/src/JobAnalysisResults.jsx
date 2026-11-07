@@ -71,9 +71,14 @@ export default function JobAnalysisResults({ result }) {
   return (
     <section className="analysis-results" aria-live="polite">
       <h3>İlan özeti ve beceri karşılaştırması</h3>
+      <p className="analysis-explanation" role="note">
+        Bu sonuçlar katalogdaki ad ve alias eşleşmelerine dayanır; katalogda olmayan beceriler algılanmayabilir. Sonuçları ilan metniyle karşılaştır.
+      </p>
       {result.role && (
         <p className="analysis-role">
-          Açıkça belirtilen rol: <strong>{result.role}</strong>
+          {result.role_source === "headline"
+            ? "Başlık satırından algılanan rol:"
+            : "Açıkça belirtilen rol:"} <strong>{result.role}</strong>
           {result.role_line_number && <small> · satır {result.role_line_number}</small>}
         </p>
       )}
@@ -122,7 +127,7 @@ export default function JobAnalysisResults({ result }) {
             </li>
           ))}
         </ul>
-      ) : <p>Kişisel katalogda eşleşen beceri bulunamadı.</p>}
+      ) : <p>Katalogda tanınan beceri eşleşmesi bulunamadı.</p>}
     </section>
   );
 }
