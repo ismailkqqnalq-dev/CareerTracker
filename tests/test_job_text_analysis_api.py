@@ -144,6 +144,24 @@ def test_non_requirement_headings_reset_section_classification(
     assert _line_section(heading, current_section) == ("unspecified", True)
 
 
+@pytest.mark.parametrize(
+    ("heading", "expected_section"),
+    [
+        ("Your Profile", "required"),
+        ("What You Need", "required"),
+        ("You Should Have", "required"),
+    ],
+)
+def test_observed_profile_headings_classify_requirements(heading, expected_section):
+    assert _line_section(heading, "unspecified") == (expected_section, True)
+
+
+@pytest.mark.parametrize("heading", ["Core Responsibilities", "Our Stack"])
+@pytest.mark.parametrize("current_section", ["required", "preferred"])
+def test_observed_neutral_headings_reset_section(heading, current_section):
+    assert _line_section(heading, current_section) == ("unspecified", True)
+
+
 def test_analyze_text_finds_visible_skills_and_conservative_sections(authenticated_client):
     client = authenticated_client
     python_skill = _add_private_skill(client, "Python", "language")

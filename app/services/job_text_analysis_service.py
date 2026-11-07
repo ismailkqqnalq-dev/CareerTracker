@@ -105,6 +105,7 @@ _REQUIRED_HEADING = re.compile(
     r"you(?:'|\u2019)ll[ \t]+bring[ \t]+these[ \t]+qualifications"
     r"(?:[ \t]+(?:&[ \t]+experience|as[ \t]+a[ \t]+[\w /,&-]+))?|"
     r"about[ \t]+you|"
+    r"your[ \t]+profile|what[ \t]+you[ \t]+need|you[ \t]+should[ \t]+have|"
     r"we(?:'|\u2019)re excited about you because you have(?:\.{3}|\u2026)|"
     r"who[ \t]+we[ \t]+are[ \t]+looking[ \t]+for|"
     r"you[ \t]+might[ \t]+be[ \t]+a[ \t]+(?:(?:good|great)[ \t]+)?fit[ \t]+if[ \t]+you"
@@ -239,6 +240,7 @@ _ABOUT_ORGANIZATION_HEADING = re.compile(
 )
 _NEUTRAL_HEADING = re.compile(
     r"(?:about(?:[ \t]+(?:us|the company|our company|the role|this role|our team|the team))?|"
+    r"core[ \t]+responsibilities|our[ \t]+stack|"
     r"location[ \t]+requirement|compensation|salary|"
     r"(?:the[ \t]+)?role(?:[ \t]+overview)?|"
     r"(?:position|job)[ \t]+overview|"
