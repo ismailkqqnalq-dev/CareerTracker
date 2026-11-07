@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createApiClient } from "./api.js";
 import ProfileMatchPanel from "./ProfileMatchPanel.jsx";
 import ApplicationAnalyticsPanel from "./ApplicationAnalyticsPanel.jsx";
+import JobAnalysisResults from "./JobAnalysisResults.jsx";
 
 const authApi = createApiClient();
 const MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -408,7 +409,7 @@ function App() {
         <section className="analysis-card" aria-labelledby="job-analysis-title">
           <div className="analysis-heading">
             <h2 id="job-analysis-title">İlan metnini analiz et</h2>
-            <p className="muted">İlan metnini yapıştır. Bulunan beceriler, yalnızca kendi katalog ve eşleştirmelerinle karşılaştırılır.</p>
+            <p className="muted">İlan metnini yapıştır. Yalnızca katalogda tanınan beceriler bulunur; katalog dışındaki beceriler görünmeyebilir. OCR metnini analiz etmeden önce kontrol et.</p>
             <p className="analysis-privacy">Metin saklanmaz. Eşleştirme kural tabanlıdır; yapay zekâ veya doğruluk olasılığı değildir.</p>
           </div>
           <form className="analysis-form" onSubmit={analyzeJobText}>
@@ -425,27 +426,7 @@ function App() {
               {analyzingJob ? "Analiz ediliyor…" : "Metni analiz et"}
             </button>
           </form>
-          {jobAnalysis && (
-            <section className="analysis-results" aria-live="polite">
-              <h3>Bulunan beceriler</h3>
-              {jobAnalysis.role && <p className="analysis-role">Açıkça belirtilen rol: <strong>{jobAnalysis.role}</strong></p>}
-              {jobAnalysis.skills.length ? (
-                <ul>
-                  {jobAnalysis.skills.map((skill) => (
-                    <li key={skill.skill_id}>
-                      <strong>{skill.name}</strong>
-                      <span>{skill.category || "Kategori belirtilmemiş"}</span>
-                      {skill.occurrences.map((occurrence, index) => (
-                        <small key={`${skill.skill_id}-${occurrence.line_number}-${index}`}>
-                          {occurrence.section === "required" ? "Zorunlu bölüm" : occurrence.section === "preferred" ? "Tercih bölümü" : "Belirtilmemiş bölüm"} · satır {occurrence.line_number}
-                        </small>
-                      ))}
-                    </li>
-                  ))}
-                </ul>
-              ) : <p>Kişisel katalogda eşleşen beceri bulunamadı.</p>}
-            </section>
-          )}
+          {jobAnalysis && <JobAnalysisResults result={jobAnalysis} />}
         </section>
 
         <section className="suggestion-input-card" aria-labelledby="suggestion-input-title">

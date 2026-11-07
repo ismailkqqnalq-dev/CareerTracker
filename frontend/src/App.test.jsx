@@ -319,11 +319,92 @@ describe("job text analysis", () => {
     expect(await screen.findByRole("heading", { name: "Bulunan beceriler" })).toBeTruthy();
     expect(screen.getByText("Backend Engineer")).toBeTruthy();
     expect(screen.getByText("Python")).toBeTruthy();
+    expect(screen.getByText("Programlama dili")).toBeTruthy();
     expect(screen.getByText("Zorunlu bölüm · satır 2")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledWith("/api/job-analysis", expect.objectContaining({
       method: "POST",
       headers: expect.any(Headers),
     }));
+  });
+
+  it("shows explicitly labeled posting details and compares detected skills with the user's profile", async () => {
+    const fetchMock = setupLoggedInApp();
+    fetchMock.mockImplementation(async (url) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
+      if (url.endsWith("/job-analysis")) {
+        return jsonResponse(200, {
+          role: "Backend Engineer",
+          role_line_number: 1,
+          metadata: {
+            company: { value: "Örnek AŞ", line_number: 2 },
+            location: { value: "İstanbul", line_number: 3 },
+            employment_type: { value: "Tam zamanlı", line_number: 4 },
+            work_arrangement: { value: "Hibrit", line_number: 5 },
+            salary: { value: "80.000 TL", line_number: 6 },
+            experience: { value: "3 yıl", line_number: 7 },
+            education: { value: "Lisans", line_number: 8 },
+            application_url: { value: "https://example.test/jobs/1", line_number: 9 },
+          },
+          skills: [
+            {
+              skill_id: 7,
+              name: "Python",
+              category: "language",
+              profile_status: "in_profile",
+              profile_proficiency_level: "advanced",
+              profile_years_experience: 3.5,
+              occurrences: [{ line_number: 11, matched_text: "Python", section: "required" }],
+            },
+            {
+              skill_id: 8,
+              name: "Kubernetes",
+              category: "tool",
+              profile_status: "missing",
+              profile_proficiency_level: null,
+              profile_years_experience: null,
+              occurrences: [{ line_number: 14, matched_text: "Kubernetes", section: "preferred" }],
+            },
+          ],
+          profile_match: {
+            required: { total_count: 1, matched_count: 1, match_percentage: 100, missing_skills: [] },
+            preferred: { total_count: 1, matched_count: 0, match_percentage: 0, missing_skills: ["Kubernetes"] },
+            unspecified: { total_count: 0, matched_count: 0, match_percentage: null, missing_skills: [] },
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    fireEvent.change(await screen.findByLabelText("İlan metni"), {
+      target: { value: "Pozisyon: Backend Engineer\nŞirket: Örnek AŞ\nPython" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Metni analiz et" }));
+
+    expect(await screen.findByRole("heading", { name: "Bulunan beceriler" })).toBeTruthy();
+    expect(screen.getByText("Şirket")).toBeTruthy();
+    expect(screen.getByText("Örnek AŞ")).toBeTruthy();
+    expect(screen.getByText("Konum")).toBeTruthy();
+    expect(screen.getByText("İstanbul")).toBeTruthy();
+    expect(screen.getByText("Tam zamanlı")).toBeTruthy();
+    expect(screen.getByText("Hibrit")).toBeTruthy();
+    expect(screen.getByText("80.000 TL")).toBeTruthy();
+    expect(screen.getByText("3 yıl")).toBeTruthy();
+    expect(screen.getByText("Lisans")).toBeTruthy();
+    expect(screen.getByText("https://example.test/jobs/1")).toBeTruthy();
+    expect(screen.getByText("Satır 2")).toBeTruthy();
+    expect(screen.getByText(/Profilinde kayıtlı.*İleri.*3,5 yıl/)).toBeTruthy();
+    expect(screen.getByText(/Profilinde kayıtlı değil/)).toBeTruthy();
+    const requiredSummary = screen.getByText("Zorunlu beceriler").closest("li").textContent;
+    expect(requiredSummary).toContain("1 / 1");
+    expect(requiredSummary).toContain("%100 profilde kayıtlı");
+    const preferredSummary = screen.getByText("Tercih edilen beceriler").closest("li").textContent;
+    expect(preferredSummary).toContain("0 / 1");
+    expect(preferredSummary).toContain("%0 profilde kayıtlı");
+    expect(screen.getByText(/iş için uygunluk veya başarı olasılığı değildir/i)).toBeTruthy();
+    expect(screen.getByText(/katalog dışındaki beceriler görünmeyebilir/i)).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "https://example.test/jobs/1" })).toBeNull();
   });
 
   it("explains when the job text is larger than the API limit", async () => {

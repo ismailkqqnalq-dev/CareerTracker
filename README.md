@@ -60,7 +60,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Fırsat skill'leri | `POST, GET /opportunities/{opportunity_id}/skills` | Evet | Fırsata skill bağlar veya bağlı skill'leri listeler |
 | Fırsat skill eşleşmesi | `GET /opportunities/{opportunity_id}/skill-match` | Evet | Profilde bulunan ve eksik skill'leri karşılaştırır |
 | OCR | `POST /ocr/extract` | Evet | PNG/JPEG ham ikili gövdesini bellekte işler, metin ve görsel ölçülerini döndürür; sonuç saklanmaz |
-| İlan analizi | `POST /job-analysis` | Evet | En fazla 100 KB metni görünür beceri kataloğuyla kural tabanlı karşılaştırır; sonucu saklamaz |
+| İlan analizi | `POST /job-analysis` | Evet | En fazla 100 KB metinden etiketli ilan alanlarını ve görünür katalog becerilerini çıkarır; becerileri profilinle karşılaştırır; sonucu saklamaz |
 | Fırsatlar | `GET, POST /opportunities`; `GET, PATCH, DELETE /opportunities/{id}` | Evet | Kullanıcının fırsatlarını yönetir |
 | Kişiler | `GET, POST /contacts`; `GET, PATCH, DELETE /contacts/{id}` | Evet | Kullanıcının kişilerini yönetir |
 | Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
@@ -144,6 +144,12 @@ JSON hata gövdesindeki sabit kodlar:
 
 `POST /job-analysis`, `Cache-Control: no-store` ile çalışır; metin veritabanına
 yazılmaz. İstek gövdesi UTF-8 JSON'dur ve en fazla 100.000 bayt kabul edilir.
+Başarılı yanıt rolü, açık etiketle bulunmuş şirket/konum/çalışma türü/ücret/
+deneyim/eğitim/başvuru bağlantısını kaynak satır numarasıyla, katalogda
+eşleşen becerileri özgün satırlarıyla ve her becerinin mevcut kullanıcının
+profilinde kayıtlı olup olmadığını döndürür. `profile_match`, her benzersiz
+beceri için zorunlu/tercih edilen/bölümü belirtilmeyen gruplarda profilinde
+kayıtlı olma oranını verir; bu bir işe uygunluk veya başarı olasılığı değildir.
 
 | `error_code` | HTTP | Anlamı |
 |---|---:|---|
@@ -468,7 +474,7 @@ tests/             # pytest testleri
 - **Tamamlandı — Faz 2:** Dashboard, CSV dışa aktarma, PostgreSQL/Docker, Alembic ve CI.
 - **Tamamlandı — Faz 2.5:** Skill modelleri ve API'si, seed katalogu, kişisel skill/alias ve öneri eşleştirme temeli.
 - **Kısmi — Faz 3:** Görsel doğrulama/OCR servis baseline'ı, kimlik doğrulamalı ham metin çıkarma API'si ve sonucu kullanıcı onayıyla Faz 4 analiz alanına aktaran arayüz var; sonuç saklanmaz ve gerçek ilanlarda OCR kalitesi kapsamlı ölçülmedi.
-- **Kısmi — Faz 4:** Yapıştırılan ilan metninden görünür katalog becerilerini, açık rol etiketini ve tanınan gereksinim bölüm başlıklarını bulan kural tabanlı servis, API, MVP arayüzü ve sentetik değerlendirme betiği var; gerçek ilanları temsil eden ölçüm ve kapsamlı çıkarım tamamlanmadı.
+- **Kısmi — Faz 4:** Yapıştırılan/OCR'dan aktarılan ilan metninden açık etiketli alanları, görünür katalog becerilerini ve tanınan gereksinim bölümlerini çıkaran; becerileri kullanıcı profilindeki kayıt, seviye ve deneyimle karşılaştıran kural tabanlı servis, API ve MVP arayüzü var. Sonuç saklanmaz; serbest metinden anlamsal alan çıkarımı ve gerçek ilanlarla kapsamlı değerlendirme tamamlanmadı.
 - **Kısmi — Faz 5:** Normalizasyon, seed alias'ları, kişisel alias'lar ve metin benzerliğine dayalı aday sıralaması var; kapsamlı beceri normalizasyonu tamamlanmadı.
 - **Kısmi — Faz 6:** Profil becerilerini yönetme, fırsat becerisi ekleme ve eşleşen/eksik becerileri gösteren MVP arayüzü ile backend endpoint'leri var; tam eşleştirme ürünü tamamlanmadı.
 - **Kısmi — Faz 7:** Kullanıcıya özel, son 1–60 takvim ayı için aylık başvuru sayısı API'si ve aylık dağılımı gösteren React ekranı var; bu betimleyici sayım tahmin veya piyasa analizi değildir. İleri metrikler, dönüşüm analizi ve piyasa analizi tamamlanmadı.
@@ -482,7 +488,7 @@ Fazlar doğrusal ilerlemez. Faz 5, 6 ve 11'in bazı altyapı parçaları OCR/NLP
 
 Faz 1, 2 ve 2.5 tamamlandı. Faz 3 OCR baseline aşamasında; görsel yükleme için
 kimlik doğrulamalı API ve sonucu ilan analiz alanına aktaran MVP arayüzü eklendi.
-Faz 4'te metin analizi için ilk kural tabanlı API ve arayüz eklendi. Faz 5, 6 ve
+Faz 4'te etiketli ilan alanı/rol çıkarımı, katalog becerisi eşleşmesi ve profil becerileriyle karşılaştırma yapan kural tabanlı API ve arayüz eklendi. Faz 5, 6 ve
 11'den bazı parçalar erken teslim edildi ancak bu fazların bütünü tamamlanmış
 değildir. Arayüz beceri önerilerini yönetmenin yanında OCR, ilan metni analizi,
 profil becerisi yönetimi ve seçilen fırsat için eşleşen/eksik becerileri gösterme
@@ -503,7 +509,8 @@ akışlarını sunar.
   bağlantıları veritabanı `CASCADE` kurallarıyla silinir. Kişi silinince aktivite
   kaydı korunur ve `contact_id` boşaltılır (`SET NULL`).
 - İlan analizi yalnızca ortak katalogu, kullanıcının kendi skill'lerini ve kişisel eşleştirmelerini görür. Katalog dışında kalan terimleri otomatik olarak öneri veya alias yapmaz.
-- İlan analizi ML değildir: becerileri ad/alias sözlüğü ve sözcük sınırlarıyla arar. Rolü yalnızca açık `Pozisyon:` / `Role:` benzeri etiketlerden, gereksinim türünü yalnızca tanınan bölüm başlıklarından alır; serbest başlık tahmini yapmaz.
+- İlan analizi ML değildir: becerileri ad/alias sözlüğü ve sözcük sınırlarıyla arar. Rolü ve şirket, konum, ücret gibi alanları yalnızca bilinen açık etiketlerden alır; etiketsiz metinden tahmin yapmaz. Gereksinim türünü yalnızca tanınan bölüm başlıklarından belirler.
+- Profil karşılaştırması, bölüm başına katalogda eşleşen benzersiz becerilerden kaçının mevcut kullanıcının profilinde kayıtlı olduğunu gösterir. Profilde kayıtlı olmamak kişinin beceriyi bilmediğini kanıtlamaz. Profil seviyesi ve deneyim yılı gösterilir, ilandaki serbest deneyim ifadesiyle otomatik kıyaslanmaz.
 - Ortak katalog küratörlü ve sınırlıdır; beceri dışarıda kalabilir. Yeni global alias eklemeden önce hem `normalize_text` hem ilan analizindeki Türkçe/OCR katlama sonrası çakışmalar denetlenmelidir. Genel sözcükler (`spring`, `spark`, `excel`, `word`, `dash`) tek başına alias yapılmaz; kısa `C`, `R`, `Go` adları yalnızca bağlam filtresini geçen satırlarda eşleşir.
 - İlan analizi eşleştirme sırasında Unicode NFC/NFD eşdeğerlerini kanonikleştirir ve `matched_text` alanında kaynak metindeki özgün yazımı korur. OCR harf hatalarını ve Türkçe ekleri anlamsal olarak düzeltmez; bu nedenle gerçek ilanlarda beceri kaçırabilir veya metne göre istenmeyen eşleşmeler olabilir.
 - Değerlendirme betiği yalnızca küçük, sentetik örnekler kullanır; precision/recall/F1 sonuçları gerçek iş ilanlarına genellenemez.
