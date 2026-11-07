@@ -77,6 +77,69 @@ def test_catalog_covers_common_technical_skills_and_stays_manageable():
     } <= names
 
 
+def test_catalog_covers_unmapped_technologies_observed_in_public_job_posts():
+    names = {entry["name"] for entry in SKILL_CATALOG}
+
+    assert {
+        "Amazon S3",
+        "Unity Catalog",
+        "Delta Lake",
+        "DuckLake",
+        "Material UI",
+        "Turborepo",
+        "Yarn Workspaces",
+        "tRPC",
+        "RabbitMQ",
+    } <= names
+
+
+def test_observed_job_stack_aliases_resolve_to_canonical_skills(db_session):
+    seed_skill_catalog(db_session)
+
+    expected = {
+        "S3": "Amazon S3",
+        "Databricks Unity Catalog": "Unity Catalog",
+        "Delta Lakehouse": "Delta Lake",
+        "Duck Lake": "DuckLake",
+        "MUI": "Material UI",
+        "Turbo Repo": "Turborepo",
+        "Yarn Workspace": "Yarn Workspaces",
+        "tRPC": "tRPC",
+        "Rabbit MQ": "RabbitMQ",
+    }
+    for alias, canonical_name in expected.items():
+        skill = find_skill(db_session, alias)
+        assert skill is not None, alias
+        assert skill.name == canonical_name, alias
+
+
+def test_observed_job_stack_terms_are_extracted(db_session):
+    seed_skill_catalog(db_session)
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "Data Engineer\n"
+            "Basic Qualifications:\n"
+            "Amazon S3, Unity Catalog, Delta Lake, DuckLake, MUI, "
+            "Turborepo, Yarn Workspaces, tRPC, RabbitMQ"
+        ),
+    )
+
+    assert {skill["name"] for skill in result["skills"]} == {
+        "Amazon S3",
+        "Unity Catalog",
+        "Delta Lake",
+        "DuckLake",
+        "Material UI",
+        "Turborepo",
+        "Yarn Workspaces",
+        "tRPC",
+        "RabbitMQ",
+    }
+
+
 def test_real_job_ad_terms_and_plural_rest_api_are_extracted(db_session):
     seed_skill_catalog(db_session)
 
