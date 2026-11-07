@@ -663,3 +663,19 @@ def test_public_posting_excited_headings_drive_skill_sections(authenticated_clie
     assert extracted["Python"]["occurrences"][0]["section"] == "required"
     assert extracted["Docker"]["occurrences"][0]["section"] == "unspecified"
     assert extracted["SQL"]["occurrences"][0]["section"] == "required"
+
+
+def test_compensation_heading_resets_requirement_section(authenticated_client):
+    client = authenticated_client
+    _add_private_skill(client, "Python", "language")
+    _add_private_skill(client, "Docker", "tool")
+
+    response = client.post(
+        "/job-analysis",
+        json={"text": "Minimum Qualifications\nPython\nCompensation\nDocker"},
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    assert extracted["Python"]["occurrences"][0]["section"] == "required"
+    assert extracted["Docker"]["occurrences"][0]["section"] == "unspecified"

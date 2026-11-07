@@ -210,7 +210,7 @@ _ABOUT_ORGANIZATION_HEADING = re.compile(
 )
 _NEUTRAL_HEADING = re.compile(
     r"(?:about(?:[ \t]+(?:us|the company|our company|the role|this role|our team|the team))?|"
-    r"location[ \t]+requirement|"
+    r"location[ \t]+requirement|compensation|salary|"
     r"(?:the[ \t]+)?role(?:[ \t]+overview)?|"
     r"(?:position|job)[ \t]+overview|"
     r"(?:your[ \t]+|(?:key[ \t]+|job[ \t]+)?)responsibilities|"
