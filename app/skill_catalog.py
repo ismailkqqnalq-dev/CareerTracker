@@ -174,10 +174,10 @@ SKILL_CATALOG += (
     _entry("Data Engineering", "concept", "veri mühendisliği"),
 
     # Data platforms, databases, and infrastructure.
-    _entry("Apache Spark", "tool", "spark sql", "pyspark"),
+    _entry("Apache Spark", "tool", "spark", "spark sql", "pyspark"),
     _entry("Apache Kafka", "tool", "kafka", "kafka streaming"),
     _entry("Apache Flink", "tool", "flink", "flink sql"),
-    _entry("Apache Airflow", "tool"),
+    _entry("Apache Airflow", "tool", "airflow"),
     _entry("dbt", "tool", "data build tool"),
     _entry("Dagster", "tool", "dagster orchestration"),
     _entry("Prefect", "tool", "prefect orchestration"),
@@ -185,7 +185,7 @@ SKILL_CATALOG += (
     _entry("Databricks", "platform", "databricks lakehouse"),
     _entry("Snowflake", "database", "snowflake data cloud"),
     _entry("BigQuery", "database", "google bigquery"),
-    _entry("Amazon Redshift", "database", "aws redshift", "redshift database"),
+    _entry("Amazon Redshift", "database", "redshift", "aws redshift", "redshift database"),
     _entry("ClickHouse", "database", "click house"),
     _entry("Elasticsearch", "database", "elastic search"),
     _entry("Redis", "database", "redis cache"),
@@ -296,8 +296,10 @@ SKILL_CATALOG += (
     _entry("Metabase", "tool"),
     _entry("Streamlit", "framework"),
     _entry("Amazon EC2", "cloud", "EC2", "Elastic Compute Cloud"),
-    _entry("Apache Iceberg", "database"),
+    _entry("Apache Iceberg", "database", "iceberg"),
     _entry("Trino", "database"),
+    _entry("SQLMesh", "tool", "SQL Mesh"),
+    _entry("Modal", "platform"),
 )
 SKILL_CATALOG += (
     # MLOps tools and AWS data services confirmed in current job listings.

@@ -96,8 +96,70 @@ def test_catalog_covers_unmapped_technologies_observed_in_public_job_posts():
         "Streamlit",
         "Amazon EC2",
         "Apache Iceberg",
+        "Apache Spark",
+        "SQLMesh",
+        "Modal",
         "Trino",
     } <= names
+
+
+def test_real_data_posting_orchestration_stack_resolves_and_is_extracted(db_session):
+    seed_skill_catalog(db_session)
+
+    expected = {
+        "Spark": "Apache Spark",
+        "Iceberg": "Apache Iceberg",
+        "Airflow": "Apache Airflow",
+        "Redshift": "Amazon Redshift",
+        "SQLMesh": "SQLMesh",
+        "SQL Mesh": "SQLMesh",
+        "Modal": "Modal",
+    }
+    for alias, canonical_name in expected.items():
+        skill = find_skill(db_session, alias)
+        assert skill is not None, alias
+        assert skill.name == canonical_name, alias
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "Spark, Iceberg, Trino and AWS Glue for lakehouse workloads\n"
+            "Workflow orchestration tools: Airflow, SQLMesh\n"
+            "Modal for ML engineering\n"
+            "Analytical database: Redshift"
+        ),
+    )
+    expected_skills = {
+        "Apache Spark",
+        "Apache Iceberg",
+        "Trino",
+        "AWS Glue",
+        "Apache Airflow",
+        "Amazon Redshift",
+        "SQLMesh",
+        "Modal",
+        "Machine Learning",
+    }
+    assert {skill["name"] for skill in result["skills"]} == expected_skills
+    assert set(result["profile_match"]["unspecified"]["missing_skills"]) == expected_skills
+
+
+def test_ambiguous_orchestration_stack_words_need_technical_context(db_session):
+    seed_skill_catalog(db_session)
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "A spark of creativity and an iceberg metaphor.\n"
+            "Open a modal dialog and improve building airflow.\n"
+            "Redshift is an astronomy observation."
+        ),
+    )
+
+    assert result["skills"] == []
+    assert find_skill(db_session, "Argo") is None
 
 
 def test_observed_job_stack_aliases_resolve_to_canonical_skills(db_session):
@@ -316,7 +378,7 @@ def test_postgre_sql_spacing_variant_resolves_as_postgresql(db_session):
     assert [item["name"] for item in result["skills"]] == ["PostgreSQL"]
 
 
-def test_generic_ambiguous_terms_are_not_standalone_catalog_aliases():
+def test_generic_ambiguous_terms_are_context_gated_or_absent():
     catalog_terms = {
         normalize_text(alias)
         for entry in SKILL_CATALOG
@@ -325,7 +387,6 @@ def test_generic_ambiguous_terms_are_not_standalone_catalog_aliases():
 
     assert {
         "spring",
-        "spark",
         "excel",
         "word",
         "dash",
@@ -339,8 +400,9 @@ def test_generic_ambiguous_terms_are_not_standalone_catalog_aliases():
         "julia",
         "express",
         "requests",
-        "airflow",
+        "argo",
     }.isdisjoint(catalog_terms)
+    assert {"spark", "airflow", "iceberg", "redshift", "modal"} <= catalog_terms
 
 
 def test_seed_entrypoint_registers_user_metadata_on_fresh_database(tmp_path):
