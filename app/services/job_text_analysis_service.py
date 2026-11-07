@@ -10,26 +10,92 @@ from app.models.skills import (
     Skill,
     SkillAliases,
     SkillSuggestion,
+    UserSkill,
 )
 from app.services.skill_access import visible_skills
 from app.services.skill_normalizer import normalize_text
 
 
 MAX_METADATA_LINE_LENGTH = 200
-_ROLE_LABEL = re.compile(
-    r"(?:position|job title|role|title|pozisyon|rol|unvan)[ \t]*[:\uff1a-][ \t]*(?P<value>.+)",
-    re.IGNORECASE,
-)
+_METADATA_LABELS = {
+    "position": "role",
+    "job title": "role",
+    "title": "role",
+    "role": "role",
+    "position name": "role",
+    "pozisyon": "role",
+    "pozisyon adi": "role",
+    "rol": "role",
+    "unvan": "role",
+    "is unvani": "role",
+    "company": "company",
+    "company name": "company",
+    "employer": "company",
+    "sirket": "company",
+    "sirket adi": "company",
+    "isveren": "company",
+    "location": "location",
+    "city": "location",
+    "konum": "location",
+    "lokasyon": "location",
+    "sehir": "location",
+    "employment type": "employment_type",
+    "job type": "employment_type",
+    "position type": "employment_type",
+    "employment": "employment_type",
+    "istihdam turu": "employment_type",
+    "calisma turu": "employment_type",
+    "is turu": "employment_type",
+    "work arrangement": "work_arrangement",
+    "work model": "work_arrangement",
+    "workplace type": "work_arrangement",
+    "location type": "work_arrangement",
+    "calisma modeli": "work_arrangement",
+    "calisma bicimi": "work_arrangement",
+    "calisma sekli": "work_arrangement",
+    "salary": "salary",
+    "salary range": "salary",
+    "compensation": "salary",
+    "pay range": "salary",
+    "maas": "salary",
+    "maas araligi": "salary",
+    "ucret": "salary",
+    "ucret araligi": "salary",
+    "experience": "experience",
+    "years of experience": "experience",
+    "work experience": "experience",
+    "required experience": "experience",
+    "deneyim": "experience",
+    "deneyim suresi": "experience",
+    "tecrube": "experience",
+    "education": "education",
+    "education level": "education",
+    "degree": "education",
+    "egitim": "education",
+    "egitim duzeyi": "education",
+    "ogrenim": "education",
+    "mezuniyet": "education",
+    "application url": "application_url",
+    "application link": "application_url",
+    "apply url": "application_url",
+    "apply link": "application_url",
+    "basvuru url": "application_url",
+    "basvuru linki": "application_url",
+    "basvuru baglantisi": "application_url",
+}
 _REQUIRED_HEADING = re.compile(
     r"(?:required(?:[ \t]+(?:skills?|qualifications?))?|requirements?|"
-    r"what you(?:'|\u2019)ll need|must[- ]have|aranan[ \t]+nitelikler|"
+    r"minimum qualifications?|what you(?:'|\u2019)ll need|what you(?:'|\u2019)ll bring|"
+    r"must[- ]have|aranan[ \t]+(?:nitelikler|ozellikler)|"
+    r"adaydan beklentiler|"
     r"is icin gerekli beceriler|"
     r"gereklilikler|zorunlu[ \t]+(?:beceriler|nitelikler))[ \t]*[:\uff1a]?",
     re.IGNORECASE,
 )
 _PREFERRED_HEADING = re.compile(
-    r"(?:preferred(?:[ \t]+(?:skills?|qualifications?))?|nice to have|"
-    r"bonus points|tercihen|tercih sebebi|tercih edilen(?: beceriler)?|"
+    r"(?:preferred(?:[ \t]+(?:skills?|qualifications?))?|nice[- ]to[- ]have|"
+    r"desired skills?|bonus(?: points)?|tercihen|tercih sebebi|"
+    r"tercih edilen(?:[ \t]+(?:beceriler|nitelikler))?|"
     r"one cikan ozellikler|avantaj)[ \t]*[:\uff1a]?",
     re.IGNORECASE,
 )
@@ -188,8 +254,56 @@ def _line_section(line: str, current: str) -> tuple[str, bool]:
     return current, False
 
 
+def _parse_metadata_line(line: str) -> tuple[str, str] | None:
+    """Read only short, explicitly labeled metadata lines; never infer values."""
+    clean_line = line.strip()
+    if not clean_line or len(clean_line) > MAX_METADATA_LINE_LENGTH:
+        return None
+
+    separator_indices = [
+        index
+        for separator in (":", "：")
+        if (index := clean_line.find(separator)) >= 0
+    ]
+    separator_index = min(separator_indices, default=-1)
+    dash_separated = separator_index < 0
+    if dash_separated:
+        separator_index = clean_line.find("-")
+    if separator_index < 0:
+        return None
+
+    label = _fold_for_matching(clean_line[:separator_index].strip())
+    field_name = _METADATA_LABELS.get(label)
+    value = clean_line[separator_index + 1 :].strip()
+    if field_name is None or not value or (dash_separated and field_name != "role"):
+        return None
+    return field_name, value
+
+
+def _section_profile_match(
+    skill_ids: set[int],
+    extracted: dict[int, dict],
+    profile: dict[int, UserSkill],
+) -> dict:
+    matched_ids = skill_ids.intersection(profile)
+    missing_ids = skill_ids.difference(profile)
+    total_count = len(skill_ids)
+    return {
+        "total_count": total_count,
+        "matched_count": len(matched_ids),
+        "match_percentage": (
+            round(len(matched_ids) / total_count * 100, 2)
+            if total_count
+            else None
+        ),
+        "missing_skills": sorted(
+            extracted[skill_id]["name"] for skill_id in missing_ids
+        ),
+    }
+
+
 def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
-    """Return explicit skill mentions; never writes or guesses missing catalog terms."""
+    """Extract explicit labels and skill mentions; compare them to this user's profile."""
     aliases = _visible_aliases(db, user_id)
     visible = {skill.id: skill for skill in visible_skills(db, user_id).all()}
     folded_alias_owners: dict[str, set[int]] = {}
@@ -213,6 +327,17 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
     ]
 
     role = None
+    role_line_number = None
+    metadata = {
+        "company": None,
+        "location": None,
+        "employment_type": None,
+        "work_arrangement": None,
+        "salary": None,
+        "experience": None,
+        "education": None,
+        "application_url": None,
+    }
     section = "unspecified"
     extracted: dict[int, dict] = {}
 
@@ -220,9 +345,17 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
         clean_line = line.strip()
         metadata_line = len(clean_line) <= MAX_METADATA_LINE_LENGTH
         if metadata_line:
-            role_match = _ROLE_LABEL.fullmatch(clean_line)
-            if role is None and role_match and role_match.group("value").strip():
-                role = role_match.group("value").strip()
+            parsed_field = _parse_metadata_line(clean_line)
+            if parsed_field:
+                field_name, value = parsed_field
+                if field_name == "role" and role is None:
+                    role = value
+                    role_line_number = line_number
+                elif field_name != "role" and metadata[field_name] is None:
+                    metadata[field_name] = {
+                        "value": value,
+                        "line_number": line_number,
+                    }
             section, is_heading = _line_section(clean_line, section)
         else:
             is_heading = False
@@ -291,9 +424,46 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
                 }
             )
 
+    profile = {
+        user_skill.skill_id: user_skill
+        for user_skill in db.query(UserSkill)
+        .filter(UserSkill.user_id == user_id)
+        .all()
+    }
+    section_skill_ids = {
+        "required": set(),
+        "preferred": set(),
+        "unspecified": set(),
+    }
+    for skill_id, entry in extracted.items():
+        user_skill = profile.get(skill_id)
+        entry["profile_status"] = "in_profile" if user_skill else "missing"
+        entry["profile_proficiency_level"] = (
+            user_skill.proficiency_level if user_skill else None
+        )
+        entry["profile_years_experience"] = (
+            user_skill.years_experience if user_skill else None
+        )
+        for occurrence in entry["occurrences"]:
+            section_skill_ids[occurrence["section"]].add(skill_id)
+
     results = []
     for skill_id in sorted(extracted, key=lambda item: visible[item].name.casefold()):
         entry = extracted[skill_id]
         entry.pop("_seen")
         results.append(entry)
-    return {"role": role, "skills": results}
+
+    return {
+        "role": role,
+        "role_line_number": role_line_number,
+        "metadata": metadata,
+        "skills": results,
+        "profile_match": {
+            section_name: _section_profile_match(
+                skill_ids,
+                extracted,
+                profile,
+            )
+            for section_name, skill_ids in section_skill_ids.items()
+        },
+    }

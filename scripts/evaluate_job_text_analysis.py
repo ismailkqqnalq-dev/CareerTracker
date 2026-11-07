@@ -10,7 +10,13 @@ import unicodedata
 from sqlalchemy.orm import Session
 
 from app.database.session import Base, create_database_engine
-from app.models.skills import PersonalSkillAlias, Skill, SkillAliases, SkillSuggestion
+from app.models.skills import (
+    PersonalSkillAlias,
+    Skill,
+    SkillAliases,
+    SkillSuggestion,
+    UserSkill,
+)
 from app.models.users import User
 from app.services.job_text_analysis_service import analyze_job_text
 from app.services.skill_catalog_service import seed_skill_catalog
@@ -152,6 +158,7 @@ def evaluate(analyzer=analyze_job_text) -> dict:
         SkillAliases.__table__,
         PersonalSkillAlias.__table__,
         SkillSuggestion.__table__,
+        UserSkill.__table__,
     ]
     Base.metadata.create_all(bind=engine, tables=tables)
 
