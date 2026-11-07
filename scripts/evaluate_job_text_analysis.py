@@ -218,4 +218,5 @@ def evaluate(analyzer=analyze_job_text) -> dict:
 
 
 if __name__ == "__main__":
-    print(json.dumps(evaluate(), ensure_ascii=False, indent=2))
+    # Keep the JSON portable to Windows consoles using legacy code pages.
+    print(json.dumps(evaluate(), ensure_ascii=True, indent=2))
