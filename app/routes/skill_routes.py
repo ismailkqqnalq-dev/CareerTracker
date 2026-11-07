@@ -5,6 +5,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
+from app.rate_limits import (
+    get_rate_limit_settings,
+    rate_limit_manager,
+    rate_limited_response,
+)
 from app.models.skills import Skill
 from app.pagination import pagination_params, paginate_query, set_total_count
 from app.services import skill_match_service
@@ -153,6 +158,17 @@ def get_skill_suggestion_candidates(
     current_user: User = Depends(get_current_user),
     semantic_embedder: SemanticEmbedder = Depends(get_semantic_embedder),
 ):
+    if strategy == "semantic":
+        settings = get_rate_limit_settings()
+        rate_decision = rate_limit_manager.check(
+            "semantic-candidates-user",
+            str(current_user.id),
+            settings.semantic_candidates_per_user_per_minute,
+            "minute",
+        )
+        if not rate_decision.allowed:
+            return rate_limited_response(rate_decision.retry_after)
+
     try:
         if strategy == "semantic":
             candidates = rank_semantic_skill_candidates(

@@ -52,6 +52,7 @@ class RateLimitSettings:
     register_ip_per_hour: int
     ocr_per_user_per_minute: int
     job_analysis_per_user_per_minute: int
+    semantic_candidates_per_user_per_minute: int
     max_tracked_keys: int
     trusted_proxy_networks: tuple[
         ipaddress.IPv4Network | ipaddress.IPv6Network, ...
@@ -97,6 +98,9 @@ def get_rate_limit_settings() -> RateLimitSettings:
         ),
         job_analysis_per_user_per_minute=positive_int_env(
             "RATE_LIMIT_JOB_ANALYSIS_PER_USER_PER_MINUTE", 10
+        ),
+        semantic_candidates_per_user_per_minute=positive_int_env(
+            "RATE_LIMIT_SEMANTIC_CANDIDATES_PER_USER_PER_MINUTE", 10
         ),
         max_tracked_keys=positive_int_env(
             "RATE_LIMIT_MAX_TRACKED_KEYS", DEFAULT_MAX_TRACKED_KEYS
