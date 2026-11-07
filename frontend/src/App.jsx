@@ -3,6 +3,7 @@ import { createApiClient } from "./api.js";
 import ProfileMatchPanel from "./ProfileMatchPanel.jsx";
 import ApplicationAnalyticsPanel from "./ApplicationAnalyticsPanel.jsx";
 import JobAnalysisResults from "./JobAnalysisResults.jsx";
+import CrmWorkspace, { VIEW_TITLES } from "./CrmWorkspace.jsx";
 
 const authApi = createApiClient();
 const MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -345,22 +346,31 @@ function App() {
       </header>
 
       <main className="page-content">
+        <div className="app-workspace-layout">
+          <nav className="app-section-nav" aria-label="CareerTracker bölümleri">
+            <p className="nav-group-label">ÇALIŞMA ALANI</p>
+            {[["overview", "Genel bakış"], ["opportunities", "Başvurular"], ["contacts", "Kişiler"], ["tasks", "Görevler"], ["activities", "Aktiviteler"]].map(([view, label]) => (
+              <button key={view} type="button" aria-current={activeView === view ? "page" : undefined} onClick={() => setActiveView(view)}><span className="nav-icon" aria-hidden="true">{({ overview: "⌂", opportunities: "▣", contacts: "♧", tasks: "✓", activities: "◷" })[view]}</span>{label}</button>
+            ))}
+            <p className="nav-group-label nav-group-secondary">BECERİ VE ANALİZ</p>
+            <button type="button" aria-current={activeView === "suggestions" ? "page" : undefined} onClick={() => setActiveView("suggestions")}><span className="nav-icon" aria-hidden="true">✧</span>Beceri önerileri</button>
+            <button type="button" aria-current={activeView === "profile" ? "page" : undefined} onClick={() => setActiveView("profile")}><span className="nav-icon" aria-hidden="true">◎</span>Profil ve eşleşme</button>
+            <button type="button" aria-current={activeView === "analytics" ? "page" : undefined} onClick={() => setActiveView("analytics")}><span className="nav-icon" aria-hidden="true">▤</span>Başvuru analizi</button>
+          </nav>
+
+          <div className="app-main-view">
         <div className="page-heading">
           <div>
-            <p className="eyebrow">KİŞİSEL BECERİ KATALOĞUN</p>
-            <h1>{activeView === "suggestions" ? "Beceri önerileri" : activeView === "profile" ? "Profil ve fırsat eşleşmesi" : "Başvuru analizi"}</h1>
-            <p className="muted heading-copy">{activeView === "suggestions" ? "Sistemin tanımadığı becerileri mevcut katalogdaki doğru beceriyle eşleştir." : activeView === "profile" ? "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır." : "Başvurularının aylara göre dağılımını incele."}</p>
+            <p className="eyebrow">{VIEW_TITLES[activeView] ? "KİŞİSEL ÇALIŞMA ALANIN" : "BECERİ VE İLAN MERKEZİ"}</p>
+            <h1>{VIEW_TITLES[activeView] || (activeView === "suggestions" ? "Beceri önerileri" : activeView === "profile" ? "Profil ve fırsat eşleşmesi" : "Başvuru analizi")}</h1>
+            <p className="muted heading-copy">{VIEW_TITLES[activeView] ? "Kariyer sürecini düzenle ve takip adımlarını yönet." : activeView === "suggestions" ? "Sistemin tanımadığı becerileri eşleştir, ilan metnini incele ve beceri analizini kullan." : activeView === "profile" ? "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır." : "Başvurularının aylara göre dağılımını incele."}</p>
           </div>
           {activeView === "suggestions" && <div className="count-card"><span className="count-number">{pendingCount}</span><span>bekleyen öneri</span></div>}
         </div>
 
-        <nav className="app-section-nav" aria-label="CareerTracker bölümleri">
-          <button type="button" aria-current={activeView === "suggestions" ? "page" : undefined} onClick={() => setActiveView("suggestions")}>Beceri önerileri</button>
-          <button type="button" aria-current={activeView === "profile" ? "page" : undefined} onClick={() => setActiveView("profile")}>Profil ve eşleşme</button>
-          <button type="button" aria-current={activeView === "analytics" ? "page" : undefined} onClick={() => setActiveView("analytics")}>Başvuru analizi</button>
-        </nav>
-
-        {activeView === "analytics" ? (
+        {VIEW_TITLES[activeView] ? (
+          <CrmWorkspace api={api} token={token} view={activeView} onNavigate={setActiveView} />
+        ) : activeView === "analytics" ? (
           <ApplicationAnalyticsPanel api={api} token={token} />
         ) : activeView === "profile" ? (
           <ProfileMatchPanel api={api} token={token} skills={skills} />
@@ -492,6 +502,8 @@ function App() {
         <p className="privacy-note"><span>🔒</span> Beceri eşleştirmelerin kişiseldir; genel skill kataloğuna otomatik alias eklenmez.</p>
           </>
         )}
+          </div>
+        </div>
       </main>
     </div>
   );

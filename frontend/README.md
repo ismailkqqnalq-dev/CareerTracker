@@ -1,6 +1,6 @@
 # CareerTracker frontend
 
-Small React interface for reviewing and mapping a user's pending skill suggestions. The existing FastAPI backend remains unchanged.
+Authenticated React web interface for the core CareerTracker CRM: overview, opportunities, contacts, tasks, activities, profile skills, skill matching, suggestions, job-text analysis, OCR, and monthly application analytics. It uses the existing FastAPI API; the backend and database schema are unchanged by frontend work.
 
 ## Run locally
 
@@ -14,7 +14,7 @@ In another terminal:
 
 ```powershell
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -25,6 +25,8 @@ $env:CAREERTRACKER_API_URL = "http://127.0.0.1:8000"
 npm run dev
 ```
 
-The screen uses the existing `/auth/register`, `/auth/token`, `/auth/me`, `/skills`, `/skills/suggestions`, `/skills/suggestions/{id}/candidates`, and `PATCH /skills/suggestions/{id}` endpoints. It stores the access token in tab-scoped `sessionStorage`; signing out clears it. Mapping is confirmed by the user and remains scoped to that user's account.
+CRM lists use the existing paginated endpoints and show 50 records per page. Create, update, and delete actions stay scoped to the signed-in user's backend permissions. Deleting an opportunity warns that its linked contacts, tasks, and activities are deleted by the current cascade behavior.
+
+The access token is stored in tab-scoped `sessionStorage`; signing out or receiving HTTP 401 clears the session. OCR and job-analysis results are not saved by the API. Skill mappings require user confirmation and remain scoped to that user's account.
 
 Build a production bundle with `npm run build`.

@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/ismailkqqnalq-dev/CareerTracker/actions/workflows/tests.yml)
 
-İş, staj ve freelance fırsatlarını takip etmek için geliştirilen bir kariyer CRM'idir. FastAPI ve SQLAlchemy REST API'si, SQLite ile yerel ve PostgreSQL ile Docker ortamında çalışabilir. `frontend/` dizininde beceri önerileri, OCR, ilan metni analizi, profil beceri eşleşmesi ve aylık başvuru analizi için sınırlı bir React MVP'si bulunur; tam CRM arayüzü değildir.
+İş, staj ve freelance fırsatlarını takip etmek için geliştirilen bir kariyer CRM'idir. FastAPI ve SQLAlchemy REST API'si, SQLite ile yerel ve PostgreSQL ile Docker ortamında çalışabilir. `frontend/` dizininde başvuru, kişi, görev ve aktivite yönetimi için CRM ekranları; beceri profili/eşleşmesi, beceri önerileri, OCR, ilan analizi ve başvuru analitiği akışları bulunur. Arayüz temel CRM iş akışlarını kapsar; mobil istemci ve üretim dağıtımı bu kapsamın dışındadır.
 ## Vizyon
 
 CareerTracker, başvuru takibinden öteye geçmeyi hedefliyor: **Career Tracker AI**. Farklı platformlardan (LinkedIn, Indeed, Upwork, Fiverr) gelen iş ve freelance fırsatlarını tek yerde toplayıp ilanlardan yapılandırılmış veri çıkaran, kullanıcının becerileriyle karşılaştıran ve zamanla piyasa trendlerini analiz eden bir kariyer istihbarat platformu.
@@ -17,6 +17,8 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Başvuru istatistiklerini sunan dashboard
 - Kullanıcıya özel, seçilen dönem için aylık başvuru hacmi analizi
 - Fırsatları CSV olarak dışa aktarma (Türkçe karakter desteği)
+- Başvurular, kişiler, görevler ve aktiviteler için React arayüzünden listeleme, ekleme, güncelleme ve silme
+- Genel bakış ekranında kullanıcıya özel başvuru durumları, görüşme/teklif sayıları ve son kayıtlar
 - Alembic veritabanı migration'ları
 - GitHub Actions ile otomatik test çalıştırma
 - 247 becerilik ortak teknik seed kataloğu, kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
@@ -300,11 +302,18 @@ docker compose exec app python -m app.seed_skill_catalog
 
 API: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). Servisleri durdurmak için `docker compose down` kullan. Veritabanı verileri `postgres_data` volume'unda saklanır.
 
-## Beceri öneri arayüzü (MVP)
+## Frontend arayüzü
 
-Arayüz beceri önerisi akışının MVP'sidir: kayıt ve giriş, tanınmayan beceri önerisi
-gönderme, benzer adayları görüntüleme ve kullanıcı onayıyla eşleştirme. Fırsat,
-kişi, aktivite ve görevleri yönetmek için tam CRM arayüzü içermez.
+Giriş yaptıktan sonra genel bakışta başvuru durumlarını ve son kayıtları görebilir;
+başvuru, kişi, görev ve aktivite kayıtlarını yönetebilirsin. Koleksiyon ekranları
+50 kayıtlık sayfalarla çalışır. Başvurulara bağlı kişiler, görevler ve aktiviteler
+başvurunun silinmesinde backend'in mevcut cascade davranışına tabidir; arayüz silme
+onayında bunu bildirir.
+
+Beceri önerisi ekranı yeni beceri gönderme ve benzer adayları kullanıcı onayıyla
+eşleştirme akışını sunar. Profil/eşleşme ve aylık analitik ekranları da yer alır.
+İlan analizi kural tabanlıdır; katalogda bulunmayan becerileri veya serbest metin
+anlamını her durumda çıkaracağı garanti edilmez.
 
 ### Katalog ve kişisel eşleştirme
 
@@ -480,19 +489,20 @@ tests/             # pytest testleri
 - **Kısmi — Faz 7:** Kullanıcıya özel, son 1–60 takvim ayı için aylık başvuru sayısı API'si ve aylık dağılımı gösteren React ekranı var; bu betimleyici sayım tahmin veya piyasa analizi değildir. İleri metrikler, dönüşüm analizi ve piyasa analizi tamamlanmadı.
 - **Kısmi — Faz 8:** Beceri önerileri için isteğe bağlı, yerel embedding tabanlı semantik aday stratejisi var; varsayılan lexical davranış korunur. Değerlendirme küçük sentetik kümeyle sınırlıdır.
 - **Planlandı — Faz 9–10:** Makine öğrenmesi ve deep learning/computer vision çalışmaları.
-- **Kısmi — Faz 11:** JWT kimlik doğrulaması ve beceri önerileri için React MVP'si var; deployment ve tam CRM arayüzü tamamlanmadı.
+- **Kısmi — Faz 11:** JWT kimlik doğrulaması ve başvuru, kişi, görev, aktivite, beceri ve analiz akışlarını kapsayan React web arayüzü var; mobil istemci ve deployment tamamlanmadı.
 
 Fazlar doğrusal ilerlemez. Faz 5, 6 ve 11'in bazı altyapı parçaları OCR/NLP başlamadan önce geliştirildi; bu fazlar tamamlandı anlamına gelmez.
 
 ## Durum
 
 Faz 1, 2 ve 2.5 tamamlandı. Faz 3 OCR baseline aşamasında; görsel yükleme için
-kimlik doğrulamalı API ve sonucu ilan analiz alanına aktaran MVP arayüzü eklendi.
-Faz 4'te etiketli ilan alanı/rol çıkarımı, katalog becerisi eşleşmesi ve profil becerileriyle karşılaştırma yapan kural tabanlı API ve arayüz eklendi. Faz 5, 6 ve
-11'den bazı parçalar erken teslim edildi ancak bu fazların bütünü tamamlanmış
-değildir. Arayüz beceri önerilerini yönetmenin yanında OCR, ilan metni analizi,
-profil becerisi yönetimi ve seçilen fırsat için eşleşen/eksik becerileri gösterme
-akışlarını sunar.
+kimlik doğrulamalı API ve sonucu ilan analiz alanına aktaran arayüz eklendi. Faz
+4'te etiketli ilan alanı/rol çıkarımı, katalog becerisi eşleşmesi ve profil
+becerileriyle karşılaştırma yapan kural tabanlı API ve arayüz eklendi. Faz 5, 6
+ve 11'den bazı parçalar erken teslim edildi ancak bu fazların bütünü tamamlanmış
+değildir. Arayüz başvuru, kişi, görev ve aktivite CRUD ekranlarını, kullanıcıya
+özel genel bakışı, OCR/ilan analizini, beceri önerilerini, profil eşleşmesini ve
+aylık başvuru analizini sunar. Mobil istemci ve üretim dağıtımı yapılmamıştır.
 
 ## Bilinen sınırlar
 
