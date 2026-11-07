@@ -25,6 +25,9 @@ def _add_private_skill(client, name, category):
         ("Skills Required:", "required"),
         ("Qualifications:", "required"),
         ("Basic Qualifications:", "required"),
+        ("Minimum Requirements:", "required"),
+        ("Minimum Qualifications:", "required"),
+        ("What you'll need to be successful", "required"),
         ("Essential Skills:", "required"),
         ("What You Bring:", "required"),
         ("What We're Looking For:", "required"),
@@ -38,6 +41,8 @@ def _add_private_skill(client, name, category):
         ("Nice-to-haves:", "preferred"),
         ("A Plus:", "preferred"),
         ("Preferred Experience:", "preferred"),
+        ("Any of the following would be a bonus", "preferred"),
+        ("Any of the following would be a bonus.", "preferred"),
         ("Tercih Edilen Yetkinlikler:", "preferred"),
         ("Artı Sayılan Özellikler:", "preferred"),
     ],
@@ -70,6 +75,7 @@ def test_analyze_text_finds_visible_skills_and_conservative_sections(authenticat
     assert response.status_code == 200
     payload = response.json()
     assert payload["role"] == "Backend Engineer"
+    assert payload["role_source"] == "explicit"
     skills = {skill["name"]: skill for skill in payload["skills"]}
     assert set(skills) == {"Python", "FastAPI", "PostgreSQL"}
     assert skills["Python"]["skill_id"] == python_skill["id"]
@@ -78,6 +84,50 @@ def test_analyze_text_finds_visible_skills_and_conservative_sections(authenticat
     assert skills["Python"]["occurrences"][0]["section"] == "required"
     assert skills["FastAPI"]["occurrences"][0]["section"] == "required"
     assert skills["PostgreSQL"]["occurrences"][0]["section"] == "preferred"
+
+
+def test_analyzer_uses_job_title_headline_when_no_role_label(db_session):
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text="Senior Software Engineer (Java or Python)\nRemote\nWe build tools for teams.",
+    )
+
+    assert result["role"] == "Senior Software Engineer (Java or Python)"
+    assert result["role_line_number"] == 1
+    assert result["role_source"] == "headline"
+
+
+def test_explicit_role_label_takes_precedence_over_headline(db_session):
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text="Senior Software Engineer\nPosition: Backend Engineer",
+    )
+
+    assert result["role"] == "Backend Engineer"
+    assert result["role_line_number"] == 2
+    assert result["role_source"] == "explicit"
+
+
+def test_analyzer_does_not_treat_introductory_prose_as_a_job_title(db_session):
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text="We are looking for a software engineer to join our team.\nPython",
+    )
+
+    assert result["role"] is None
+
+
+def test_analyzer_does_not_infer_a_role_from_a_later_body_line(db_session):
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text="About us\nFirst intro\nSecond intro\nThird intro\nFourth intro\nSenior Data Engineer",
+    )
+
+    assert result["role"] is None
 
 
 def test_analyzer_handles_symbolic_names_and_avoids_bare_short_matches(authenticated_client):

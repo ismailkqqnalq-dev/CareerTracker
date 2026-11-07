@@ -47,7 +47,7 @@ def test_seed_skill_catalog_is_idempotent(db_session):
 def test_catalog_covers_common_technical_skills_and_stays_manageable():
     names = {entry["name"] for entry in SKILL_CATALOG}
 
-    assert 120 <= len(SKILL_CATALOG) <= 180
+    assert 120 <= len(SKILL_CATALOG) <= 200
     assert {
         "Python",
         "pandas",
@@ -65,7 +65,61 @@ def test_catalog_covers_common_technical_skills_and_stays_manageable():
         "PostgreSQL",
         "AWS",
         "Kubernetes",
+        "NoSQL",
+        "Amazon SQS",
+        "Flyte",
+        "JUnit",
+        "TestNG",
+        "Gradle",
+        "Apache Maven",
+        "Swagger",
+        "GitHub",
     } <= names
+
+
+def test_real_job_ad_terms_and_plural_rest_api_are_extracted(db_session):
+    seed_skill_catalog(db_session)
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "Minimum Requirements:\n"
+            "REST APIs, NoSQL, Amazon SQS, Flyte\n"
+            "Any of the following would be a bonus\n"
+            "JUnit, TestNG, Gradle, Apache Maven, Swagger, GitHub"
+        ),
+    )
+
+    found = {item["name"]: item for item in result["skills"]}
+    assert {
+        "REST API", "NoSQL", "Amazon SQS", "Flyte", "JUnit", "TestNG",
+        "Gradle", "Apache Maven", "Swagger", "GitHub",
+    } <= found.keys()
+    assert found["REST API"]["occurrences"][0]["matched_text"] == "REST APIs"
+    assert found["REST API"]["occurrences"][0]["section"] == "required"
+    assert found["JUnit"]["occurrences"][0]["section"] == "preferred"
+
+
+def test_real_job_ad_catalog_aliases_resolve_to_expected_canonical_names(db_session):
+    seed_skill_catalog(db_session)
+
+    expected = {
+        "REST APIs": "REST API",
+        "No SQL": "NoSQL",
+        "SQS": "Amazon SQS",
+        "Flyte workflow orchestration": "Flyte",
+        "JUnit Jupiter": "JUnit",
+        "Test NG": "TestNG",
+        "Gradle build tool": "Gradle",
+        "Maven": "Apache Maven",
+        "Swagger UI": "Swagger",
+        "github.com": "GitHub",
+    }
+    for alias, canonical_name in expected.items():
+        skill = find_skill(db_session, alias)
+        assert skill is not None, alias
+        assert skill.name == canonical_name, alias
 
 
 def test_turkish_machine_learning_alias_resolves_and_is_extracted(db_session):
