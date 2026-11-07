@@ -86,13 +86,15 @@ _METADATA_LABELS = {
     "basvuru baglantisi": "application_url",
 }
 _REQUIRED_HEADING = re.compile(
-    r"(?:required(?:[ \t]+(?:skills?(?:[ \t]+and[ \t]+experience)?|"
+    r"(?:required[ \t]+skills?[ \t]*(?:&[ \t]*|and[ \t]+)qualifications?|"
+    r"required(?:[ \t]+(?:skills?(?:[ \t]+and[ \t]+experience)?|"
     r"qualifications?|experience))?|requirements?|"
     r"expected[ \t]+(?:skills?|qualifications?|experience)|"
     r"(?:minimum|basic)[ \t]+(?:requirements?|qualifications?)|qualifications?|"
-    r"essential[ \t]+(?:skills?|qualifications?)|"
+    r"essential(?:[ \t]+(?:skills?|qualifications?))?|"
     r"technical[ \t]+skills?(?:[ \t]*(?:&[ \t]*|and[ \t]+)experience)?|"
     r"skills?[ \t]*(?:[ \t]*&[ \t]*|[ \t]+and[ \t]+)experience|"
+    r"skills?[ \t]+(?:and[ \t]+|&[ \t]*)qualifications?|"
     r"skills?[ \t]+required|"
     r"you(?:'|\u2019)ll[ \t]+bring[ \t]+these[ \t]+qualifications"
     r"(?:[ \t]+(?:&[ \t]+experience|as[ \t]+a[ \t]+[\w /,&-]+))?|"
@@ -108,7 +110,7 @@ _REQUIRED_HEADING = re.compile(
     r"the[ \t]+essentials|"
     r"what you[ \t]+bring|what you[ \t]+will[ \t]+bring"
     r"(?:[ \t]+with[ \t]+you)?|"
-    r"what we(?:'|\u2019)re[ \t]+looking for|"
+    r"what we(?:'|\u2019)re[ \t]+looking for(?:[ \t]*\([ \t]*required[ \t]*\))?|"
     r"what we[ \t]+look[ \t]+for"
     r"(?:[ \t]+in[ \t]+(?:you|candidates?|a[ \t]+candidate))?|"
     r"what we[ \t]+(?:need[ \t]+from[ \t]+you|expect[ \t]+you[ \t]+to[ \t]+know)|"
