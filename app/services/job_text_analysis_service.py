@@ -163,6 +163,39 @@ _CONTEXTUAL_ALIAS_CONTEXT = {
         r"training|pytorch|tensorflow|llm)\b",
         re.IGNORECASE,
     ),
+    "bert": re.compile(
+        r"\b(?:transformers?|nlp|language[ -]+models?|llm|text[ -]+models?|"
+        r"hugging[ -]+face)\b",
+        re.IGNORECASE,
+    ),
+    "bart": re.compile(
+        r"\b(?:transformers?|nlp|language[ -]+models?|llm|text[ -]+models?|"
+        r"hugging[ -]+face)\b",
+        re.IGNORECASE,
+    ),
+    "jax": re.compile(
+        r"\b(?:machine[ -]+learning|ml|nlp|framework|deep[ -]+learning|"
+        r"pytorch|tensorflow|transformers?|hugging[ -]+face|bert|bart|"
+        r"gradients?|autodiff|numerical[ -]+computing)\b",
+        re.IGNORECASE,
+    ),
+    "embeddings": re.compile(
+        r"\b(?:vector|semantic|search|retrieval|machine[ -]+learning|ml|llm|nlp)\b",
+        re.IGNORECASE,
+    ),
+    "braintrust": re.compile(
+        r"\b(?:llm|machine[ -]+learning|ml|evaluation|eval\w*|benchmark\w*|"
+        r"observability|prompt\w*)\b",
+        re.IGNORECASE,
+    ),
+    "reranking": re.compile(
+        r"\b(?:search|retrieval|ranking|relevance|cross[ -]+encoder|query)\b",
+        re.IGNORECASE,
+    ),
+    "spelling correction": re.compile(
+        r"\b(?:search|query|nlp|text|language[ -]+model)\b",
+        re.IGNORECASE,
+    ),
 }
 _NEUTRAL_HEADING = re.compile(
     r"(?:about(?:[ \t]+(?:us|the company))?|"
