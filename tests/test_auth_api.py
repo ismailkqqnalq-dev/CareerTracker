@@ -4,6 +4,19 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.services import auth_service
 from app.security import registration_is_enabled
+from app.models.activities import Activity
+from app.models.contacts import Contact
+from app.models.opportunity import Opportunity
+from app.models.opportunity_skills import OpportunitySkill
+from app.models.skills import (
+    PersonalSkillAlias,
+    Skill,
+    SkillAliases,
+    SkillSuggestion,
+    UserSkill,
+)
+from app.models.tasks import Task
+from app.models.users import User
 
 
 def register(client, email="test@example.com", password="StrongPass123"):
@@ -68,6 +81,170 @@ def test_login_with_wrong_password_returns_401(client):
 
 def test_me_without_token_returns_401(client):
     response = client.get("/auth/me")
+
+    assert response.status_code == 401
+
+
+def _seed_account_deletion_records(db_session, owner_email="owner@example.com"):
+    owner = db_session.query(User).filter_by(email=owner_email).one()
+    other = User(
+        email="other-account@example.com",
+        hashed_password="not-used-in-this-test",
+        is_active=True,
+    )
+    db_session.add(other)
+    db_session.flush()
+
+    shared_skill = Skill(name="SharedAccountDeletionTest", category="tool")
+    owner_skill = Skill(
+        name="OwnerAccountDeletionTest", category="tool", owner_user_id=owner.id
+    )
+    other_skill = Skill(
+        name="OtherAccountDeletionTest", category="tool", owner_user_id=other.id
+    )
+    db_session.add_all([shared_skill, owner_skill, other_skill])
+    db_session.flush()
+
+    db_session.add_all(
+        [
+            SkillAliases(alias="sharedaccountdeletiontest", skill_id=shared_skill.id),
+            PersonalSkillAlias(
+                user_id=owner.id,
+                alias="owneraccountdeletionalias",
+                skill_id=owner_skill.id,
+            ),
+            PersonalSkillAlias(
+                user_id=other.id,
+                alias="otheraccountdeletionalias",
+                skill_id=other_skill.id,
+            ),
+            UserSkill(user_id=owner.id, skill_id=owner_skill.id),
+            SkillSuggestion(
+                user_id=owner.id,
+                raw_name="Owner Suggested Deletion Skill",
+                normalized_name="ownersuggesteddeletionskill",
+                resolved_skill_id=shared_skill.id,
+                status="accepted",
+            ),
+            SkillSuggestion(
+                user_id=other.id,
+                raw_name="Other Suggested Deletion Skill",
+                normalized_name="othersuggesteddeletionskill",
+                status="pending",
+            ),
+        ]
+    )
+
+    owner_opportunity = Opportunity(user_id=owner.id, company="Owner company")
+    other_opportunity = Opportunity(user_id=other.id, company="Other company")
+    db_session.add_all([owner_opportunity, other_opportunity])
+    db_session.flush()
+
+    owner_contact = Contact(user_id=owner.id, name="Owner contact", opportunity_id=owner_opportunity.id)
+    other_contact = Contact(user_id=other.id, name="Other contact", opportunity_id=other_opportunity.id)
+    db_session.add_all([owner_contact, other_contact])
+    db_session.flush()
+    db_session.add_all(
+        [
+            Task(user_id=owner.id, opportunity_id=owner_opportunity.id, description="Owner task"),
+            Task(user_id=other.id, opportunity_id=other_opportunity.id, description="Other task"),
+            Activity(
+                user_id=owner.id,
+                opportunity_id=owner_opportunity.id,
+                contact_id=owner_contact.id,
+                activity_type="call",
+            ),
+            Activity(
+                user_id=other.id,
+                opportunity_id=other_opportunity.id,
+                contact_id=other_contact.id,
+                activity_type="call",
+            ),
+            OpportunitySkill(opportunity_id=owner_opportunity.id, skill_id=shared_skill.id),
+            OpportunitySkill(opportunity_id=owner_opportunity.id, skill_id=owner_skill.id),
+            OpportunitySkill(opportunity_id=other_opportunity.id, skill_id=other_skill.id),
+        ]
+    )
+    db_session.commit()
+    return owner.id, other.id
+
+
+def test_delete_account_requires_the_current_password_and_keeps_data_on_failure(
+    authenticated_client, db_session
+):
+    client = authenticated_client
+    owner_id, _other_id = _seed_account_deletion_records(db_session)
+
+    response = client.request("DELETE", "/auth/me", json={"password": "WrongPass123"})
+
+    assert response.status_code == 403
+    assert response.json()["error_code"] == "password_confirmation_failed"
+    assert client.get("/auth/me").status_code == 200
+    assert db_session.get(User, owner_id) is not None
+    assert db_session.query(Opportunity).filter_by(user_id=owner_id).count() == 1
+
+
+def test_delete_account_cascades_only_the_current_users_data(
+    authenticated_client, db_session
+):
+    client = authenticated_client
+    owner_id, other_id = _seed_account_deletion_records(db_session)
+    shared_skill_id = (
+        db_session.query(Skill)
+        .filter_by(name="SharedAccountDeletionTest")
+        .one()
+        .id
+    )
+
+    response = client.request(
+        "DELETE", "/auth/me", json={"password": "StrongPass123"}
+    )
+
+    assert response.status_code == 204
+    assert client.get("/auth/me").status_code == 401
+    assert db_session.get(User, owner_id) is None
+    assert db_session.query(Opportunity).filter_by(user_id=owner_id).count() == 0
+    assert db_session.query(Contact).filter_by(user_id=owner_id).count() == 0
+    assert db_session.query(Task).filter_by(user_id=owner_id).count() == 0
+    assert db_session.query(Activity).filter_by(user_id=owner_id).count() == 0
+    assert db_session.query(UserSkill).filter_by(user_id=owner_id).count() == 0
+    assert db_session.query(PersonalSkillAlias).filter_by(user_id=owner_id).count() == 0
+    assert db_session.query(SkillSuggestion).filter_by(user_id=owner_id).count() == 0
+    assert db_session.query(Skill).filter_by(name="OwnerAccountDeletionTest").count() == 0
+    assert db_session.get(Skill, shared_skill_id) is not None
+    assert (
+        db_session.query(SkillAliases)
+        .filter_by(alias="sharedaccountdeletiontest", skill_id=shared_skill_id)
+        .count()
+        == 1
+    )
+
+    assert db_session.get(User, other_id) is not None
+    assert db_session.query(Opportunity).filter_by(user_id=other_id).count() == 1
+    assert db_session.query(Contact).filter_by(user_id=other_id).count() == 1
+    assert db_session.query(Task).filter_by(user_id=other_id).count() == 1
+    assert db_session.query(Activity).filter_by(user_id=other_id).count() == 1
+    assert db_session.query(Skill).filter_by(name="OtherAccountDeletionTest").count() == 1
+    assert (
+        db_session.query(PersonalSkillAlias)
+        .filter_by(user_id=other_id, alias="otheraccountdeletionalias")
+        .count()
+        == 1
+    )
+    assert db_session.query(SkillSuggestion).filter_by(user_id=other_id).count() == 1
+    assert (
+        db_session.query(OpportunitySkill)
+        .join(Opportunity, OpportunitySkill.opportunity_id == Opportunity.id)
+        .filter(Opportunity.user_id == other_id)
+        .count()
+        == 1
+    )
+
+
+def test_delete_account_requires_authentication(client):
+    response = client.request(
+        "DELETE", "/auth/me", json={"password": "StrongPass123"}
+    )
 
     assert response.status_code == 401
 

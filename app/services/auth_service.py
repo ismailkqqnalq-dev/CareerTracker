@@ -54,3 +54,17 @@ def authenticate_user(
         return None
 
     return user
+
+
+def delete_user(db: Session, user: User, password: str) -> bool:
+    """Delete the authenticated user's account after password confirmation."""
+    if not verify_password(password, user.hashed_password):
+        return False
+
+    try:
+        db.delete(user)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return True

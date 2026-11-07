@@ -46,6 +46,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Hesap | `POST /auth/register` | Hayır | Hesap oluşturur |
 | Oturum | `POST /auth/token` | Hayır | E-posta (`username` alanında) ve parola ile JWT alır |
 | Oturum | `GET /auth/me` | Evet | Oturum açmış kullanıcıyı döndürür |
+| Hesap | `DELETE /auth/me` | Evet | Mevcut parolayı yeniden doğrular, hesabı ve kişisel kayıtlarını siler |
 | Skill kataloğu | `GET /skills` | Opsiyonel | Ortak katalogu; oturum varsa kullanıcının kendi skill'lerini de listeler |
 | Skill kataloğu | `POST /skills` | Evet | Yalnızca giriş yapan kullanıcıya özel skill oluşturur |
 | Skill çözümleme | `GET /skills/resolve?name=...` | Opsiyonel | Görünür skill'i ad veya alias ile bulur |
@@ -224,6 +225,14 @@ Yalnızca `APP_ENV=development` açıkça belirtilmişse (büyük/küçük harf 
 kayıt varsayılan olarak açıktır. `APP_ENV` tanımsız, boş veya bilinmeyen bir değerse
 kayıt kapalıdır. `REGISTRATION_ENABLED=true|false` ile varsayılan açıkça
 geçersiz kılınabilir. Kapalı kayıt isteği `403 registration_disabled` döndürür.
+
+Hesap sahibi `DELETE /auth/me` isteğiyle mevcut parolasını yeniden doğrulayıp
+hesabını silebilir. Kullanıcının CRM kayıtları, profil becerileri, önerileri ve
+kişisel becerileri veritabanı `CASCADE` kurallarıyla silinir; ortak beceri
+kataloğu ve diğer kullanıcıların kayıtları korunur. Silinen hesabın JWT'si,
+hesap bulunamadığı için sonraki istekte geçersiz olur. Yanlış parola
+`403 password_confirmation_failed` döndürür. İşlem geri alınamaz; bu MVP'de
+hesap silme yalnızca API üzerinden yapılabilir.
 
 Kabul edilmiş risk: kayıtlı e-posta için `POST /auth/register` mevcut davranış
 gereği `409` döndürür ve bu, e-posta adresinin sistemde olup olmadığını ortaya

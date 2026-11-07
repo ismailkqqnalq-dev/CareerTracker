@@ -26,6 +26,10 @@ class RegisterRequest(BaseModel):
         return str(value).strip().lower()
 
 
+class DeleteAccountRequest(BaseModel):
+    password: Password
+
+
 class UserResponse(BaseModel):
     id: int
     email: EmailStr
