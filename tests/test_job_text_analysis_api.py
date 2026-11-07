@@ -73,6 +73,10 @@ def test_alias_automaton_cache_reuses_catalog_and_has_a_fixed_bound(db_session):
         ("Technical Skills", "required"),
         ("What You Will Bring With You", "required"),
         ("What We Look For", "required"),
+        ("YOU'LL BRING THESE QUALIFICATIONS:", "required"),
+        ("YOU\u2019LL BRING THESE QUALIFICATIONS AS A SENIOR ENGINEER:", "required"),
+        ("THESE QUALIFICATIONS WOULD BE NICE TO HAVE:", "preferred"),
+        ("THESE QUALIFICATIONS WOULD BE NICE TO HAVE", "preferred"),
         ("Gerekli Yetkinlikler:", "required"),
         ("Aranan Yetkinlikler:", "required"),
         ("Temel Nitelikler:", "required"),
@@ -739,3 +743,28 @@ def test_official_infrastructure_posting_bring_and_look_for_headings_are_require
     assert extracted["Docker"]["occurrences"][0]["section"] == "unspecified"
     assert extracted["Kubernetes"]["occurrences"][0]["section"] == "required"
     assert extracted["Python"]["occurrences"][0]["section"] == "required"
+
+
+def test_official_rocket_lab_qualification_headings_separate_required_and_nice_to_have(
+    authenticated_client,
+):
+    client = authenticated_client
+    _add_private_skill(client, "C++", "language")
+    _add_private_skill(client, "Python", "language")
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "YOU'LL BRING THESE QUALIFICATIONS:\n"
+                "C++ development\n"
+                "THESE QUALIFICATIONS WOULD BE NICE TO HAVE:\n"
+                "Python development"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    assert extracted["C++"]["occurrences"][0]["section"] == "required"
+    assert extracted["Python"]["occurrences"][0]["section"] == "preferred"
