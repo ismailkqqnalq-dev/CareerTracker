@@ -88,6 +88,9 @@ _METADATA_LABELS = {
 _REQUIRED_HEADING = re.compile(
     r"(?:required[ \t]+skills?[ \t]*(?:&[ \t]*|and[ \t]+)qualifications?|"
     r"required[ \t]+qualifications?[ \t]+and[ \t]+skills?|"
+    r"what you[ \t]+should[ \t]+bring(?:[ \t]+with[ \t]+you)?|"
+    r"(?:core|key)[ \t]+qualifications?(?:[ \t]*\([ \t]*must[- ]haves?[ \t]*\))?|"
+    r"what you[ \t]+need[ \t]+to[ \t]+succeed(?:[ \t]*\([ \t]*minimum[ \t]+requirements?[ \t]*\))?|"
     r"required(?:[ \t]+(?:skills?(?:[ \t]+and[ \t]+experience)?|"
     r"qualifications?|experience))?|requirements?|"
     r"expected[ \t]+(?:skills?|qualifications?|experience)|"
