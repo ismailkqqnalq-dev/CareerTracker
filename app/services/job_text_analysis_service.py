@@ -189,10 +189,78 @@ def _fold_for_matching(value: str) -> str:
     return unicodedata.normalize("NFC", value).translate(_MATCH_FOLD_TRANSLATION).lower()
 
 
-@lru_cache(maxsize=1024)
-def _compile_alias_pattern(alias: str) -> re.Pattern:
-    """Reuse bounded, compiled literal matchers across analysis requests."""
-    return re.compile(r"(?<!\w)" + re.escape(alias) + r"(?!\w)")
+_WORD_CHARACTER = re.compile(r"\w")
+
+
+@lru_cache(maxsize=16)
+def _build_alias_automaton(
+    aliases: tuple[tuple[str, int | None], ...],
+) -> tuple[list[dict[str, int]], list[int], list[list[tuple[str, int | None]]]]:
+    """Build a trie with failure links so each line is scanned once."""
+    transitions: list[dict[str, int]] = [{}]
+    failures = [0]
+    outputs: list[list[tuple[str, int | None]]] = [[]]
+
+    for alias, skill_id in aliases:
+        state = 0
+        for character in alias:
+            next_state = transitions[state].get(character)
+            if next_state is None:
+                next_state = len(transitions)
+                transitions[state][character] = next_state
+                transitions.append({})
+                failures.append(0)
+                outputs.append([])
+            state = next_state
+        outputs[state].append((alias, skill_id))
+
+    queue = list(transitions[0].values())
+    queue_index = 0
+    while queue_index < len(queue):
+        state = queue[queue_index]
+        queue_index += 1
+        for character, next_state in transitions[state].items():
+            fallback = failures[state]
+            while fallback and character not in transitions[fallback]:
+                fallback = failures[fallback]
+            failures[next_state] = transitions[fallback].get(character, 0)
+            outputs[next_state].extend(outputs[failures[next_state]])
+            queue.append(next_state)
+
+    return transitions, failures, outputs
+
+
+def _find_alias_matches(
+    text: str,
+    automaton: tuple[
+        list[dict[str, int]],
+        list[int],
+        list[list[tuple[str, int | None]]],
+    ],
+) -> list[tuple[int, int, str, int | None]]:
+    """Find Unicode word-bounded aliases in one pass, preserving finditer semantics."""
+    transitions, failures, outputs = automaton
+    state = 0
+    next_start_by_alias: dict[str, int] = {}
+    matches = []
+
+    for index, character in enumerate(text):
+        while state and character not in transitions[state]:
+            state = failures[state]
+        state = transitions[state].get(character, 0)
+        end = index + 1
+        for alias, skill_id in outputs[state]:
+            start = end - len(alias)
+            if start < next_start_by_alias.get(alias, 0):
+                continue
+            if start and _WORD_CHARACTER.fullmatch(text[start - 1]):
+                continue
+            if end < len(text) and _WORD_CHARACTER.fullmatch(text[end]):
+                continue
+            next_start_by_alias[alias] = end
+            matches.append((start, end, alias, skill_id))
+
+    return matches
 
 
 def _hangul_jamo_type(char: str) -> str | None:
@@ -398,17 +466,14 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
 
     # Folding may merge previously distinct spellings. Never assign an
     # ambiguous folded spelling to whichever skill happened to be visited first.
-    patterns = [
-        (
-            alias,
-            next(iter(skill_ids)) if len(skill_ids) == 1 else None,
-            _compile_alias_pattern(alias),
-        )
+    alias_patterns = tuple(
+        (alias, next(iter(skill_ids)) if len(skill_ids) == 1 else None)
         for alias, skill_ids in sorted(
             folded_alias_owners.items(),
             key=lambda item: (-len(item[0]), item[0]),
         )
-    ]
+    )
+    alias_automaton = _build_alias_automaton(alias_patterns)
 
     role = None
     role_line_number = None
@@ -457,49 +522,54 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
 
         folded_line, source_spans = _fold_for_matching_with_offsets(line)
         line_matches = []
-        for alias, skill_id, pattern in patterns:
+        for match_start, match_end, alias, skill_id in _find_alias_matches(
+            folded_line, alias_automaton
+        ):
             if skill_id is not None and skill_id not in visible:
                 continue
-            for match in pattern.finditer(folded_line):
-                if alias in _CONTEXTUAL_ALIAS_CONTEXT:
-                    source_start, source_end = _source_span(
-                        source_spans, match.start(), match.end()
-                    )
-                    context = line[
-                        max(0, source_start - 80):min(len(line), source_end + 80)
-                    ]
-                    if not _CONTEXTUAL_ALIAS_CONTEXT[alias].search(
-                        _fold_for_matching(context)
-                    ):
-                        continue
-                elif alias in _SHORT_AMBIGUOUS_ALIASES:
-                    source_start, source_end = _source_span(
-                        source_spans, match.start(), match.end()
-                    )
-                    context = line[max(0, source_start - 16):source_end + 16]
-                    if not _SHORT_ALIAS_CONTEXT.search(_fold_for_matching(context)):
-                        continue
-                else:
-                    source_start, source_end = _source_span(
-                        source_spans, match.start(), match.end()
-                    )
-                line_matches.append((match, alias, skill_id, source_start, source_end))
+            source_start, source_end = _source_span(
+                source_spans, match_start, match_end
+            )
+            if alias in _CONTEXTUAL_ALIAS_CONTEXT:
+                context = line[
+                    max(0, source_start - 80):min(len(line), source_end + 80)
+                ]
+                if not _CONTEXTUAL_ALIAS_CONTEXT[alias].search(
+                    _fold_for_matching(context)
+                ):
+                    continue
+            elif alias in _SHORT_AMBIGUOUS_ALIASES:
+                context = line[max(0, source_start - 16):source_end + 16]
+                if not _SHORT_ALIAS_CONTEXT.search(_fold_for_matching(context)):
+                    continue
+            line_matches.append(
+                (match_start, match_end, alias, skill_id, source_start, source_end)
+            )
 
         # Prefer the longest catalog phrase when aliases overlap (for example,
         # a skill named "C" must not also match the "C" in "C#" or "C++").
         accepted_matches = []
-        for match, alias, skill_id, source_start, source_end in sorted(
+        for match_start, match_end, alias, skill_id, source_start, source_end in sorted(
             line_matches,
-            key=lambda item: (-(item[0].end() - item[0].start()), item[0].start()),
+            key=lambda item: (-(item[1] - item[0]), item[0]),
         ):
             if any(
-                source_start < accepted[4] and accepted[3] < source_end
+                source_start < accepted[5] and accepted[4] < source_end
                 for accepted in accepted_matches
             ):
                 continue
-            accepted_matches.append((match, alias, skill_id, source_start, source_end))
+            accepted_matches.append(
+                (match_start, match_end, alias, skill_id, source_start, source_end)
+            )
 
-        for match, _alias, skill_id, source_start, source_end in accepted_matches:
+        for (
+            _match_start,
+            _match_end,
+            _alias,
+            skill_id,
+            source_start,
+            source_end,
+        ) in accepted_matches:
             if skill_id is None:
                 # An ambiguous longer folded phrase blocks shorter overlaps,
                 # but is never attributed to either skill.
