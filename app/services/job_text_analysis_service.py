@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+from bisect import bisect_left, bisect_right
 from functools import lru_cache
 
 from sqlalchemy.orm import Session
@@ -157,6 +158,12 @@ _PREFERRED_HEADING = re.compile(
     re.IGNORECASE,
 )
 _SHORT_AMBIGUOUS_ALIASES = {"c", "r", "go"}
+_TECHNICAL_SKILL_CATEGORIES = frozenset(
+    {
+        "api", "cloud", "database", "framework", "language", "library",
+        "platform", "runtime", "testing", "tool",
+    }
+)
 _SHORT_ALIAS_CONTEXT = re.compile(
     r"\b(?:programming|programming language|language|experience|"
     r"dili|programlama|deneyim|tecrube|beceri)\b",
@@ -190,6 +197,14 @@ _CONTEXTUAL_ALIAS_CONTEXT = {
     ),
     "airflow": re.compile(
         r"\b(?:apache|workflow|orchestrat\w*|pipeline\w*|mwaa|dag)\b",
+        re.IGNORECASE,
+    ),
+    "lambda": re.compile(
+        r"\b(?:aws|amazon|cloud|serverless|function(?:s)?)\b",
+        re.IGNORECASE,
+    ),
+    "ecs": re.compile(
+        r"\b(?:aws|amazon|cloud|container(?:s)?|elastic container service)\b",
         re.IGNORECASE,
     ),
     "redshift": re.compile(
@@ -261,6 +276,7 @@ _HEADLINE_ROLE_SUFFIX = re.compile(
     r"managers?|consultants?|specialists?|administrators?|technicians?|"
     r"programmers?|testers?|interns?|researchers?|product owners?|"
     r"scrum masters?|directors?|leads?)\b"
+    r"(?:[ \t]+(?:IV|III|II|V|I|[0-9]{1,2}))?"
     r"(?:[ \t]*\([^()\r\n]{1,80}\))?"
     r"(?:[ \t]*[-\u2013\u2014|][ \t]+[\w+#./]+"
     r"(?:[ \t]+[\w+#./]+){0,2})?$",
@@ -435,6 +451,20 @@ def _source_span(
     if source_spans is None:
         return start, end
     return source_spans[start][0], source_spans[end - 1][1]
+
+
+def _select_non_overlapping_matches(line_matches, source_length: int) -> list[tuple]:
+    """Keep longer matches first and test interval overlap in optimized byte ops."""
+    accepted = []
+    occupied = bytearray(source_length)
+
+    for match in sorted(line_matches, key=lambda item: (-(item[1] - item[0]), item[0])):
+        source_start, source_end = match[4], match[5]
+        if occupied.find(b"\x01", source_start, source_end) >= 0:
+            continue
+        accepted.append(match)
+        occupied[source_start:source_end] = b"\x01" * (source_end - source_start)
+    return accepted
 
 
 def _visible_aliases(db: Session, user_id: int) -> dict[str, int]:
@@ -626,7 +656,7 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
             continue
 
         folded_line, source_spans = _fold_for_matching_with_offsets(line)
-        line_matches = []
+        candidate_matches = []
         for match_start, match_end, alias, skill_id in _find_alias_matches(
             folded_line, alias_automaton
         ):
@@ -635,17 +665,80 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
             source_start, source_end = _source_span(
                 source_spans, match_start, match_end
             )
+            candidate_matches.append(
+                (match_start, match_end, alias, skill_id, source_start, source_end)
+            )
+
+        technical_context_matches = sorted(
+            (source_start, skill_id)
+            for _start, _end, alias, skill_id, source_start, _source_end
+            in candidate_matches
+            if skill_id is not None
+            and alias not in _CONTEXTUAL_ALIAS_CONTEXT
+            and alias not in _SHORT_AMBIGUOUS_ALIASES
+            and visible[skill_id].category in _TECHNICAL_SKILL_CATEGORIES
+        )
+        technical_context_starts = [start for start, _skill_id in technical_context_matches]
+        language_context_matches = sorted(
+            (source_start, skill_id)
+            for _start, _end, _alias, skill_id, source_start, _source_end
+            in candidate_matches
+            if skill_id is not None and visible[skill_id].category == "language"
+        )
+        language_context_starts = [start for start, _skill_id in language_context_matches]
+
+        line_matches = []
+        for (
+            match_start,
+            match_end,
+            alias,
+            skill_id,
+            source_start,
+            source_end,
+        ) in candidate_matches:
             if alias in _CONTEXTUAL_ALIAS_CONTEXT:
                 context = line[
                     max(0, source_start - 80):min(len(line), source_end + 80)
                 ]
-                if not _CONTEXTUAL_ALIAS_CONTEXT[alias].search(
-                    _fold_for_matching(context)
-                ):
+                has_explicit_context = bool(
+                    _CONTEXTUAL_ALIAS_CONTEXT[alias].search(
+                        _fold_for_matching(context)
+                    )
+                )
+                if alias == "airflow" and not has_explicit_context:
+                    # In a comma-separated skill list, nearby recognized
+                    # technical skills provide context for the otherwise
+                    # ordinary word "airflow" without making it global. The
+                    # sorted index bounds this lookup to the local window.
+                    left = bisect_left(technical_context_starts, source_start - 80)
+                    right = bisect_right(technical_context_starts, source_start + 80)
+                    has_explicit_context = any(
+                        other_id != skill_id
+                        for _other_start, other_id
+                        in technical_context_matches[left:right]
+                    )
+                if not has_explicit_context:
                     continue
             elif alias in _SHORT_AMBIGUOUS_ALIASES:
                 context = line[max(0, source_start - 16):source_end + 16]
-                if not _SHORT_ALIAS_CONTEXT.search(_fold_for_matching(context)):
+                has_explicit_context = bool(
+                    _SHORT_ALIAS_CONTEXT.search(_fold_for_matching(context))
+                )
+                if alias == "go" and not has_explicit_context:
+                    left = bisect_left(language_context_starts, source_start - 48)
+                    right = bisect_right(language_context_starts, source_start + 48)
+                    nearby_languages = {
+                        other_id
+                        for _other_start, other_id
+                        in language_context_matches[left:right]
+                        if other_id != skill_id
+                    }
+                    # "Go is a plus" appears in real language lists without
+                    # repeating "programming language" near the word Go. Two
+                    # neighboring catalogued languages make that context
+                    # explicit while a lone unrelated language does not.
+                    has_explicit_context = len(nearby_languages) >= 2
+                if not has_explicit_context:
                     continue
             line_matches.append(
                 (match_start, match_end, alias, skill_id, source_start, source_end)
@@ -653,19 +746,10 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
 
         # Prefer the longest catalog phrase when aliases overlap (for example,
         # a skill named "C" must not also match the "C" in "C#" or "C++").
-        accepted_matches = []
-        for match_start, match_end, alias, skill_id, source_start, source_end in sorted(
+        accepted_matches = _select_non_overlapping_matches(
             line_matches,
-            key=lambda item: (-(item[1] - item[0]), item[0]),
-        ):
-            if any(
-                source_start < accepted[5] and accepted[4] < source_end
-                for accepted in accepted_matches
-            ):
-                continue
-            accepted_matches.append(
-                (match_start, match_end, alias, skill_id, source_start, source_end)
-            )
+            source_length=len(line),
+        )
 
         for (
             _match_start,

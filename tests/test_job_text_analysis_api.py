@@ -533,6 +533,20 @@ def test_job_analysis_handles_100kb_adversarial_text_quickly(db_session):
     assert time.perf_counter() - started < 1.0
 
 
+def test_repeated_contextual_skill_matching_scales_with_100kb_input(db_session):
+    seed_skill_catalog(db_session)
+    cases = [
+        ("Python Airflow " * 6_666)[:100_000],
+        ("Python, Java, Go " * 5_882)[:100_000],
+    ]
+
+    started = time.perf_counter()
+    for text in cases:
+        analyze_job_text(db_session, user_id=1, text=text)
+
+    assert time.perf_counter() - started < 1.0
+
+
 def test_folded_heading_over_200_characters_is_not_classified():
     from app.services.job_text_analysis_service import _line_section
 
