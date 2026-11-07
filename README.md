@@ -19,7 +19,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Fırsatları CSV olarak dışa aktarma (Türkçe karakter desteği)
 - Alembic veritabanı migration'ları
 - GitHub Actions ile otomatik test çalıştırma
-- 246 becerilik ortak teknik seed kataloğu, kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
+- 247 becerilik ortak teknik seed kataloğu, kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
 - Fırsatlara skill bağlama ve bağlı skill'leri listeleme
 - Profil becerilerini yönetme, fırsat gereksinimlerine katalog becerisi ekleme ve profil/fırsat eşleşmesini görme (`frontend/` MVP arayüzü)
 - Kullanıcıya özel bekleyen beceri önerilerini gözden geçirip mevcut katalogla eşleştirme (`frontend/` MVP arayüzü)
@@ -474,7 +474,7 @@ tests/             # pytest testleri
 - **Tamamlandı — Faz 2:** Dashboard, CSV dışa aktarma, PostgreSQL/Docker, Alembic ve CI.
 - **Tamamlandı — Faz 2.5:** Skill modelleri ve API'si, seed katalogu, kişisel skill/alias ve öneri eşleştirme temeli.
 - **Kısmi — Faz 3:** Görsel doğrulama/OCR servis baseline'ı, kimlik doğrulamalı ham metin çıkarma API'si ve sonucu kullanıcı onayıyla Faz 4 analiz alanına aktaran arayüz var; sonuç saklanmaz ve gerçek ilanlarda OCR kalitesi kapsamlı ölçülmedi.
-- **Kısmi — Faz 4:** Yapıştırılan/OCR'dan aktarılan ilan metninden açık etiketli alanları, görünür katalog becerilerini ve tanınan gereksinim bölümlerini çıkaran; becerileri kullanıcı profilindeki kayıt, seviye ve deneyimle karşılaştıran kural tabanlı servis, API ve MVP arayüzü var. Sonuç saklanmaz; serbest metinden anlamsal alan çıkarımı ve gerçek ilanlarla kapsamlı değerlendirme tamamlanmadı.
+- **Kısmi — Faz 4:** Yapıştırılan/OCR'dan aktarılan ilan metninden açık etiketli alanları, görünür katalog becerilerini ve tanınan gereksinim bölümlerini çıkaran; becerileri kullanıcı profilindeki kayıt, seviye ve deneyimle karşılaştıran kural tabanlı servis, API ve MVP arayüzü var. Yedi kısa gerçek ilan kırpıntısı üzerinde dar kapsamlı bir regresyon değerlendirmesi bulunur; bu, kapsamlı veya üretim doğruluğu ölçümü değildir. Sonuç saklanmaz; serbest metinden anlamsal alan çıkarımı ve kapsamlı değerlendirme tamamlanmadı.
 - **Kısmi — Faz 5:** Normalizasyon, seed alias'ları, kişisel alias'lar ve metin benzerliğine dayalı aday sıralaması var; kapsamlı beceri normalizasyonu tamamlanmadı.
 - **Kısmi — Faz 6:** Profil becerilerini yönetme, fırsat becerisi ekleme ve eşleşen/eksik becerileri gösteren MVP arayüzü ile backend endpoint'leri var; tam eşleştirme ürünü tamamlanmadı.
 - **Kısmi — Faz 7:** Kullanıcıya özel, son 1–60 takvim ayı için aylık başvuru sayısı API'si ve aylık dağılımı gösteren React ekranı var; bu betimleyici sayım tahmin veya piyasa analizi değildir. İleri metrikler, dönüşüm analizi ve piyasa analizi tamamlanmadı.
@@ -513,7 +513,7 @@ akışlarını sunar.
 - Profil karşılaştırması, bölüm başına katalogda eşleşen benzersiz becerilerden kaçının mevcut kullanıcının profilinde kayıtlı olduğunu gösterir. Profilde kayıtlı olmamak kişinin beceriyi bilmediğini kanıtlamaz. Profil seviyesi ve deneyim yılı gösterilir, ilandaki serbest deneyim ifadesiyle otomatik kıyaslanmaz.
 - Ortak katalog küratörlü ve sınırlıdır; beceri dışarıda kalabilir. Yeni global alias eklemeden önce hem `normalize_text` hem ilan analizindeki Türkçe/OCR katlama sonrası çakışmalar denetlenmelidir. `Spark`, `Iceberg`, `Airflow`, `Redshift` ve `Modal` katalogda bağlam kontrollü alias'lardır; örneğin lakehouse/veri işleme, orkestrasyon, veri ambarı veya ML/model çalıştırma bağlamı olmadan eşleşmez. `BERT`, `BART`, `JAX`, `embeddings`, `Braintrust`, `reranking` ve `spelling correction` gibi adlar da yakındaki NLP/ML, değerlendirme veya arama bağlamını gerektirir. `Argo` tek başına katalog alias'ı değildir. `Spring`, `Excel`, `Word` ve `Dash` gibi genel sözcükler de tek başına alias yapılmaz; kısa `C`, `R`, `Go` adları yalnızca programlama bağlamı filtresini geçen satırlarda eşleşir.
 - İlan analizi eşleştirme sırasında Unicode NFC/NFD eşdeğerlerini kanonikleştirir ve `matched_text` alanında kaynak metindeki özgün yazımı korur. OCR harf hatalarını ve Türkçe ekleri anlamsal olarak düzeltmez; bu nedenle gerçek ilanlarda beceri kaçırabilir veya metne göre istenmeyen eşleşmeler olabilir.
-- Değerlendirme betiği yalnızca küçük, sentetik örnekler kullanır; precision/recall/F1 sonuçları gerçek iş ilanlarına genellenemez.
+- `scripts.evaluate_job_text_analysis` sentetik ilan/OCR varyantlarını, `scripts.evaluate_public_job_postings` yedi kısa ve elle etiketlenmiş gerçek ilan kırpıntısını ölçer. Gerçek ilan kümesi veri mühendisliği, yazılım, makine öğrenmesi ve DevOps rollerinden seçilmiştir; küçük ve temsil gücü olmayan bir regresyon kümesidir. Katalogda bilerek yer almayan belirsiz yalın adlar (ör. Rust ve Scala) kapsama notu olarak raporlanır, precision/recall/F1 hesabına girmez. Hiçbir sonuç gerçek ilanlardaki genel başarıyı kanıtlamaz.
 
 
 - Rate-limit sayaçları süreç içi bellektedir; birden fazla worker veya replika

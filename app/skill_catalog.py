@@ -214,7 +214,7 @@ SKILL_CATALOG += (
 
     # Cloud, DevOps, delivery, and observability.
     _entry("AWS", "cloud", "amazon web services", "aws cloud"),
-    _entry("Microsoft Azure", "cloud", "azure cloud", "ms azure"),
+    _entry("Microsoft Azure", "cloud", "azure", "azure cloud", "ms azure"),
     _entry("Google Cloud Platform", "cloud", "gcp", "google cloud"),
     _entry("Docker", "tool", "docker containers"),
     _entry("Docker Compose", "tool", "docker compose plugin"),
@@ -239,7 +239,8 @@ SKILL_CATALOG += (
     _entry("Serverless Computing", "concept", "serverless architecture"),
     _entry("Vercel", "platform", "vercel platform"),
     _entry("Cloudflare", "platform", "cloudflare platform"),
-    _entry("AWS Lambda", "cloud", "aws lambda functions"),
+    _entry("AWS Lambda", "cloud", "aws lambda functions", "lambda"),
+    _entry("Amazon ECS", "cloud", "aws elastic container service", "elastic container service", "ecs"),
     _entry("Azure Functions", "cloud", "azure function apps"),
 
     # Testing, APIs, and common developer tooling.
