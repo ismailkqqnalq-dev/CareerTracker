@@ -84,6 +84,11 @@ Maaş 0 ile PostgreSQL `INTEGER` üst sınırı arasında olmalıdır. `type` ve
 serbest metin olarak kalır; yanıt şemaları eski verilerle uyum için uzunluk kısıtı
 uygulamaz.
 
+Her hesap varsayılan olarak en fazla 5000 fırsat oluşturabilir. Sınır
+`MAX_OPPORTUNITIES_PER_USER` ile değiştirilebilir; kotaya ulaşınca yeni fırsat
+isteği `409 quota_exceeded` döndürür. Sayaç yalnızca isteği yapan kullanıcının
+fırsatlarını kapsar.
+
 ### İstek sınırları
 
 Kimlik doğrulama ve kaynak tüketen işlemler için süreç içi, bellek tabanlı
@@ -105,6 +110,12 @@ Sınırlar ve bellek anahtarı üst sınırı `.env` içindeki
 saklamaz; IP ve e-posta bileşimlerini tek yönlü özetlerle anahtarlar. Süresi
 dolmuş anahtarlar yeni isteklerde temizlenir. Bellek anahtar sınırına ulaşıldığında
 yeni anahtarlar, en yakın pencere süresi dolana kadar 429 alır.
+
+`/ocr/extract` ve `/job-analysis` dışındaki istek gövdeleri en fazla 1 MiB
+olabilir. `Content-Length` büyükse gövde okunmadan `413 request_too_large` döner;
+başlık yoksa veya gerçek akış bildirilen boyutu aşarsa alınan baytlar ayrıca
+sayılır. OCR'ın 10 MiB ve ilan analizinin 100 KB sınırları kendi uç noktalarında
+uygulanır.
 
 `X-Forwarded-For` varsayılan olarak yok sayılır. Yalnızca doğrudan istemci
 `TRUSTED_PROXY_IPS` içindeki IP/CIDR ağlarından biriyse zincir güvenilir proxy

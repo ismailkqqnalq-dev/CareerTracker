@@ -5,6 +5,8 @@ from fastapi import FastAPI
 
 from app.security import validate_security_configuration
 from app.rate_limits import validate_rate_limit_configuration
+from app.record_limits import validate_record_limit_configuration
+from app.request_limits import RequestBodySizeLimitMiddleware
 
 from app.routes.activity_routes import router as activity_router
 from app.routes.contact_routes import router as contact_router
@@ -20,10 +22,12 @@ from app.routes.auth_routes import router as auth_router
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     validate_security_configuration()
     validate_rate_limit_configuration()
+    validate_record_limit_configuration()
     yield
 
 
 app = FastAPI(title="CareerTracker", lifespan=lifespan)
+app.add_middleware(RequestBodySizeLimitMiddleware)
 app.include_router(opportunity_router)
 app.include_router(activity_router)
 app.include_router(task_router)
