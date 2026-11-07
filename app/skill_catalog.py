@@ -299,3 +299,32 @@ SKILL_CATALOG += (
     _entry("Apache Iceberg", "database"),
     _entry("Trino", "database"),
 )
+SKILL_CATALOG += (
+    # MLOps tools and AWS data services confirmed in current job listings.
+    _entry("MLflow", "platform", "ML Flow"),
+    _entry("DVC", "tool", "Data Version Control"),
+    _entry("Weights & Biases", "platform", "Weights and Biases", "W&B", "wandb"),
+    _entry("Feast", "platform"),
+    _entry("Parquet", "format", "Apache Parquet"),
+    _entry("Apache ORC", "format", "ORC file format"),
+    _entry("Apache Avro", "format", "Avro"),
+    _entry("Amazon Athena", "cloud", "AWS Athena"),
+    _entry("AWS Glue", "cloud", "Amazon Glue"),
+    _entry("Amazon EMR", "cloud", "AWS EMR", "Elastic MapReduce"),
+    _entry(
+        "AWS Step Functions",
+        "cloud",
+        "Amazon Step Functions",
+        "Step Functions",
+    ),
+    _entry("Amazon CloudWatch", "cloud", "AWS CloudWatch"),
+    _entry("Amazon RDS", "database", "AWS RDS"),
+    _entry("AWS DMS", "cloud"),
+    _entry(
+        "Amazon MWAA",
+        "cloud",
+        "AWS MWAA",
+        "Managed Workflows for Apache Airflow",
+    ),
+    _entry("Snowflake Cortex", "platform"),
+)

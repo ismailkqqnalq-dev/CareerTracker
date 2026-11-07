@@ -47,7 +47,7 @@ def test_seed_skill_catalog_is_idempotent(db_session):
 def test_catalog_covers_common_technical_skills_and_stays_manageable():
     names = {entry["name"] for entry in SKILL_CATALOG}
 
-    assert 120 <= len(SKILL_CATALOG) <= 220
+    assert 120 <= len(SKILL_CATALOG) <= 240
     assert {
         "Python",
         "pandas",
@@ -464,3 +464,85 @@ def test_yolo_is_not_extracted_from_unrelated_ordinary_usage(db_session):
     )
 
     assert "YOLO" not in {skill["name"] for skill in result["skills"]}
+
+
+def test_current_mlops_and_aws_data_stack_terms_resolve_and_extract(db_session):
+    seed_skill_catalog(db_session)
+
+    expected_aliases = {
+        "MLflow": "MLflow",
+        "ML Flow": "MLflow",
+        "DVC": "DVC",
+        "Data Version Control": "DVC",
+        "Weights & Biases": "Weights & Biases",
+        "W&B": "Weights & Biases",
+        "wandb": "Weights & Biases",
+        "Feast": "Feast",
+        "Parquet": "Parquet",
+        "Apache Parquet": "Parquet",
+        "Apache ORC": "Apache ORC",
+        "ORC file format": "Apache ORC",
+        "Avro": "Apache Avro",
+        "Amazon Athena": "Amazon Athena",
+        "AWS Athena": "Amazon Athena",
+        "AWS Glue": "AWS Glue",
+        "Amazon Glue": "AWS Glue",
+        "Amazon EMR": "Amazon EMR",
+        "AWS EMR": "Amazon EMR",
+        "AWS Step Functions": "AWS Step Functions",
+        "Step Functions": "AWS Step Functions",
+        "Amazon CloudWatch": "Amazon CloudWatch",
+        "Amazon RDS": "Amazon RDS",
+        "AWS DMS": "AWS DMS",
+        "Amazon MWAA": "Amazon MWAA",
+        "Snowflake Cortex": "Snowflake Cortex",
+    }
+    missing = [
+        name
+        for name in set(expected_aliases.values())
+        if find_skill(db_session, name) is None
+    ]
+    assert not missing, missing
+    for alias, canonical_name in expected_aliases.items():
+        skill = find_skill(db_session, alias)
+        assert skill is not None, alias
+        assert skill.name == canonical_name, alias
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "MLOps: MLflow, DVC, Weights & Biases (wandb), Feast/feature stores.\n"
+            "Data formats: Apache Parquet, Apache ORC, Apache Avro.\n"
+            "AWS stack: Amazon Athena, AWS Glue, Amazon EMR, AWS Step Functions, "
+            "Amazon CloudWatch, Amazon RDS, AWS DMS, Amazon MWAA.\n"
+            "Analytics: Snowflake Cortex."
+        ),
+    )
+    expected_skills = set(expected_aliases.values()) | {"MLOps", "AWS"}
+    assert {skill["name"] for skill in result["skills"]} == expected_skills
+    assert (
+        result["profile_match"]["unspecified"]["total_count"]
+        == len(expected_skills)
+    )
+    assert (
+        set(result["profile_match"]["unspecified"]["missing_skills"])
+        == expected_skills
+    )
+
+
+def test_feast_and_step_functions_require_technical_context(db_session):
+    seed_skill_catalog(db_session)
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "We had a feast after work.\n"
+            "The step functions describe a piecewise mathematical model."
+        ),
+    )
+
+    names = {skill["name"] for skill in result["skills"]}
+    assert "Feast" not in names
+    assert "AWS Step Functions" not in names
