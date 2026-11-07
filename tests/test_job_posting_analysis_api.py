@@ -128,6 +128,42 @@ def test_analyzer_compares_required_preferred_and_unspecified_skills_to_profile(
     )
 
 
+def test_analyzer_classifies_ideally_also_as_preferred_for_profile_match(
+    authenticated_client,
+):
+    client = authenticated_client
+    python = _add_private_skill(client, "Python", "language")
+    _add_private_skill(client, "FastAPI", "framework")
+    added = client.post("/users/me/skills", json={"skill_id": python["id"]})
+    assert added.status_code == 201
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "Minimum Qualifications:\nFastAPI\n"
+                "Ideally, you also:\nPython"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    match = response.json()["profile_match"]
+    assert match["required"] == {
+        "total_count": 1,
+        "matched_count": 0,
+        "match_percentage": 0.0,
+        "missing_skills": ["FastAPI"],
+    }
+    assert match["preferred"] == {
+        "total_count": 1,
+        "matched_count": 1,
+        "match_percentage": 100.0,
+        "missing_skills": [],
+    }
+    assert match["unspecified"]["total_count"] == 0
+
+
 def test_analyzer_does_not_guess_unlabeled_job_details_or_store_them(
     authenticated_client, db_session
 ):

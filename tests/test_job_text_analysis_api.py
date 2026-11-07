@@ -83,6 +83,7 @@ def test_reuses_compiled_alias_patterns_between_analyses(db_session, monkeypatch
         ("To Be Successful, You'll Need", "required"),
         ("Bonus Points If You Have", "preferred"),
         ("Bonus Points For", "preferred"),
+        ("Ideally, you also:", "preferred"),
         ("Tercih Edilen Yetkinlikler:", "preferred"),
         ("Artı Sayılan Özellikler:", "preferred"),
     ],

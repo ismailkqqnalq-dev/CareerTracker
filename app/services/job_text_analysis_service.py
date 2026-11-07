@@ -106,6 +106,7 @@ _REQUIRED_HEADING = re.compile(
 )
 _PREFERRED_HEADING = re.compile(
     r"(?:preferred(?:[ \t]+(?:skills?|qualifications?|experience))?|"
+    r"ideally,[ \t]+you[ \t]+also|ideally[ \t]+also|"
     r"desired[ \t]+(?:skills?|qualifications?|experience)|"
     r"desirable[ \t]+(?:skills?|qualifications?|experience)|"
     r"nice[- ]to[- ]haves?|good[ \t]+to[ \t]+have|a[ \t]+plus|"
