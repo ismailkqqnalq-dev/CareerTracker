@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -12,7 +12,12 @@ from app.rate_limits import (
     rate_limit_manager,
     rate_limited_response,
 )
-from app.schemas.auth import RegisterRequest, TokenResponse, UserResponse
+from app.schemas.auth import (
+    DeleteAccountRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+)
 from app.security import create_access_token, registration_is_enabled
 from app.services import auth_service
 
@@ -115,3 +120,25 @@ def read_current_user(
     current_user: User = Depends(get_current_user),
 ):
     return current_user
+
+
+@router.delete(
+    "/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses={403: {"description": "Current password confirmation failed"}},
+)
+def delete_current_user(
+    data: DeleteAccountRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not auth_service.delete_user(db, current_user, data.password):
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={
+                "detail": "Current password is incorrect",
+                "error_code": "password_confirmation_failed",
+            },
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
