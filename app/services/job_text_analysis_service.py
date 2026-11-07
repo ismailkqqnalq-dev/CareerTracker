@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+from functools import lru_cache
 
 from sqlalchemy.orm import Session
 
@@ -169,6 +170,12 @@ def _fold_for_matching(value: str) -> str:
     # Translate dotted capital İ before lower(): its default lower() expands to
     # two code points, which would invalidate offsets into the original line.
     return unicodedata.normalize("NFC", value).translate(_MATCH_FOLD_TRANSLATION).lower()
+
+
+@lru_cache(maxsize=1024)
+def _compile_alias_pattern(alias: str) -> re.Pattern:
+    """Reuse bounded, compiled literal matchers across analysis requests."""
+    return re.compile(r"(?<!\w)" + re.escape(alias) + r"(?!\w)")
 
 
 def _hangul_jamo_type(char: str) -> str | None:
@@ -378,7 +385,7 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
         (
             alias,
             next(iter(skill_ids)) if len(skill_ids) == 1 else None,
-            re.compile(r"(?<!\w)" + re.escape(alias) + r"(?!\w)"),
+            _compile_alias_pattern(alias),
         )
         for alias, skill_ids in sorted(
             folded_alias_owners.items(),
