@@ -59,6 +59,7 @@ class JobTextProfileMatch(BaseModel):
 class JobTextAnalysisResponse(BaseModel):
     role: str | None
     role_line_number: int | None
+    role_source: Literal["explicit", "headline"] | None
     metadata: JobTextMetadata
     skills: list[JobTextSkill]
     profile_match: JobTextProfileMatch

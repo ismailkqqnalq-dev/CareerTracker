@@ -17,6 +17,7 @@ from app.services.skill_normalizer import normalize_text
 
 
 MAX_METADATA_LINE_LENGTH = 200
+MAX_HEADLINE_ROLE_LENGTH = 140
 _METADATA_LABELS = {
     "position": "role",
     "job title": "role",
@@ -85,9 +86,11 @@ _METADATA_LABELS = {
 }
 _REQUIRED_HEADING = re.compile(
     r"(?:required(?:[ \t]+(?:skills?|qualifications?))?|requirements?|"
-    r"(?:minimum|basic)[ \t]+qualifications?|qualifications?|"
+    r"(?:minimum|basic)[ \t]+(?:requirements?|qualifications?)|qualifications?|"
     r"essential[ \t]+(?:skills?|qualifications?)|skills?[ \t]+required|"
-    r"what you(?:'|\u2019)ll[ \t]+(?:need|bring)|what you[ \t]+bring|"
+    r"what you(?:'|\u2019)ll[ \t]+(?:"
+    r"need(?:[ \t]+to[ \t]+(?:succeed|be[ \t]+successful))?|bring)|"
+    r"what you[ \t]+bring|"
     r"what we(?:'|\u2019)re[ \t]+looking for|must[- ]have|"
     r"aranan[ \t]+(?:nitelikler|ozellikler|yetkinlikler)|"
     r"istenen[ \t]+(?:nitelikler|ozellikler|yetkinlikler)|"
@@ -103,7 +106,8 @@ _PREFERRED_HEADING = re.compile(
     r"desired[ \t]+(?:skills?|qualifications?|experience)|"
     r"desirable[ \t]+(?:skills?|qualifications?|experience)|"
     r"nice[- ]to[- ]haves?|good[ \t]+to[ \t]+have|a[ \t]+plus|"
-    r"bonus(?: points)?|tercihen|tercih sebebi|"
+    r"bonus(?: points)?|any of the following (?:would be|is) a bonus[.!]?|"
+    r"tercihen|tercih sebebi|"
     r"tercih edilen(?:[ \t]+(?:beceriler|nitelikler|yetkinlikler))?|"
     r"arti sayilan[ \t]+(?:ozellikler|yetkinlikler|beceriler)|"
     r"one cikan ozellikler|avantaj)[ \t]*[:\uff1a]?",
@@ -113,6 +117,18 @@ _SHORT_AMBIGUOUS_ALIASES = {"c", "r", "go"}
 _SHORT_ALIAS_CONTEXT = re.compile(
     r"\b(?:programming|programming language|language|experience|"
     r"dili|programlama|deneyim|tecrube|beceri)\b",
+    re.IGNORECASE,
+)
+_HEADLINE_ROLE_SUFFIX = re.compile(
+    r"\b(?:engineers?|developers?|scientists?|analysts?|architects?|designers?|"
+    r"managers?|consultants?|specialists?|administrators?|technicians?|"
+    r"programmers?|testers?|interns?|researchers?|product owners?|"
+    r"scrum masters?|directors?|leads?)\b"
+    r"(?:[ \t]*\([^()\r\n]{1,80}\))?$",
+    re.IGNORECASE,
+)
+_HEADLINE_SENTENCE_START = re.compile(
+    r"^(?:we|you|our|join|about|looking for|we are|we're|we\u2019re)\b",
     re.IGNORECASE,
 )
 _MATCH_FOLD_TRANSLATION = str.maketrans(
@@ -290,6 +306,20 @@ def _parse_metadata_line(line: str) -> tuple[str, str] | None:
     return field_name, value
 
 
+def _parse_headline_role(line: str) -> str | None:
+    """Accept a short title-like headline, never infer a role from prose."""
+    clean_line = line.strip()
+    if (
+        not clean_line
+        or len(clean_line) > MAX_HEADLINE_ROLE_LENGTH
+        or any(char in clean_line for char in ":：!?\n\r")
+        or clean_line.endswith((".", ";"))
+        or _HEADLINE_SENTENCE_START.search(_fold_for_matching(clean_line))
+    ):
+        return None
+    return clean_line if _HEADLINE_ROLE_SUFFIX.search(clean_line) else None
+
+
 def _section_profile_match(
     skill_ids: set[int],
     extracted: dict[int, dict],
@@ -338,6 +368,7 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
 
     role = None
     role_line_number = None
+    role_source = None
     metadata = {
         "company": None,
         "location": None,
@@ -350,9 +381,15 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
     }
     section = "unspecified"
     extracted: dict[int, dict] = {}
+    headline_role = None
+    headline_role_line_number = None
 
     for line_number, line in enumerate(text.splitlines(), start=1):
         clean_line = line.strip()
+        if line_number <= 5 and headline_role is None:
+            headline_role = _parse_headline_role(clean_line)
+            if headline_role is not None:
+                headline_role_line_number = line_number
         metadata_line = len(clean_line) <= MAX_METADATA_LINE_LENGTH
         if metadata_line:
             parsed_field = _parse_metadata_line(clean_line)
@@ -361,6 +398,7 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
                 if field_name == "role" and role is None:
                     role = value
                     role_line_number = line_number
+                    role_source = "explicit"
                 elif field_name != "role" and metadata[field_name] is None:
                     metadata[field_name] = {
                         "value": value,
@@ -434,6 +472,11 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
                 }
             )
 
+    if role is None and headline_role is not None:
+        role = headline_role
+        role_line_number = headline_role_line_number
+        role_source = "headline"
+
     profile = {
         user_skill.skill_id: user_skill
         for user_skill in db.query(UserSkill)
@@ -466,6 +509,7 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
     return {
         "role": role,
         "role_line_number": role_line_number,
+        "role_source": role_source,
         "metadata": metadata,
         "skills": results,
         "profile_match": {

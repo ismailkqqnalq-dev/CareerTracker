@@ -19,7 +19,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Fırsatları CSV olarak dışa aktarma (Türkçe karakter desteği)
 - Alembic veritabanı migration'ları
 - GitHub Actions ile otomatik test çalıştırma
-- 180 becerilik ortak teknik seed kataloğu, kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
+- 189 becerilik ortak teknik seed kataloğu, kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
 - Fırsatlara skill bağlama ve bağlı skill'leri listeleme
 - Profil becerilerini yönetme, fırsat gereksinimlerine katalog becerisi ekleme ve profil/fırsat eşleşmesini görme (`frontend/` MVP arayüzü)
 - Kullanıcıya özel bekleyen beceri önerilerini gözden geçirip mevcut katalogla eşleştirme (`frontend/` MVP arayüzü)
@@ -60,7 +60,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Fırsat skill'leri | `POST, GET /opportunities/{opportunity_id}/skills` | Evet | Fırsata skill bağlar veya bağlı skill'leri listeler |
 | Fırsat skill eşleşmesi | `GET /opportunities/{opportunity_id}/skill-match` | Evet | Profilde bulunan ve eksik skill'leri karşılaştırır |
 | OCR | `POST /ocr/extract` | Evet | PNG/JPEG ham ikili gövdesini bellekte işler, metin ve görsel ölçülerini döndürür; sonuç saklanmaz |
-| İlan analizi | `POST /job-analysis` | Evet | En fazla 100 KB metinden etiketli ilan alanlarını ve görünür katalog becerilerini çıkarır; becerileri profilinle karşılaştırır; sonucu saklamaz |
+| İlan analizi | `POST /job-analysis` | Evet | En fazla 100 KB metinden etiketli ilan alanlarını, rol etiketini veya baştaki kısa unvan satırını ve görünür katalog becerilerini çıkarır; becerileri profilinle karşılaştırır; sonucu saklamaz |
 | Fırsatlar | `GET, POST /opportunities`; `GET, PATCH, DELETE /opportunities/{id}` | Evet | Kullanıcının fırsatlarını yönetir |
 | Kişiler | `GET, POST /contacts`; `GET, PATCH, DELETE /contacts/{id}` | Evet | Kullanıcının kişilerini yönetir |
 | Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
@@ -509,7 +509,7 @@ akışlarını sunar.
   bağlantıları veritabanı `CASCADE` kurallarıyla silinir. Kişi silinince aktivite
   kaydı korunur ve `contact_id` boşaltılır (`SET NULL`).
 - İlan analizi yalnızca ortak katalogu, kullanıcının kendi skill'lerini ve kişisel eşleştirmelerini görür. Katalog dışında kalan terimleri otomatik olarak öneri veya alias yapmaz.
-- İlan analizi ML değildir: becerileri ad/alias sözlüğü ve sözcük sınırlarıyla arar. Rolü ve şirket, konum, ücret gibi alanları yalnızca bilinen açık etiketlerden alır; etiketsiz metinden tahmin yapmaz. Gereksinim türünü yalnızca tanınan bölüm başlıklarından belirler.
+- İlan analizi ML değildir: becerileri ad/alias sözlüğü ve sözcük sınırlarıyla arar; yalnızca katalogda karşılığı olan becerileri algılayabilir. Uygulama bu sınırlamayı analiz sonucunda kullanıcıya gösterir. Şirket, konum ve ücret gibi bilgileri yalnızca açık etiketlerden alır. Rolü açık etiketten alır; etiket yoksa ilk beş satırdaki kısa, iş unvanı biçimine benzeyen satırı daha düşük güvenli başlık adayı olarak gösterebilir. Gereksinim türünü yalnızca tanınan bölüm başlıklarından belirler.
 - Profil karşılaştırması, bölüm başına katalogda eşleşen benzersiz becerilerden kaçının mevcut kullanıcının profilinde kayıtlı olduğunu gösterir. Profilde kayıtlı olmamak kişinin beceriyi bilmediğini kanıtlamaz. Profil seviyesi ve deneyim yılı gösterilir, ilandaki serbest deneyim ifadesiyle otomatik kıyaslanmaz.
 - Ortak katalog küratörlü ve sınırlıdır; beceri dışarıda kalabilir. Yeni global alias eklemeden önce hem `normalize_text` hem ilan analizindeki Türkçe/OCR katlama sonrası çakışmalar denetlenmelidir. Genel sözcükler (`spring`, `spark`, `excel`, `word`, `dash`) tek başına alias yapılmaz; kısa `C`, `R`, `Go` adları yalnızca bağlam filtresini geçen satırlarda eşleşir.
 - İlan analizi eşleştirme sırasında Unicode NFC/NFD eşdeğerlerini kanonikleştirir ve `matched_text` alanında kaynak metindeki özgün yazımı korur. OCR harf hatalarını ve Türkçe ekleri anlamsal olarak düzeltmez; bu nedenle gerçek ilanlarda beceri kaçırabilir veya metne göre istenmeyen eşleşmeler olabilir.

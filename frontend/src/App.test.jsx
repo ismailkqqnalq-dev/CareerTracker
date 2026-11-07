@@ -300,6 +300,7 @@ describe("job text analysis", () => {
       if (url.endsWith("/job-analysis")) {
         return jsonResponse(200, {
           role: "Backend Engineer",
+          role_source: "headline",
           skills: [{
             skill_id: 7,
             name: "Python",
@@ -318,6 +319,8 @@ describe("job text analysis", () => {
 
     expect(await screen.findByRole("heading", { name: "Bulunan beceriler" })).toBeTruthy();
     expect(screen.getByText("Backend Engineer")).toBeTruthy();
+    expect(screen.getByText("Başlık satırından algılanan rol:")).toBeTruthy();
+    expect(screen.getByRole("note").textContent).toContain("katalogda olmayan beceriler algılanmayabilir");
     expect(screen.getByText("Python")).toBeTruthy();
     expect(screen.getByText("Programlama dili")).toBeTruthy();
     expect(screen.getByText("Zorunlu bölüm · satır 2")).toBeTruthy();
