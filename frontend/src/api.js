@@ -19,7 +19,7 @@ export class ApiError extends Error {
 }
 
 export function createApiClient({ onUnauthorized } = {}) {
-  async function request(path, { token, ...options } = {}) {
+  async function perform(path, { token, ...options } = {}) {
     const headers = new Headers(options.headers || {});
     if (options.body && !(options.body instanceof URLSearchParams) && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
@@ -36,7 +36,34 @@ export function createApiClient({ onUnauthorized } = {}) {
       const retryAfter = response.headers?.get?.("Retry-After") ?? null;
       throw new ApiError(response.status, body?.error_code ?? null, retryAfter);
     }
+    return { body, response };
+  }
+
+  async function request(path, options = {}) {
+    const { body } = await perform(path, options);
     return body;
+  }
+
+  async function requestPage(path, { token, limit = 50, offset = 0, ...options } = {}) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+      throw new RangeError("limit must be between 1 and 200");
+    }
+    if (!Number.isInteger(offset) || offset < 0) {
+      throw new RangeError("offset must be a non-negative integer");
+    }
+
+    const [pathname, search = ""] = path.split("?", 2);
+    const params = new URLSearchParams(search);
+    params.set("limit", String(limit));
+    params.set("offset", String(offset));
+    const { body, response } = await perform(`${pathname}?${params}`, { ...options, token });
+    if (!Array.isArray(body)) throw new TypeError("Expected a paginated list response");
+
+    const headerTotal = Number.parseInt(response.headers?.get?.("X-Total-Count"), 10);
+    return {
+      items: body,
+      totalCount: Number.isFinite(headerTotal) && headerTotal >= 0 ? headerTotal : body.length,
+    };
   }
 
   async function requestAll(path, { token, pageSize = 200, ...options } = {}) {
@@ -60,5 +87,5 @@ export function createApiClient({ onUnauthorized } = {}) {
     }
   }
 
-  return { request, requestAll };
+  return { request, requestAll, requestPage };
 }
