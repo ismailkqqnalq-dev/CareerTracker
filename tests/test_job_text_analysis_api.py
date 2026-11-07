@@ -57,6 +57,24 @@ def test_common_job_ad_headings_classify_requirement_sections(
     assert _line_section(heading, "unspecified") == (expected_section, True)
 
 
+@pytest.mark.parametrize(
+    "heading",
+    [
+        "Tech Stack",
+        "Our Tech Stack",
+        "What You'll Do",
+        "Some Things You Might Work On",
+        "The Role",
+        "The Rewards Package",
+    ],
+)
+@pytest.mark.parametrize("current_section", ["required", "preferred"])
+def test_non_requirement_headings_reset_section_classification(
+    heading, current_section
+):
+    assert _line_section(heading, current_section) == ("unspecified", True)
+
+
 def test_analyze_text_finds_visible_skills_and_conservative_sections(authenticated_client):
     client = authenticated_client
     python_skill = _add_private_skill(client, "Python", "language")
@@ -198,6 +216,28 @@ def test_analyzer_classifies_observed_frontend_job_section_labels(authenticated_
     assert skills["React"]["occurrences"][0]["section"] == "required"
     assert skills["TypeScript"]["occurrences"][0]["section"] == "required"
     assert skills["Playwright"]["occurrences"][0]["section"] == "preferred"
+
+
+def test_analyzer_resets_section_after_observed_tech_stack_heading(authenticated_client):
+    client = authenticated_client
+    _add_private_skill(client, "Python", "language")
+    _add_private_skill(client, "Next.js", "framework")
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "Backend Engineer\n"
+                "Qualifications:\nPython\n"
+                "Tech Stack\nNext.js"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    skills = {skill["name"]: skill for skill in response.json()["skills"]}
+    assert skills["Python"]["occurrences"][0]["section"] == "required"
+    assert skills["Next.js"]["occurrences"][0]["section"] == "unspecified"
 
 
 def test_analyzer_does_not_expose_another_users_private_skill(authenticated_client):
