@@ -920,6 +920,49 @@ def test_required_qualification_heading_variants_keep_preferred_sections_distinc
     assert extracted["Rust"]["occurrences"][0]["section"] == "preferred"
 
 
+
+def test_bring_to_role_and_experience_headings_classify_requirements(authenticated_client):
+    client = authenticated_client
+    for name, category in (
+        ("Python", "language"),
+        ("AWS", "cloud"),
+        ("Docker", "tool"),
+        ("Kubernetes", "tool"),
+        ("React", "framework"),
+        ("Rust", "language"),
+    ):
+        _add_private_skill(client, name, category)
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "What You Bring to the Role:\nPython\n"
+                "What You Bring to the Table:\nAWS\n"
+                "What You Bring With You:\nDocker\n"
+                "Your Skills and Experience:\nKubernetes\n"
+                "Your Qualifications:\nReact\n"
+                "Your Impact:\nRust"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    actual_sections = {
+        name: extracted[name]["occurrences"][0]["section"]
+        for name in ("Python", "AWS", "Docker", "Kubernetes", "React", "Rust")
+    }
+    assert actual_sections == {
+        "Python": "required",
+        "AWS": "required",
+        "Docker": "required",
+        "Kubernetes": "required",
+        "React": "required",
+        "Rust": "unspecified",
+    }
+
+
 def test_what_it_takes_and_what_you_have_headings_classify_requirements(
     authenticated_client,
 ):
