@@ -47,7 +47,7 @@ def test_seed_skill_catalog_is_idempotent(db_session):
 def test_catalog_covers_common_technical_skills_and_stays_manageable():
     names = {entry["name"] for entry in SKILL_CATALOG}
 
-    assert 120 <= len(SKILL_CATALOG) <= 200
+    assert 120 <= len(SKILL_CATALOG) <= 220
     assert {
         "Python",
         "pandas",
@@ -90,6 +90,13 @@ def test_catalog_covers_unmapped_technologies_observed_in_public_job_posts():
         "Yarn Workspaces",
         "tRPC",
         "RabbitMQ",
+        "asyncio",
+        "GitLab",
+        "Metabase",
+        "Streamlit",
+        "Amazon EC2",
+        "Apache Iceberg",
+        "Trino",
     } <= names
 
 
@@ -111,6 +118,35 @@ def test_observed_job_stack_aliases_resolve_to_canonical_skills(db_session):
         skill = find_skill(db_session, alias)
         assert skill is not None, alias
         assert skill.name == canonical_name, alias
+
+
+def test_quantlane_stack_aliases_resolve_and_are_extracted(db_session):
+    seed_skill_catalog(db_session)
+
+    expected = {
+        "asyncio": "asyncio",
+        "GitLab": "GitLab",
+        "Metabase": "Metabase",
+        "Streamlit": "Streamlit",
+        "EC2": "Amazon EC2",
+        "Apache Iceberg": "Apache Iceberg",
+        "Trino": "Trino",
+    }
+    for alias, canonical_name in expected.items():
+        skill = find_skill(db_session, alias)
+        assert skill is not None, alias
+        assert skill.name == canonical_name, alias
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "Our stack:\n"
+            "asyncio, GitLab, Metabase, Streamlit, EC2, "
+            "Apache Iceberg, Trino"
+        ),
+    )
+    assert {skill["name"] for skill in result["skills"]} == set(expected.values())
 
 
 def test_observed_job_stack_terms_are_extracted(db_session):

@@ -287,4 +287,13 @@ SKILL_CATALOG += (
     _entry("Yarn Workspaces", "tool", "yarn workspace"),
     _entry("tRPC", "api"),
     _entry("RabbitMQ", "tool", "rabbit mq", "rabbit message queue"),
+
+    # Data engineering tools confirmed in current job postings.
+    _entry("asyncio", "library"),
+    _entry("GitLab", "platform"),
+    _entry("Metabase", "tool"),
+    _entry("Streamlit", "framework"),
+    _entry("Amazon EC2", "cloud", "EC2", "Elastic Compute Cloud"),
+    _entry("Apache Iceberg", "database"),
+    _entry("Trino", "database"),
 )
