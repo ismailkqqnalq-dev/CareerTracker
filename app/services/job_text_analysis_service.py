@@ -86,17 +86,20 @@ _METADATA_LABELS = {
     "basvuru baglantisi": "application_url",
 }
 _REQUIRED_HEADING = re.compile(
-    r"(?:required(?:[ \t]+(?:skills?|qualifications?))?|requirements?|"
+    r"(?:required(?:[ \t]+(?:skills?(?:[ \t]+and[ \t]+experience)?|"
+    r"qualifications?|experience))?|requirements?|"
     r"expected[ \t]+(?:skills?|qualifications?|experience)|"
     r"(?:minimum|basic)[ \t]+(?:requirements?|qualifications?)|qualifications?|"
-    r"essential[ \t]+(?:skills?|qualifications?)|technical[ \t]+skills?|"
+    r"essential[ \t]+(?:skills?|qualifications?)|"
+    r"technical[ \t]+skills?(?:[ \t]*(?:&[ \t]*|and[ \t]+)experience)?|"
+    r"skills?[ \t]*(?:[ \t]*&[ \t]*|[ \t]+and[ \t]+)experience|"
     r"skills?[ \t]+required|"
     r"you(?:'|\u2019)ll[ \t]+bring[ \t]+these[ \t]+qualifications"
     r"(?:[ \t]+(?:&[ \t]+experience|as[ \t]+a[ \t]+[\w /,&-]+))?|"
     r"about[ \t]+you|"
     r"we(?:'|\u2019)re excited about you because you have(?:\.{3}|\u2026)|"
     r"who[ \t]+we[ \t]+are[ \t]+looking[ \t]+for|"
-    r"you[ \t]+might[ \t]+be[ \t]+a[ \t]+(?:good[ \t]+)?fit[ \t]+if[ \t]+you"
+    r"you[ \t]+might[ \t]+be[ \t]+a[ \t]+(?:(?:good|great)[ \t]+)?fit[ \t]+if[ \t]+you"
     r"(?:[ \t]+have)?|"
     r"what you will need(?:[ \t]+to[ \t]+(?:succeed|be[ \t]+successful))?|"
     r"what you(?:'|\u2019)ll[ \t]+(?:"

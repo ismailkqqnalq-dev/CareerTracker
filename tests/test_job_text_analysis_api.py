@@ -71,6 +71,10 @@ def test_alias_automaton_cache_reuses_catalog_and_has_a_fixed_bound(db_session):
         ("What You Bring:", "required"),
         ("What We're Looking For:", "required"),
         ("Technical Skills", "required"),
+        ("Technical Skills & Experience", "required"),
+        ("Skills & Experience", "required"),
+        ("Required Skills and Experience", "required"),
+        ("You might be a great fit if you:", "required"),
         ("What You Will Bring With You", "required"),
         ("What We Look For", "required"),
         ("YOU MIGHT BE A FIT IF YOU HAVE:", "required"),
@@ -836,3 +840,40 @@ def test_need_to_know_and_must_have_headings_keep_skill_sections_distinct(
     assert extracted["React"]["occurrences"][0]["section"] == "required"
     assert extracted["AWS"]["occurrences"][0]["section"] == "required"
     assert extracted["Kubernetes"]["occurrences"][0]["section"] == "preferred"
+
+
+def test_live_posting_skill_headings_classify_required_and_preferred_sections(
+    authenticated_client,
+):
+    client = authenticated_client
+    _add_private_skill(client, "Java", "language")
+    _add_private_skill(client, "Python", "language")
+    _add_private_skill(client, "AWS", "cloud")
+    _add_private_skill(client, "React", "framework")
+    _add_private_skill(client, "Docker", "tool")
+    _add_private_skill(client, "Kubernetes", "tool")
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "What you'll do:\nDocker tasks\n"
+                "Required skills and experience:\nJava\n"
+                "Skills & Experience:\nPython\n"
+                "Technical Skills & Experience:\nAWS\n"
+                "Who you are:\nReact\n"
+                "You might be a great fit if you:\nKubernetes\n"
+                "Nice-to-have:\nDocker"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    assert extracted["Docker"]["occurrences"][0]["section"] == "unspecified"
+    assert extracted["Java"]["occurrences"][0]["section"] == "required"
+    assert extracted["Python"]["occurrences"][0]["section"] == "required"
+    assert extracted["AWS"]["occurrences"][0]["section"] == "required"
+    assert extracted["React"]["occurrences"][0]["section"] == "unspecified"
+    assert extracted["Kubernetes"]["occurrences"][0]["section"] == "required"
+    assert extracted["Docker"]["occurrences"][1]["section"] == "preferred"
