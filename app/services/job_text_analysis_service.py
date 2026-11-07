@@ -87,6 +87,7 @@ _METADATA_LABELS = {
 }
 _REQUIRED_HEADING = re.compile(
     r"(?:required(?:[ \t]+(?:skills?|qualifications?))?|requirements?|"
+    r"expected[ \t]+(?:skills?|qualifications?|experience)|"
     r"(?:minimum|basic)[ \t]+(?:requirements?|qualifications?)|qualifications?|"
     r"essential[ \t]+(?:skills?|qualifications?)|skills?[ \t]+required|"
     r"what you(?:'|\u2019)ll[ \t]+(?:"
@@ -109,7 +110,8 @@ _PREFERRED_HEADING = re.compile(
     r"ideally,[ \t]+you[ \t]+also|ideally[ \t]+also|"
     r"desired[ \t]+(?:skills?|qualifications?|experience)|"
     r"desirable[ \t]+(?:skills?|qualifications?|experience)|"
-    r"nice[- ]to[- ]haves?|good[ \t]+to[ \t]+have|a[ \t]+plus|"
+    r"nice[- ]to[- ]haves?(?:,?[ \t]+but[ \t]+not[ \t]+required)?|"
+    r"good[ \t]+to[ \t]+have|a[ \t]+plus|"
     r"bonus(?: points)?(?: if you have| for)?|"
     r"any of the following (?:would be|is) a bonus[.!]?|"
     r"tercihen|tercih sebebi|"
@@ -140,7 +142,8 @@ _CONTEXTUAL_ALIAS_CONTEXT = {
         re.IGNORECASE,
     ),
     "spark": re.compile(
-        r"\b(?:apache|pyspark|spark[ -]+sql|lakehouse|data[ -]+(?:lake|processing)|"
+        r"\b(?:apache|pyspark|spark[ -]+sql|python|java|scala|sql|"
+        r"programming[ -]+languages?|lakehouse|data[ -]+(?:lake|processing)|"
         r"distributed[ -]+(?:computing|processing)|big[ -]+data)\b",
         re.IGNORECASE,
     ),
@@ -198,14 +201,14 @@ _CONTEXTUAL_ALIAS_CONTEXT = {
     ),
 }
 _NEUTRAL_HEADING = re.compile(
-    r"(?:about(?:[ \t]+(?:us|the company))?|"
+    r"(?:about(?:[ \t]+(?:us|you|the company))?|"
     r"(?:the[ \t]+)?role(?:[ \t]+overview)?|"
     r"(?:position|job)[ \t]+overview|"
-    r"(?:key[ \t]+|job[ \t]+)?responsibilities|"
+    r"(?:your[ \t]+|(?:key[ \t]+|job[ \t]+)?)responsibilities|"
     r"what you(?:'|\u2019)ll do|what you will do|"
     r"some things you might work on|"
     r"(?:our[ \t]+)?(?:tech|technical)[ \t]+stack|"
-    r"technical environment|"
+    r"technical environment|technologies[ \t]+we[ \t]+love|"
     r"(?:the[ \t]+)?(?:rewards package|benefits)|"
     r"why join us|what we offer)[ \t]*[:\uff1a]?",
     re.IGNORECASE,

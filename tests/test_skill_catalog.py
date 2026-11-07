@@ -222,6 +222,45 @@ def test_public_ml_nlp_posting_stack_resolves_and_is_extracted(db_session):
     )
 
 
+def test_real_posting_headings_reset_sections_and_parse_language_list(db_session):
+    seed_skill_catalog(db_session)
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "Required Qualifications:\nPython\n"
+            "Your Responsibilities\nJavaScript\n"
+            "Preferred Qualifications\nFastAPI\n"
+            "About You\nPyTorch\n"
+            "Nice to have, but not required\nLangGraph\n"
+            "Technologies we love\nLanguages: Python, Spark"
+        ),
+    )
+    skills = {item["name"]: item for item in result["skills"]}
+
+    assert skills["Python"]["occurrences"][0]["section"] == "required"
+    assert skills["JavaScript"]["occurrences"][0]["section"] == "unspecified"
+    assert skills["FastAPI"]["occurrences"][0]["section"] == "preferred"
+    assert skills["PyTorch"]["occurrences"][0]["section"] == "unspecified"
+    assert skills["LangGraph"]["occurrences"][0]["section"] == "preferred"
+    assert skills["Apache Spark"]["occurrences"][0]["section"] == "unspecified"
+
+
+def test_expected_qualifications_heading_marks_skills_as_required(db_session):
+    seed_skill_catalog(db_session)
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text="Responsibilities\nPython\nExpected Qualifications\nSQL",
+    )
+    skills = {item["name"]: item for item in result["skills"]}
+
+    assert skills["Python"]["occurrences"][0]["section"] == "unspecified"
+    assert skills["SQL"]["occurrences"][0]["section"] == "required"
+
+
 def test_ambiguous_ml_terms_need_model_or_search_context(db_session):
     seed_skill_catalog(db_session)
 
