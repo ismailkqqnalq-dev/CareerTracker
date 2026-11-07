@@ -1031,3 +1031,45 @@ def test_expect_from_you_and_required_qualifications_and_skills_headings(authent
         "React": "preferred",
         "Rust": "unspecified",
     }
+
+
+def test_qualification_label_variants_keep_sections_distinct(authenticated_client):
+    client = authenticated_client
+    for name, category in (
+        ("Python", "language"),
+        ("AWS", "cloud"),
+        ("Docker", "tool"),
+        ("Kubernetes", "tool"),
+        ("Rust", "language"),
+        ("React", "framework"),
+    ):
+        _add_private_skill(client, name, category)
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "What You Should Bring With You:\nPython\n"
+                "Core Qualifications (Must-Haves):\nAWS\n"
+                "Key Qualifications:\nDocker\n"
+                "What You Need to Succeed (Minimum Requirements):\nKubernetes\n"
+                "Preferred Qualifications:\nRust\n"
+                "What You'll Do:\nReact"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    actual_sections = {
+        name: extracted[name]["occurrences"][0]["section"]
+        for name in ("Python", "AWS", "Docker", "Kubernetes", "Rust", "React")
+    }
+    assert actual_sections == {
+        "Python": "required",
+        "AWS": "required",
+        "Docker": "required",
+        "Kubernetes": "required",
+        "Rust": "preferred",
+        "React": "unspecified",
+    }
