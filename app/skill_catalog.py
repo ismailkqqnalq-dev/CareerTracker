@@ -133,6 +133,8 @@ SKILL_CATALOG += (
     _entry("LightGBM", "library", "light gbm", "lgbm"),
     _entry("CatBoost", "library", "cat boost"),
     _entry("OpenCV", "library", "opencv python", "cv2"),
+    _entry("YOLO", "concept"),
+    _entry("CenterNet", "concept"),
     _entry("spaCy", "library", "spacy nlp"),
     _entry("NLTK", "library", "natural language toolkit"),
     _entry("Hugging Face Transformers", "library", "huggingface transformers", "hf transformers"),

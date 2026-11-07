@@ -147,6 +147,9 @@ def test_quantlane_stack_aliases_resolve_and_are_extracted(db_session):
         ),
     )
     assert {skill["name"] for skill in result["skills"]} == set(expected.values())
+    unspecified = result["profile_match"]["unspecified"]
+    assert unspecified["total_count"] == len(expected)
+    assert set(unspecified["missing_skills"]) == set(expected.values())
 
 
 def test_observed_job_stack_terms_are_extracted(db_session):
@@ -426,3 +429,38 @@ def test_seed_catalog_rejects_alias_owned_by_another_skill(db_session):
         .first()
         is None
     )
+
+
+def test_covar_vision_model_names_resolve_and_extract(db_session):
+    seed_skill_catalog(db_session)
+
+    expected = {"YOLO": "YOLO", "CenterNet": "CenterNet"}
+    missing = [alias for alias in expected if find_skill(db_session, alias) is None]
+    assert not missing, missing
+    for alias, canonical_name in expected.items():
+        assert find_skill(db_session, alias).name == canonical_name
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text=(
+            "Applicants should know object detection networks "
+            "such as YOLO and CenterNet."
+        ),
+    )
+    assert {skill["name"] for skill in result["skills"]} == set(expected.values())
+    unspecified = result["profile_match"]["unspecified"]
+    assert unspecified["total_count"] == 2
+    assert set(unspecified["missing_skills"]) == set(expected.values())
+
+
+def test_yolo_is_not_extracted_from_unrelated_ordinary_usage(db_session):
+    seed_skill_catalog(db_session)
+
+    result = analyze_job_text(
+        db_session,
+        user_id=1,
+        text="The team uses a YOLO approach to meet every deadline.",
+    )
+
+    assert "YOLO" not in {skill["name"] for skill in result["skills"]}
