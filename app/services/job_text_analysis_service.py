@@ -87,6 +87,7 @@ _METADATA_LABELS = {
 }
 _REQUIRED_HEADING = re.compile(
     r"(?:required[ \t]+skills?[ \t]*(?:&[ \t]*|and[ \t]+)qualifications?|"
+    r"required[ \t]+qualifications?[ \t]+and[ \t]+skills?|"
     r"required(?:[ \t]+(?:skills?(?:[ \t]+and[ \t]+experience)?|"
     r"qualifications?|experience))?|requirements?|"
     r"expected[ \t]+(?:skills?|qualifications?|experience)|"
@@ -120,6 +121,7 @@ _REQUIRED_HEADING = re.compile(
     r"what we(?:'|\u2019)re[ \t]+looking for(?:[ \t]*\([ \t]*required[ \t]*\))?|"
     r"what we[ \t]+look[ \t]+for"
     r"(?:[ \t]+in[ \t]+(?:you|candidates?|a[ \t]+candidate))?|"
+    r"what we[ \t]+expect[ \t]+from[ \t]+you|"
     r"what we[ \t]+(?:need[ \t]+from[ \t]+you|expect[ \t]+you[ \t]+to[ \t]+know)|"
     r"must[- ]haves?|"
     r"aranan[ \t]+(?:nitelikler|ozellikler|yetkinlikler)|"
