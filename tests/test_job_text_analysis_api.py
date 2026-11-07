@@ -164,6 +164,14 @@ def test_role_scoped_bring_heading_classifies_requirements(heading):
     assert _line_section(heading, "unspecified") == ("required", True)
 
 
+@pytest.mark.parametrize(
+    "heading",
+    ["What Will Make You Successful", "What Will Make You Successful Here:"],
+)
+def test_success_outcome_heading_classifies_requirements(heading):
+    assert _line_section(heading, "unspecified") == ("required", True)
+
+
 @pytest.mark.parametrize("heading", ["Core Responsibilities", "Our Stack"])
 @pytest.mark.parametrize("current_section", ["required", "preferred"])
 def test_observed_neutral_headings_reset_section(heading, current_section):
