@@ -112,6 +112,7 @@ _REQUIRED_HEADING = re.compile(
     r"(?:[ \t]+have)?|"
     r"what[ \t]+you[ \t]+have|"
     r"what[ \t]+it[ \t]+takes(?:[ \t]+to[ \t]+be[ \t]+successful)?|"
+    r"what[ \t]+will[ \t]+make[ \t]+you[ \t]+successful(?:[ \t]+here)?|"
     r"have[ \t]+you[ \t]+got[ \t]+what[ \t]+it[ \t]+takes\??|"
     r"what[ \t]+we[ \t]+require|"
     r"qualifications?[ \t]+you[ \t]+(?:will|(?:'|\u2019)ll)[ \t]+bring|"
