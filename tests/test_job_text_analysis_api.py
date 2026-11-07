@@ -995,3 +995,39 @@ def test_what_it_takes_and_what_you_have_headings_classify_requirements(
     for name in ("Python", "FastAPI", "AWS", "Docker", "Kubernetes", "TypeScript"):
         assert extracted[name]["occurrences"][0]["section"] == "required"
     assert extracted["React"]["occurrences"][0]["section"] == "preferred"
+
+
+def test_expect_from_you_and_required_qualifications_and_skills_headings(authenticated_client):
+    client = authenticated_client
+    for name, category in (
+        ("Python", "language"),
+        ("AWS", "cloud"),
+        ("React", "framework"),
+        ("Rust", "language"),
+    ):
+        _add_private_skill(client, name, category)
+
+    response = client.post(
+        "/job-analysis",
+        json={
+            "text": (
+                "What We Expect From You:\nPython\n"
+                "Required Qualifications and Skills:\nAWS\n"
+                "Preferred Qualifications:\nReact\n"
+                "What You'll Be Doing:\nRust"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    extracted = {skill["name"]: skill for skill in response.json()["skills"]}
+    actual_sections = {
+        name: extracted[name]["occurrences"][0]["section"]
+        for name in ("Python", "AWS", "React", "Rust")
+    }
+    assert actual_sections == {
+        "Python": "required",
+        "AWS": "required",
+        "React": "preferred",
+        "Rust": "unspecified",
+    }
