@@ -21,38 +21,41 @@ def _add_private_skill(client, name, category):
     return response.json()
 
 
-def test_reuses_compiled_alias_patterns_between_analyses(db_session, monkeypatch):
+def test_alias_search_work_does_not_scale_as_aliases_times_lines(
+    db_session, monkeypatch
+):
     seed_skill_catalog(db_session)
-    cached_compiler = getattr(job_analysis_service, "_compile_alias_pattern", None)
-    if cached_compiler is not None:
-        cached_compiler.cache_clear()
+    original_matcher = job_analysis_service._find_alias_matches
+    scanned_lines = []
 
-    original_compile = job_analysis_service.re.compile
-    compile_calls = []
+    def counting_matcher(text, automaton):
+        scanned_lines.append(len(text))
+        return original_matcher(text, automaton)
 
-    def count_compile_calls(pattern, flags=0):
-        compile_calls.append(pattern)
-        return original_compile(pattern, flags)
+    monkeypatch.setattr(job_analysis_service, "_find_alias_matches", counting_matcher)
+    text = "\n".join(["Python, SQL and cloud experience"] * 5)
+    result = analyze_job_text(db_session, user_id=1, text=text)
 
-    monkeypatch.setattr(job_analysis_service.re, "compile", count_compile_calls)
+    assert {skill["name"] for skill in result["skills"]} >= {"Python", "SQL"}
+    assert scanned_lines == [len("Python, SQL and cloud experience")] * 5
+
+
+def test_alias_automaton_cache_reuses_catalog_and_has_a_fixed_bound(db_session):
+    seed_skill_catalog(db_session)
+    cached_builder = job_analysis_service._build_alias_automaton
+    cached_builder.cache_clear()
+    text = "Python, SQL and cloud experience"
+
     try:
-        job_analysis_service.analyze_job_text(
-            db_session,
-            user_id=1,
-            text="Python, PostgreSQL and FastAPI",
-        )
-        first_count = len(compile_calls)
-        compile_calls.clear()
-        job_analysis_service.analyze_job_text(
-            db_session,
-            user_id=1,
-            text="Python, PostgreSQL and FastAPI",
-        )
-        assert first_count > 0
-        assert len(compile_calls) < first_count
+        first = analyze_job_text(db_session, user_id=1, text=text)
+        second = analyze_job_text(db_session, user_id=1, text=text)
+        cache_info = cached_builder.cache_info()
+
+        assert first == second
+        assert cache_info.hits == 1
+        assert cache_info.maxsize == 16
     finally:
-        if cached_compiler is not None:
-            cached_compiler.cache_clear()
+        cached_builder.cache_clear()
 
 
 @pytest.mark.parametrize(
