@@ -90,6 +90,8 @@ _REQUIRED_HEADING = re.compile(
     r"essential[ \t]+(?:skills?|qualifications?)|skills?[ \t]+required|"
     r"what you(?:'|\u2019)ll[ \t]+(?:"
     r"need(?:[ \t]+to[ \t]+(?:succeed|be[ \t]+successful))?|bring)|"
+    r"to[ \t]+be[ \t]+successful,[ \t]+you(?:'|\u2019)ll[ \t]+need|"
+    r"the[ \t]+essentials|"
     r"what you[ \t]+bring|"
     r"what we(?:'|\u2019)re[ \t]+looking for|must[- ]have|"
     r"aranan[ \t]+(?:nitelikler|ozellikler|yetkinlikler)|"
@@ -106,7 +108,8 @@ _PREFERRED_HEADING = re.compile(
     r"desired[ \t]+(?:skills?|qualifications?|experience)|"
     r"desirable[ \t]+(?:skills?|qualifications?|experience)|"
     r"nice[- ]to[- ]haves?|good[ \t]+to[ \t]+have|a[ \t]+plus|"
-    r"bonus(?: points)?|any of the following (?:would be|is) a bonus[.!]?|"
+    r"bonus(?: points)?(?: if you have| for)?|"
+    r"any of the following (?:would be|is) a bonus[.!]?|"
     r"tercihen|tercih sebebi|"
     r"tercih edilen(?:[ \t]+(?:beceriler|nitelikler|yetkinlikler))?|"
     r"arti sayilan[ \t]+(?:ozellikler|yetkinlikler|beceriler)|"
@@ -124,7 +127,9 @@ _HEADLINE_ROLE_SUFFIX = re.compile(
     r"managers?|consultants?|specialists?|administrators?|technicians?|"
     r"programmers?|testers?|interns?|researchers?|product owners?|"
     r"scrum masters?|directors?|leads?)\b"
-    r"(?:[ \t]*\([^()\r\n]{1,80}\))?$",
+    r"(?:[ \t]*\([^()\r\n]{1,80}\))?"
+    r"(?:[ \t]*[-\u2013\u2014|][ \t]+[\w+#./]+"
+    r"(?:[ \t]+[\w+#./]+){0,2})?$",
     re.IGNORECASE,
 )
 _HEADLINE_SENTENCE_START = re.compile(
