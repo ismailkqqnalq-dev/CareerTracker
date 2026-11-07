@@ -62,3 +62,24 @@ def test_evaluator_uses_only_an_in_memory_database(monkeypatch):
     evaluator.evaluate()
 
     assert database_urls == ["sqlite:///:memory:"]
+
+
+def test_evaluator_cli_is_safe_with_windows_legacy_output_encoding():
+    import json
+    import os
+    import subprocess
+    import sys
+
+    environment = os.environ.copy()
+    environment["PYTHONIOENCODING"] = "cp1254"
+    completed = subprocess.run(
+        [sys.executable, "-m", "scripts.evaluate_job_text_analysis"],
+        capture_output=True,
+        check=False,
+        encoding="utf-8",
+        env=environment,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert all(ord(character) < 128 for character in completed.stdout)
+    assert json.loads(completed.stdout)["dataset"].startswith("synthetic only")
