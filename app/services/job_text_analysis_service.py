@@ -85,17 +85,27 @@ _METADATA_LABELS = {
 }
 _REQUIRED_HEADING = re.compile(
     r"(?:required(?:[ \t]+(?:skills?|qualifications?))?|requirements?|"
-    r"minimum qualifications?|what you(?:'|\u2019)ll need|what you(?:'|\u2019)ll bring|"
-    r"must[- ]have|aranan[ \t]+(?:nitelikler|ozellikler)|"
+    r"(?:minimum|basic)[ \t]+qualifications?|qualifications?|"
+    r"essential[ \t]+(?:skills?|qualifications?)|skills?[ \t]+required|"
+    r"what you(?:'|\u2019)ll[ \t]+(?:need|bring)|what you[ \t]+bring|"
+    r"what we(?:'|\u2019)re[ \t]+looking for|must[- ]have|"
+    r"aranan[ \t]+(?:nitelikler|ozellikler|yetkinlikler)|"
+    r"istenen[ \t]+(?:nitelikler|ozellikler|yetkinlikler)|"
+    r"temel[ \t]+(?:nitelikler|yetkinlikler)|"
+    r"gerekli[ \t]+(?:nitelikler|ozellikler|yetkinlikler)|"
     r"adaydan beklentiler|"
     r"is icin gerekli beceriler|"
     r"gereklilikler|zorunlu[ \t]+(?:beceriler|nitelikler))[ \t]*[:\uff1a]?",
     re.IGNORECASE,
 )
 _PREFERRED_HEADING = re.compile(
-    r"(?:preferred(?:[ \t]+(?:skills?|qualifications?))?|nice[- ]to[- ]have|"
-    r"desired skills?|bonus(?: points)?|tercihen|tercih sebebi|"
-    r"tercih edilen(?:[ \t]+(?:beceriler|nitelikler))?|"
+    r"(?:preferred(?:[ \t]+(?:skills?|qualifications?|experience))?|"
+    r"desired[ \t]+(?:skills?|qualifications?|experience)|"
+    r"desirable[ \t]+(?:skills?|qualifications?|experience)|"
+    r"nice[- ]to[- ]haves?|good[ \t]+to[ \t]+have|a[ \t]+plus|"
+    r"bonus(?: points)?|tercihen|tercih sebebi|"
+    r"tercih edilen(?:[ \t]+(?:beceriler|nitelikler|yetkinlikler))?|"
+    r"arti sayilan[ \t]+(?:ozellikler|yetkinlikler|beceriler)|"
     r"one cikan ozellikler|avantaj)[ \t]*[:\uff1a]?",
     re.IGNORECASE,
 )
