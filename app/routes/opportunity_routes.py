@@ -2,13 +2,14 @@ import csv
 import io
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database.session import get_db
 from app.models.users import User
 from app.pagination import pagination_params, set_total_count
+from app.record_limits import OpportunityQuotaExceeded
 from app.schemas.analytics import ApplicationAnalyticsResponse
 from app.schemas.opportunity import (
     OpportunityCreate,
@@ -27,11 +28,20 @@ def create_opportunity(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return service.create_opportunity(
-        db,
-        opportunity.model_dump(),
-        user_id=current_user.id,
-    )
+    try:
+        return service.create_opportunity(
+            db,
+            opportunity.model_dump(),
+            user_id=current_user.id,
+        )
+    except OpportunityQuotaExceeded:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": "Opportunity limit reached for this account.",
+                "error_code": "quota_exceeded",
+            },
+        )
 
 
 @router.get("/opportunities", response_model=list[OpportunityResponse])

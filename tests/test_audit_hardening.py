@@ -351,3 +351,45 @@ def test_skill_lists_and_suggestions_support_pagination(authenticated_client):
         assert response.status_code == 200, (path, response.text)
         assert len(response.json()) == 1
         assert response.headers["X-Total-Count"] == str(total)
+
+
+def test_opportunity_quota_is_per_user_and_returns_error_code(
+    authenticated_client, monkeypatch
+):
+    client = authenticated_client
+    monkeypatch.setenv("MAX_OPPORTUNITIES_PER_USER", "1")
+
+    first = client.post("/opportunities", json=_opportunity_payload(company="Owner"))
+    over_limit = client.post(
+        "/opportunities", json=_opportunity_payload(company="Owner extra")
+    )
+
+    assert first.status_code == 200
+    assert over_limit.status_code == 409
+    assert over_limit.json()["error_code"] == "quota_exceeded"
+
+    registration = client.post(
+        "/auth/register",
+        json={"email": "second-owner@example.com", "password": "StrongPass123"},
+    )
+    assert registration.status_code == 201
+    login = client.post(
+        "/auth/token",
+        data={"username": "second-owner@example.com", "password": "StrongPass123"},
+    )
+    assert login.status_code == 200
+    client.headers["Authorization"] = f"Bearer {login.json()['access_token']}"
+
+    other_user_opportunity = client.post(
+        "/opportunities", json=_opportunity_payload(company="Other owner")
+    )
+
+    assert other_user_opportunity.status_code == 200
+
+
+def test_opportunity_quota_defaults_to_five_thousand(monkeypatch):
+    from app.record_limits import get_max_opportunities_per_user
+
+    monkeypatch.delenv("MAX_OPPORTUNITIES_PER_USER", raising=False)
+
+    assert get_max_opportunities_per_user() == 5000

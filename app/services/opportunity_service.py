@@ -1,8 +1,14 @@
 from app.repositories import opportunity_repository as op
+from app.record_limits import get_max_opportunities_per_user
 
 
 def create_opportunity(db, opportunity_data, user_id):
-    return op.create_opportunity(db, opportunity_data, user_id)
+    return op.create_opportunity(
+        db,
+        opportunity_data,
+        user_id,
+        max_per_user=get_max_opportunities_per_user(),
+    )
 
 
 def get_all_opportunities(db, user_id, limit=50, offset=0):
