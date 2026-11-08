@@ -225,3 +225,4 @@ __marimo__/
 *.bak-*
 career-backups/
 careertracker.db
+.snapshot-*

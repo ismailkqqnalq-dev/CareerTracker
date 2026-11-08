@@ -1,0 +1,63 @@
+name: Deployment preparation checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  proxy-and-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate isolated production Compose
+        env:
+          CADDY_IMAGE: caddy:2-alpine
+          APP_IMAGE: careertracker:ci
+          POSTGRES_IMAGE: postgres:16
+          SITE_DOMAIN: example.invalid
+          JWT_SECRET_KEY: ci-only-not-used-to-start-application
+          DATABASE_URL: postgresql://careertracker:ci-only@db/careertracker
+          POSTGRES_PASSWORD: ci-only
+        run: docker compose -f deploy/compose.production.yml config --quiet
+      - name: Exercise proxy routing and frontend headers with synthetic content
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/web" "$RUNNER_TEMP/api"
+          printf 'synthetic-spa' > "$RUNNER_TEMP/web/index.html"
+          printf '{"ok":true}' > "$RUNNER_TEMP/api/health"
+          docker network create proxy-test
+          docker run -d --name app --network proxy-test -v "$RUNNER_TEMP/api:/data:ro" -w /data python:3.11-slim python -m http.server 8000
+          docker run --rm -e SITE_DOMAIN=example.invalid -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker run -d --name edge --network proxy-test -p 127.0.0.1:18080:8080 -e SITE_DOMAIN=http://localhost:8080 -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$RUNNER_TEMP/web:/srv:ro" caddy:2-alpine
+          for i in $(seq 1 30); do
+            if curl --fail -s http://localhost:18080/ > "$RUNNER_TEMP/body"; then break; fi
+            sleep 1
+          done
+          grep -q synthetic-spa "$RUNNER_TEMP/body"
+          curl --fail -sD "$RUNNER_TEMP/headers" http://localhost:18080/nested/page | grep -q synthetic-spa
+          grep -qi 'Content-Security-Policy:' "$RUNNER_TEMP/headers"
+          grep -qi 'X-Content-Type-Options: nosniff' "$RUNNER_TEMP/headers"
+          curl --fail -s http://localhost:18080/api/health | grep -q '"ok":true'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18080/api/docs)" = 404
+      - name: PostgreSQL backup and restore drill with synthetic rows
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name backup-db -e POSTGRES_PASSWORD=ci-only postgres:16
+          for i in $(seq 1 30); do
+            if docker exec backup-db pg_isready -U postgres; then break; fi
+            sleep 1
+          done
+          docker exec backup-db psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE TABLE sample(id integer PRIMARY KEY, value text); INSERT INTO sample VALUES(1, 'synthetic');"
+          docker exec backup-db pg_dump -U postgres -Fc -f /tmp/drill.dump postgres
+          docker exec backup-db createdb -U postgres restored
+          docker exec backup-db pg_restore -U postgres --exit-on-error --single-transaction --no-owner --no-acl -d restored /tmp/drill.dump
+          test "$(docker exec backup-db psql -U postgres -d restored -Atc 'SELECT value FROM sample WHERE id=1')" = synthetic
+      - name: Cleanup synthetic containers
+        if: always()
+        run: |
+          docker rm -f edge app backup-db || true
+          docker network rm proxy-test || true
