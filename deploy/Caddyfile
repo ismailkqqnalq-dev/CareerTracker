@@ -1,0 +1,26 @@
+{$SITE_DOMAIN} {
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Cache-Control no-store
+        -Server
+    }
+    @documentation path /api/docs /api/docs/* /api/redoc /api/openapi.json
+    route {
+        handle @documentation {
+            respond 404
+        }
+        handle_path /api/* {
+            reverse_proxy app:8000
+        }
+        handle {
+            header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+            root * /srv
+            try_files {path} /index.html
+            file_server
+        }
+    }
+}

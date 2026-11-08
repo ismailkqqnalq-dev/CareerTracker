@@ -1,0 +1,65 @@
+services:
+  proxy:
+    image: ${CADDY_IMAGE:?Set an audited Caddy 2 image reference, preferably by digest}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?Set the public DNS hostname}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../frontend/dist:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      edge:
+        ipv4_address: 172.30.40.10
+    depends_on:
+      - app
+  app:
+    image: ${APP_IMAGE:?Set the reviewed backend image digest}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    command: [python3, -m, uvicorn, 'app.main:app', --host, '0.0.0.0', --port, '8000', --no-proxy-headers, --no-access-log, --workers, '1']
+    environment:
+      APP_ENV: production
+      REGISTRATION_ENABLED: 'false'
+      PYTHON_DOTENV_DISABLED: '1'
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set a strong JWT signing key}
+      DATABASE_URL: ${DATABASE_URL:?Set the PostgreSQL URL for host db with a URL-encoded password}
+      TRUSTED_PROXY_IPS: 172.30.40.10/32
+    networks: [edge, data]
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: ${POSTGRES_IMAGE:?Set an audited PostgreSQL 16 image reference, preferably by digest}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: careertracker
+      POSTGRES_DB: careertracker
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong database password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U careertracker -d careertracker']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.30.40.0/24
+  data:
+    internal: true
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

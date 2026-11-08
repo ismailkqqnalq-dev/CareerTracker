@@ -540,3 +540,9 @@ aylık başvuru analizini sunar. Mobil istemci ve üretim dağıtımı yapılmam
 ## Lisans
 
 [MIT](LICENSE)
+
+## HTTPS ve yedekleme hazırlığı
+
+Ayrı üretim Compose şablonu, HTTPS proxy ve güvenli yedek/geri yükleme adımları
+[üretim hazırlığı belgesinde](docs/production-preparation.md) yer alır. Bunlar hazırlıktır;
+canlı sunucu, DNS, sertifika ve otomatik şifreli dış yedekleme kurulmuş değildir.
