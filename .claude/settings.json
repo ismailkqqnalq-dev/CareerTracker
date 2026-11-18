@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/verify_on_stop.py",
+            "timeout": 900
+          }
+        ]
+      }
+    ]
+  }
+}
