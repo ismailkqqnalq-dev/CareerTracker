@@ -85,8 +85,15 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-      - name: Audit frontend dependencies
+      - name: Audit frontend production dependencies
         working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+      # Geliştirme araçları (vite, vitest) kullanıcıya giden pakete girmez. Düzeltmesi
+      # henüz çıkmamış açıklar PR'ları kilitlemesin diye bu adım sadece raporlar.
+      # Yaması yayınlanınca: bağımlılığı güncelle; açıklar sürerse bu adımı tekrar zorunlu yap.
+      - name: Audit frontend dev dependencies (report only)
+        working-directory: frontend
+        continue-on-error: true
         run: npm audit --audit-level=high
 
   ocr-smoke:
