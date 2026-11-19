@@ -3,15 +3,20 @@
 - Python dosyaları değiştiyse backend testlerini (bellek içi SQLite ile) çalıştırır.
 - frontend/ altında değişiklik varsa ve node_modules kuruluysa Vitest'i çalıştırır.
 - Testler kırılırsa çıkış kodu 2 ile Claude'u durdurmaz; hata çıktısı Claude'a geri gider.
+- pytest'ten önce pyproject.toml bağımlılıklarının bu Python'da kurulu olduğuna bakar; eksikse
+  "kod kırık" yerine "ortam eksik" der (sistem Python'u ile .venv ayrışınca yanlış alarm vermesin).
 - Sonsuz döngüye girmemek için hook'un kendisi bir kez devam ettirdiyse (stop_hook_active)
   ikinci kez engellemez.
 """
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import tomllib
+from importlib import metadata
 from pathlib import Path
 
 TIMEOUT_SECONDS = 600
@@ -90,6 +95,20 @@ def related_tests(root: Path, files: list[str]) -> list[str] | None:
     return sorted(selected)
 
 
+def missing_dependencies(root: Path) -> list[str]:
+    """pyproject.toml'daki ana ve dev bağımlılıklarından bu Python'da kurulu olmayanları döndürür."""
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    requirements = project.get("dependencies", []) + project.get("optional-dependencies", {}).get("dev", [])
+    missing = []
+    for requirement in requirements:
+        name = re.match(r"[A-Za-z0-9._-]+", requirement).group(0)  # "pwdlib[argon2]" -> "pwdlib"
+        try:
+            metadata.distribution(name)
+        except metadata.PackageNotFoundError:
+            missing.append(name)
+    return missing
+
+
 def run(cmd: list[str], cwd: Path, env: dict) -> tuple[bool, str]:
     try:
         result = subprocess.run(
@@ -132,6 +151,16 @@ def main() -> int:
     failures = []
 
     if python_changed:
+        missing = missing_dependencies(root)
+        if missing:
+            print(
+                "Ortam eksik, kod kırık değil: testler çalıştırılmadı. Kodu değiştirme.\n"
+                f"Bu Python'da kurulu olmayan bağımlılıklar: {', '.join(missing)}\n"
+                f"Python: {sys.executable}\n"
+                f'Kullanıcıya şunu çalıştırmasını söyle: "{sys.executable}" -m pip install -e ".[dev]"',
+                file=sys.stderr,
+            )
+            return 2
         env = dict(os.environ)
         env["DATABASE_URL"] = "sqlite:///:memory:"
         env["PYTHON_DOTENV_DISABLED"] = "1"
