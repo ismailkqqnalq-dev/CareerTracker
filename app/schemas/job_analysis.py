@@ -56,10 +56,16 @@ class JobTextProfileMatch(BaseModel):
     unspecified: JobTextSectionMatch
 
 
+class JobTextUnrecognizedTerm(BaseModel):
+    term: str
+    line_number: int = Field(ge=1)
+
+
 class JobTextAnalysisResponse(BaseModel):
     role: str | None
     role_line_number: int | None
     role_source: Literal["explicit", "headline"] | None
     metadata: JobTextMetadata
     skills: list[JobTextSkill]
+    unrecognized_terms: list[JobTextUnrecognizedTerm]
     profile_match: JobTextProfileMatch

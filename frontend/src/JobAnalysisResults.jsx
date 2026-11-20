@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 const METADATA_FIELDS = [
   ["company", "Şirket"],
   ["location", "Konum"],
@@ -61,7 +63,47 @@ function SectionCoverage({ section, label }) {
   );
 }
 
-export default function JobAnalysisResults({ result }) {
+function UnrecognizedTerms({ terms, onSuggestTerm }) {
+  const [outcomes, setOutcomes] = useState({});
+
+  async function suggest(term) {
+    setOutcomes((current) => ({ ...current, [term]: { busy: true } }));
+    const outcome = await onSuggestTerm(term);
+    setOutcomes((current) => ({ ...current, [term]: outcome }));
+  }
+
+  return (
+    <section className="analysis-unrecognized" aria-label="Katalogda tanınmayan terimler">
+      <h4>Katalogda tanınmayan terimler</h4>
+      <p className="analysis-explanation">
+        Bu terimler beceri listesi satırlarında geçiyor ama katalogda karşılıkları yok. Beceri olduğunu düşündüklerini öneri olarak gönderebilirsin; hiçbiri kendiliğinden kaydedilmez.
+      </p>
+      <ul aria-live="polite">
+        {terms.map(({ term, line_number: lineNumber }) => {
+          const outcome = outcomes[term];
+          return (
+            <li key={term}>
+              <strong>{term}</strong>
+              <small>satır {lineNumber}</small>
+              {!outcome?.sent && (
+                <button
+                  className="button button-quiet"
+                  type="button"
+                  aria-label={`${term} terimini öneri olarak gönder`}
+                  disabled={outcome?.busy}
+                  onClick={() => suggest(term)}
+                >{outcome?.busy ? "Gönderiliyor…" : "Öneri olarak gönder"}</button>
+              )}
+              {outcome?.message && <span className="analysis-term-outcome">{outcome.message}</span>}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export default function JobAnalysisResults({ result, onSuggestTerm }) {
   const metadata = result.metadata || {};
   const populatedMetadata = METADATA_FIELDS
     .map(([key, label]) => [key, label, metadata[key]])
@@ -128,6 +170,10 @@ export default function JobAnalysisResults({ result }) {
           ))}
         </ul>
       ) : <p>Katalogda tanınan beceri eşleşmesi bulunamadı.</p>}
+
+      {result.unrecognized_terms?.length > 0 && onSuggestTerm && (
+        <UnrecognizedTerms terms={result.unrecognized_terms} onSuggestTerm={onSuggestTerm} />
+      )}
     </section>
   );
 }
