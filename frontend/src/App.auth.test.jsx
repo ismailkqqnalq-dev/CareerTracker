@@ -73,6 +73,7 @@ describe("authenticated API requests", () => {
       throw new Error(`Unexpected request: ${url}`);
     }));
     render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Beceri önerileri" }));
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("İstek tamamlanamadı"));
     expect(screen.queryByText("private backend detail")).toBeNull();
