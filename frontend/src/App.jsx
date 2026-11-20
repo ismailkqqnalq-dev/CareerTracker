@@ -3,6 +3,7 @@ import { createApiClient } from "./api.js";
 import ProfileMatchPanel from "./ProfileMatchPanel.jsx";
 import ApplicationAnalyticsPanel from "./ApplicationAnalyticsPanel.jsx";
 import JobAnalysisResults from "./JobAnalysisResults.jsx";
+import SaveAnalysisAsOpportunity from "./SaveAnalysisAsOpportunity.jsx";
 import CrmWorkspace, { VIEW_TITLES } from "./CrmWorkspace.jsx";
 
 const authApi = createApiClient();
@@ -437,6 +438,7 @@ function App() {
             </button>
           </form>
           {jobAnalysis && <JobAnalysisResults result={jobAnalysis} />}
+          {jobAnalysis && <SaveAnalysisAsOpportunity result={jobAnalysis} api={api} token={token} onNavigate={setActiveView} />}
         </section>
 
         <section className="suggestion-input-card" aria-labelledby="suggestion-input-title">

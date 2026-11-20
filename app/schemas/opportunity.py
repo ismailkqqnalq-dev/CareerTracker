@@ -15,6 +15,7 @@ Status = Annotated[str, StringConstraints(max_length=50)]
 Notes = Annotated[str, StringConstraints(max_length=5000)]
 NextAction = Annotated[str, StringConstraints(max_length=500)]
 Salary = Annotated[int, Field(ge=0, le=2_147_483_647)]
+SkillId = Annotated[int, Field(gt=0)]
 
 
 class OpportunityCreate(BaseModel):
@@ -29,6 +30,8 @@ class OpportunityCreate(BaseModel):
     notes: Notes
     next_action: NextAction
     last_contact_date: date
+    # İsteğe bağlı: başvuruyla aynı işlemde bağlanacak, kullanıcıya görünür beceriler.
+    skill_ids: list[SkillId] = Field(default_factory=list, max_length=100)
 
     @field_validator("job_link")
     @classmethod
