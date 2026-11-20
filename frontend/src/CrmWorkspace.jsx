@@ -266,7 +266,7 @@ function RecordEditor({ config, record, related, onCancel, onSave, busy }) {
   );
 }
 
-function RecordCard({ view, record, related, onEdit, onDelete, onToggleTask }) {
+function RecordCard({ view, record, related, onEdit, onDelete, onToggleTask, onStatusChange, statusBusy }) {
   const opportunity = view === "opportunities";
   const contact = view === "contacts";
   const task = view === "tasks";
@@ -295,7 +295,20 @@ function RecordCard({ view, record, related, onEdit, onDelete, onToggleTask }) {
             <h3>{title}</h3>
             {contact && <p>{record.role || "Rol belirtilmedi"}</p>}
           </div>
-          {opportunity && <span className="crm-status-pill">{record.status || "Durum yok"}</span>}
+          {opportunity && (
+            <select
+              className="crm-status-pill crm-status-select"
+              aria-label={`${record.company || "Başvuru"} durumu`}
+              value={record.status || ""}
+              disabled={statusBusy}
+              onChange={(event) => onStatusChange(record, event.target.value)}
+            >
+              {!OPPORTUNITY_STATUSES.includes(record.status) && (
+                <option value={record.status || ""} disabled>{record.status ? `${record.status} (eski değer)` : "Durum yok"}</option>
+              )}
+              {OPPORTUNITY_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+          )}
           {task && <span className={`crm-status-pill ${record.is_completed ? "success" : "warning"}`}>{record.is_completed ? "Tamamlandı" : "Açık"}</span>}
         </div>
         <div className="crm-record-meta">
@@ -497,6 +510,7 @@ function ResourceWorkspace({ api, token, view }) {
   const [query, setQuery] = useState("");
   const [editor, setEditor] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [statusBusyId, setStatusBusyId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -585,6 +599,25 @@ function ResourceWorkspace({ api, token, view }) {
     }
   }
 
+  async function changeStatus(record, status) {
+    setStatusBusyId(record.id);
+    setError("");
+    setNotice("");
+    try {
+      await api.request(`/opportunities/${record.id}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ status }),
+      });
+      setNotice(`${record.company || "Başvuru"} durumu “${status}” olarak güncellendi.`);
+      setReloadKey((value) => value + 1);
+    } catch {
+      setError("Başvuru durumu güncellenemedi. Tekrar dene.");
+    } finally {
+      setStatusBusyId(null);
+    }
+  }
+
   const pageNumber = Math.floor(offset / PAGE_SIZE) + 1;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -628,6 +661,8 @@ function ResourceWorkspace({ api, token, view }) {
                 onEdit={(item) => setEditor({ mode: "edit", record: item })}
                 onDelete={remove}
                 onToggleTask={toggleTask}
+                onStatusChange={changeStatus}
+                statusBusy={statusBusyId === record.id}
               />
             ))}
           </div>

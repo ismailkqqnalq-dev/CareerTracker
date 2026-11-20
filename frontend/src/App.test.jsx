@@ -651,6 +651,24 @@ describe("application analytics navigation", () => {
   });
 });
 
+describe("account settings navigation", () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("opens the account settings with password change and account deletion", async () => {
+    setupLoggedInApp();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hesap ayarları" }));
+
+    expect(screen.getByRole("heading", { name: "Şifreyi değiştir" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Hesabı sil" })).toBeTruthy();
+    expect((await screen.findByText("test@example.com", { selector: "strong" }))).toBeTruthy();
+  });
+});
+
 describe("skill suggestion rejection", () => {
   beforeEach(() => sessionStorage.clear());
   afterEach(() => {
