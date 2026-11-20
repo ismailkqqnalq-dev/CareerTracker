@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { OPPORTUNITY_STATUSES } from "./CrmWorkspace.jsx";
 
 const today = () => {
   const date = new Date();
@@ -34,7 +35,7 @@ function initialForm(result) {
     company: (metadata.company?.value || "").slice(0, 200),
     position: (result.role || "").slice(0, 200),
     type: "İş",
-    status: "Başvuruldu",
+    status: OPPORTUNITY_STATUSES[0],
     location: (metadata.location?.value || "").slice(0, 200),
     job_link: httpUrlOrEmpty(metadata.application_url?.value),
     notes: notes.slice(0, 5000),
@@ -145,7 +146,9 @@ export default function SaveAnalysisAsOpportunity({ result, api, token, onNaviga
         </div>
         <div className="crm-field">
           <label htmlFor="save-status">Durum</label>
-          <input id="save-status" required maxLength={50} list="save-opportunity-statuses" value={values.status} onChange={(e) => change("status", e.target.value)} />
+          <select id="save-status" required value={values.status} onChange={(e) => change("status", e.target.value)}>
+            {OPPORTUNITY_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
         </div>
         <div className="crm-field">
           <label htmlFor="save-location">Konum</label>
@@ -176,10 +179,6 @@ export default function SaveAnalysisAsOpportunity({ result, api, token, onNaviga
         </fieldset>
         <datalist id="save-opportunity-types">
           <option value="İş" /><option value="Staj" /><option value="Freelance" />
-        </datalist>
-        <datalist id="save-opportunity-statuses">
-          <option value="Başvuruldu" /><option value="Ön görüşme" /><option value="Teknik mülakat" />
-          <option value="Son mülakat" /><option value="Teklif" /><option value="Reddedildi" />
         </datalist>
         {saveError && <p className="form-error crm-field-wide" role="alert">{saveError}</p>}
         <div className="crm-form-actions crm-field-wide">

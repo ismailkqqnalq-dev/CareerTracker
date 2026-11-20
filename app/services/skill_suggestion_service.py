@@ -120,6 +120,35 @@ def resolve_suggestion(
     return suggestion
 
 
+class SuggestionNotPendingError(ValueError):
+    pass
+
+
+def reject_suggestion(
+    db: Session,
+    *,
+    user_id: int,
+    suggestion_id: int,
+) -> SkillSuggestion:
+    suggestion = (
+        db.query(SkillSuggestion)
+        .filter(
+            SkillSuggestion.id == suggestion_id,
+            SkillSuggestion.user_id == user_id,
+        )
+        .first()
+    )
+    if suggestion is None:
+        raise LookupError(f"Skill suggestion not found: {suggestion_id}")
+    if suggestion.status != "pending":
+        raise SuggestionNotPendingError("Only pending suggestions can be rejected")
+
+    suggestion.status = "rejected"
+    db.commit()
+    db.refresh(suggestion)
+    return suggestion
+
+
 def rank_skill_candidates(
     db: Session,
     *,

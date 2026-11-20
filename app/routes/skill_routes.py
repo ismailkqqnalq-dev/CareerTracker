@@ -140,6 +140,30 @@ def resolve_skill_suggestion(
         raise HTTPException(status_code=404, detail=str(error))
 
 
+@router.post(
+    "/skills/suggestions/{suggestion_id}/reject",
+    response_model=SkillSuggestionResponse,
+)
+def reject_skill_suggestion(
+    suggestion_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return skill_suggestion_service.reject_suggestion(
+            db,
+            user_id=current_user.id,
+            suggestion_id=suggestion_id,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    except skill_suggestion_service.SuggestionNotPendingError as error:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": str(error), "error_code": "suggestion_not_pending"},
+        )
+
+
 @router.get(
     "/skills/suggestions/{suggestion_id}/candidates",
     response_model=list[SkillSuggestionCandidate],
@@ -344,7 +368,35 @@ def list_opportunity_skills(
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))
-    
+
+
+@router.delete(
+    "/opportunities/{opportunity_id}/skills/{skill_id}",
+    status_code=204,
+)
+def detach_opportunity_skill(
+    opportunity_id: int,
+    skill_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        opportunity_skill_service.detach_skill(
+            db, opportunity_id, skill_id, user_id=current_user.id
+        )
+    except opportunity_skill_service.OpportunityNotFoundError as error:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(error), "error_code": "opportunity_not_found"},
+        )
+    except opportunity_skill_service.SkillNotAttachedError as error:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(error), "error_code": "skill_not_attached"},
+        )
+    return Response(status_code=204)
+
+
 @router.post(
     "/users/me/skills",
     response_model=UserSkillResponse,
