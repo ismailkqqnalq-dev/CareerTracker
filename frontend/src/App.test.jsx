@@ -10,6 +10,12 @@ function jsonResponse(status, body) {
   };
 }
 
+// Uygulama genel bakışla açılır; öneri ve ilan testleri önce kendi sekmelerine geçer.
+function renderAtSuggestions() {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Beceri önerileri" }));
+}
+
 function setupLoggedInApp() {
   sessionStorage.setItem("careertracker_token", "temporary-test-token");
   const fetchMock = vi.fn(async (url) => {
@@ -19,7 +25,7 @@ function setupLoggedInApp() {
     throw new Error(`Unexpected request: ${url}`);
   });
   vi.stubGlobal("fetch", fetchMock);
-  render(<App />);
+  renderAtSuggestions();
   return fetchMock;
 }
 
@@ -49,7 +55,7 @@ function setupSuggestionReviewApp(patchResponse) {
     throw new Error(`Unexpected request: ${url}`);
   });
   vi.stubGlobal("fetch", fetchMock);
-  render(<App />);
+  renderAtSuggestions();
   return fetchMock;
 }
 
@@ -58,6 +64,30 @@ function deferred() {
   const promise = new Promise((resolvePromise) => { resolve = resolvePromise; });
   return { promise, resolve };
 }
+
+describe("landing view", () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("opens on the overview and loads the daily agenda", async () => {
+    sessionStorage.setItem("careertracker_token", "temporary-test-token");
+    const fetchMock = vi.fn(async (url) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Genel bakış" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Genel bakış" }).getAttribute("aria-current")).toBe("page");
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => url.includes("/agenda?today="))).toBe(true));
+  });
+});
 
 describe("skill suggestion input", () => {
   beforeEach(() => sessionStorage.clear());
@@ -275,7 +305,7 @@ describe("skill suggestion input", () => {
   it("shows a helpful error instead of crashing when the network request rejects", async () => {
     sessionStorage.setItem("careertracker_token", "temporary-test-token");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
-    render(<App />);
+    renderAtSuggestions();
 
     expect((await screen.findByRole("alert")).textContent).toContain("İstek tamamlanamadı");
     expect(screen.getByRole("heading", { name: "Beceri önerileri" })).toBeTruthy();
@@ -650,7 +680,7 @@ describe("skill suggestion rejection", () => {
       throw new Error(`Unexpected request: ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<App />);
+    renderAtSuggestions();
 
     fireEvent.click(await screen.findByRole("button", { name: "Reddet" }));
 
