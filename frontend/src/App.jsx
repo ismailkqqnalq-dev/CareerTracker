@@ -216,6 +216,24 @@ function App() {
     }
   }
 
+  async function rejectSuggestion(suggestion) {
+    setResolving(suggestion.id);
+    setError("");
+    setNotice("");
+    try {
+      await api.request(`/skills/suggestions/${suggestion.id}/reject`, { method: "POST", token });
+      setNotice(`“${suggestion.raw_name}” önerisi reddedildi.`);
+      await load(token);
+    } catch (rejectError) {
+      if (rejectError.status === 409) {
+        setError("Bu öneri artık beklemede değil. Liste yenilendi.");
+        await load(token);
+      } else if (rejectError.status !== 401) setError(errorMessage(rejectError));
+    } finally {
+      setResolving(null);
+    }
+  }
+
   async function submitSuggestion(event) {
     event.preventDefault();
     const skill = newSkill.trim();
@@ -494,7 +512,7 @@ function App() {
                     {search[suggestion.id] && <div className="search-results" role="listbox" aria-label="Katalog becerileri">
                       {options.length ? options.slice(0, 8).map((skill) => <button key={skill.id} role="option" aria-selected={Number(selected[suggestion.id]) === skill.id} onClick={() => { setSelected((current) => ({ ...current, [suggestion.id]: skill.id })); setSearch((current) => ({ ...current, [suggestion.id]: "" })); }}>{skill.name}<span>{skill.category || ""}</span></button>) : <p>Bu aramayla eşleşen beceri bulunamadı.</p>}
                     </div>}
-                    <div className="card-actions"><span className="selection-summary">{selectedSkill ? <>Seçilen: <strong>{selectedSkill.name}</strong></> : "Eşleştirme seçilmedi"}</span><button className="button button-primary" disabled={!selectedSkill || resolving === suggestion.id} onClick={() => mapSuggestion(suggestion)}>{resolving === suggestion.id ? "Eşleştiriliyor…" : "Eşleştirmeyi onayla"}</button></div>
+                    <div className="card-actions"><span className="selection-summary">{selectedSkill ? <>Seçilen: <strong>{selectedSkill.name}</strong></> : "Eşleştirme seçilmedi"}</span><button type="button" className="button button-quiet" disabled={resolving === suggestion.id} onClick={() => rejectSuggestion(suggestion)}>Reddet</button><button className="button button-primary" disabled={!selectedSkill || resolving === suggestion.id} onClick={() => mapSuggestion(suggestion)}>{resolving === suggestion.id ? "Eşleştiriliyor…" : "Eşleştirmeyi onayla"}</button></div>
                   </div>
                 </article>
               );

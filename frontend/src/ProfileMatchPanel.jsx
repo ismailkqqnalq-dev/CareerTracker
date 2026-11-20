@@ -188,6 +188,27 @@ export default function ProfileMatchPanel({ api, token, skills }) {
     }
   }
 
+  async function removeOpportunitySkill(skill) {
+    if (!selectedOpportunityId) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const dropFromList = () => setRequiredSkills((current) => current.filter((item) => item.id !== skill.id));
+    try {
+      await api.request(`/opportunities/${selectedOpportunityId}/skills/${skill.id}`, { method: "DELETE", token });
+      dropFromList();
+      setMatch(null);
+      setNotice(`${skill.name} fırsatın gereksinimlerinden kaldırıldı.`);
+    } catch (removeError) {
+      if (removeError.errorCode === "skill_not_attached") {
+        dropFromList();
+        setMatch(null);
+      } else if (removeError.status !== 401) setError("Beceri fırsattan kaldırılamadı. Tekrar deneyebilirsin.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="profile-match-layout">
       {error && <p className="form-error" role="alert">{error}</p>}
@@ -270,7 +291,7 @@ export default function ProfileMatchPanel({ api, token, skills }) {
             </form>
             <div className="required-skills" aria-live="polite">
               <h3>Fırsatın beceri gereksinimleri</h3>
-              {loadingRequiredSkills ? <p>Gereksinimler yükleniyor…</p> : requiredSkills.length ? <ul>{requiredSkills.map((skill) => <li key={skill.id}>{skill.name}</li>)}</ul> : <p>Henüz beceri gereksinimi yok.</p>}
+              {loadingRequiredSkills ? <p>Gereksinimler yükleniyor…</p> : requiredSkills.length ? <ul>{requiredSkills.map((skill) => <li key={skill.id}><span>{skill.name}</span> <button type="button" className="text-button" disabled={busy} onClick={() => removeOpportunitySkill(skill)}>{skill.name} gereksinimini kaldır</button></li>)}</ul> : <p>Henüz beceri gereksinimi yok.</p>}
             </div>
           </>
         )}

@@ -620,3 +620,42 @@ describe("application analytics navigation", () => {
     expect(sessionStorage.getItem("careertracker_token")).toBeNull();
   });
 });
+
+describe("skill suggestion rejection", () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects a pending suggestion and removes it from the pending list", async () => {
+    sessionStorage.setItem("careertracker_token", "temporary-test-token");
+    let pending = true;
+    const suggestion = {
+      id: 2,
+      raw_name: "Pyton",
+      normalized_name: "pyton",
+      status: "pending",
+      created_at: "2026-10-25T00:00:00Z",
+    };
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, pending ? [suggestion] : []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
+      if (url.includes("/skills/suggestions/2/candidates")) return jsonResponse(200, []);
+      if (url.endsWith("/skills/suggestions/2/reject") && options.method === "POST") {
+        pending = false;
+        return jsonResponse(200, { ...suggestion, status: "rejected", resolved_skill_id: null });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reddet" }));
+
+    expect((await screen.findByRole("status")).textContent).toContain("“Pyton” önerisi reddedildi");
+    await waitFor(() => expect(screen.queryByText("Pyton")).toBeNull());
+    expect(fetchMock.mock.calls.some(([url, options]) => url.endsWith("/skills/suggestions/2/reject") && options?.method === "POST")).toBe(true);
+  });
+});
