@@ -15,6 +15,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Görüşme ve diğer aktiviteleri kaydetme
 - Takip görevleri ve hatırlatmalar
 - Başvuru istatistiklerini sunan dashboard
+- Genel bakışta gündem: geciken ve 7 gün içindeki açık görevler, süreçte olup 7 günden uzun süredir temas olmayan başvurular; görevi tamamlama ve "bugün iletişime geçtim" tek tıkla
 - Kullanıcıya özel, seçilen dönem için aylık başvuru hacmi analizi
 - Fırsatları CSV olarak dışa aktarma (Türkçe karakter desteği)
 - Başvurular, kişiler, görevler ve aktiviteler için React arayüzünden listeleme, ekleme, güncelleme ve silme
@@ -71,6 +72,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
 | Görevler | `GET, POST /tasks`; `GET, PATCH, DELETE /tasks/{id}` | Evet | Kullanıcının görevlerini yönetir |
 | Dashboard | `GET /dashboard` | Evet | Kullanıcının fırsat istatistiklerini döndürür |
+| Gündem | `GET /agenda?today=YYYY-AA-GG` | Evet | Geciken ve 7 gün içinde son tarihi olan açık görevleri (son tarihe göre) ve durumu Başvuruldu/Ön görüşme/Teknik mülakat/Son mülakat olup son teması en az 7 gün önce olan başvuruları döndürür; her liste en fazla 20 kayıt. `today` kullanıcının yerel tarihidir, verilmezse sunucu tarihi kullanılır |
 | Analitik | `GET /analytics/applications?months=12` | Evet | Sunucunun geçerli takvim ayı dahil son 1–60 aydaki başvuru sayılarını döndürür; boş aylar sıfırdır |
 | CSV | `GET /opportunities/export` | Evet | Kullanıcının fırsatlarını CSV olarak indirir |
 
