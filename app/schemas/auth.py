@@ -30,6 +30,11 @@ class DeleteAccountRequest(BaseModel):
     password: Password
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: Password
+    new_password: Password
+
+
 class UserResponse(BaseModel):
     id: int
     email: EmailStr

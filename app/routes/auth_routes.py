@@ -13,6 +13,7 @@ from app.rate_limits import (
     rate_limited_response,
 )
 from app.schemas.auth import (
+    ChangePasswordRequest,
     DeleteAccountRequest,
     RegisterRequest,
     TokenResponse,
@@ -120,6 +121,30 @@ def read_current_user(
     current_user: User = Depends(get_current_user),
 ):
     return current_user
+
+
+@router.post(
+    "/me/password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses={403: {"description": "Current password confirmation failed"}},
+)
+def change_current_user_password(
+    data: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not auth_service.change_password(
+        db, current_user, data.current_password, data.new_password
+    ):
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={
+                "detail": "Current password is incorrect",
+                "error_code": "password_confirmation_failed",
+            },
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete(

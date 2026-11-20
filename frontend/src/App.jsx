@@ -5,6 +5,7 @@ import ApplicationAnalyticsPanel from "./ApplicationAnalyticsPanel.jsx";
 import JobAnalysisResults from "./JobAnalysisResults.jsx";
 import SaveAnalysisAsOpportunity from "./SaveAnalysisAsOpportunity.jsx";
 import CrmWorkspace, { VIEW_TITLES } from "./CrmWorkspace.jsx";
+import AccountPanel from "./AccountPanel.jsx";
 
 const authApi = createApiClient();
 const MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -375,20 +376,24 @@ function App() {
             <button type="button" aria-current={activeView === "suggestions" ? "page" : undefined} onClick={() => setActiveView("suggestions")}><span className="nav-icon" aria-hidden="true">✧</span>Beceri önerileri</button>
             <button type="button" aria-current={activeView === "profile" ? "page" : undefined} onClick={() => setActiveView("profile")}><span className="nav-icon" aria-hidden="true">◎</span>Profil ve eşleşme</button>
             <button type="button" aria-current={activeView === "analytics" ? "page" : undefined} onClick={() => setActiveView("analytics")}><span className="nav-icon" aria-hidden="true">▤</span>Başvuru analizi</button>
+            <p className="nav-group-label nav-group-secondary">HESAP</p>
+            <button type="button" aria-current={activeView === "account" ? "page" : undefined} onClick={() => setActiveView("account")}><span className="nav-icon" aria-hidden="true">⚙</span>Hesap ayarları</button>
           </nav>
 
           <div className="app-main-view">
         <div className="page-heading">
           <div>
-            <p className="eyebrow">{VIEW_TITLES[activeView] ? "KİŞİSEL ÇALIŞMA ALANIN" : "BECERİ VE İLAN MERKEZİ"}</p>
-            <h1>{VIEW_TITLES[activeView] || (activeView === "suggestions" ? "Beceri önerileri" : activeView === "profile" ? "Profil ve fırsat eşleşmesi" : "Başvuru analizi")}</h1>
-            <p className="muted heading-copy">{VIEW_TITLES[activeView] ? "Kariyer sürecini düzenle ve takip adımlarını yönet." : activeView === "suggestions" ? "Sistemin tanımadığı becerileri eşleştir, ilan metnini incele ve beceri analizini kullan." : activeView === "profile" ? "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır." : "Başvurularının aylara göre dağılımını incele."}</p>
+            <p className="eyebrow">{VIEW_TITLES[activeView] ? "KİŞİSEL ÇALIŞMA ALANIN" : activeView === "account" ? "HESAP" : "BECERİ VE İLAN MERKEZİ"}</p>
+            <h1>{VIEW_TITLES[activeView] || (activeView === "suggestions" ? "Beceri önerileri" : activeView === "profile" ? "Profil ve fırsat eşleşmesi" : activeView === "account" ? "Hesap ayarları" : "Başvuru analizi")}</h1>
+            <p className="muted heading-copy">{VIEW_TITLES[activeView] ? "Kariyer sürecini düzenle ve takip adımlarını yönet." : activeView === "suggestions" ? "Sistemin tanımadığı becerileri eşleştir, ilan metnini incele ve beceri analizini kullan." : activeView === "profile" ? "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır." : activeView === "account" ? "Şifreni değiştir veya hesabını kalıcı olarak sil." : "Başvurularının aylara göre dağılımını incele."}</p>
           </div>
           {activeView === "suggestions" && <div className="count-card"><span className="count-number">{pendingCount}</span><span>bekleyen öneri</span></div>}
         </div>
 
         {VIEW_TITLES[activeView] ? (
           <CrmWorkspace api={api} token={token} view={activeView} onNavigate={setActiveView} />
+        ) : activeView === "account" ? (
+          <AccountPanel api={api} token={token} email={user?.email} onAccountDeleted={() => { setActiveView("overview"); logout(); }} />
         ) : activeView === "analytics" ? (
           <ApplicationAnalyticsPanel api={api} token={token} />
         ) : activeView === "profile" ? (
