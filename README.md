@@ -16,6 +16,8 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Takip görevleri ve hatırlatmalar
 - Başvuru istatistiklerini sunan dashboard
 - Genel bakışta gündem: geciken ve 7 gün içindeki açık görevler, süreçte olup 7 günden uzun süredir temas olmayan başvurular; görevi tamamlama ve "bugün iletişime geçtim" tek tıkla
+- Başvurular listesinde durumu kart üzerinden tek seçimle değiştirme
+- Hesap ayarları ekranında şifre değiştirme ve hesabı kalıcı olarak silme
 - Kullanıcıya özel, seçilen dönem için aylık başvuru hacmi analizi
 - Fırsatları CSV olarak dışa aktarma (Türkçe karakter desteği)
 - Başvurular, kişiler, görevler ve aktiviteler için React arayüzünden listeleme, ekleme, güncelleme ve silme
@@ -50,6 +52,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Hesap | `POST /auth/register` | Hayır | Hesap oluşturur |
 | Oturum | `POST /auth/token` | Hayır | E-posta (`username` alanında) ve parola ile JWT alır |
 | Oturum | `GET /auth/me` | Evet | Oturum açmış kullanıcıyı döndürür |
+| Hesap | `POST /auth/me/password` | Evet | `current_password` doğrulanırsa parolayı `new_password` ile değiştirir; `204`, yanlış parolada `403 password_confirmation_failed` |
 | Hesap | `DELETE /auth/me` | Evet | Mevcut parolayı yeniden doğrular, hesabı ve kişisel kayıtlarını siler |
 | Skill kataloğu | `GET /skills` | Opsiyonel | Ortak katalogu; oturum varsa kullanıcının kendi skill'lerini de listeler |
 | Skill kataloğu | `POST /skills` | Evet | Yalnızca giriş yapan kullanıcıya özel skill oluşturur |
@@ -258,8 +261,13 @@ hesabını silebilir. Kullanıcının CRM kayıtları, profil becerileri, öneri
 kişisel becerileri veritabanı `CASCADE` kurallarıyla silinir; ortak beceri
 kataloğu ve diğer kullanıcıların kayıtları korunur. Silinen hesabın JWT'si,
 hesap bulunamadığı için sonraki istekte geçersiz olur. Yanlış parola
-`403 password_confirmation_failed` döndürür. İşlem geri alınamaz; bu MVP'de
-hesap silme yalnızca API üzerinden yapılabilir.
+`403 password_confirmation_failed` döndürür. İşlem geri alınamaz; arayüzde
+"Hesap ayarları" ekranından şifre onayı ve ek bir onay penceresiyle yapılır.
+
+`POST /auth/me/password` mevcut parolayı doğrulayıp yenisini kaydeder. JWT'ler
+durumsuz olduğu için değişiklikten önce verilmiş bir token süresi dolana kadar
+(en fazla 30 dakika) geçerli kalır. E-posta gönderim altyapısı olmadığından
+"şifremi unuttum" akışı yoktur.
 
 Kabul edilmiş risk: kayıtlı e-posta için `POST /auth/register` mevcut davranış
 gereği `409` döndürür ve bu, e-posta adresinin sistemde olup olmadığını ortaya
