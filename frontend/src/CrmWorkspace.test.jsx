@@ -53,6 +53,44 @@ describe("opportunity status field", () => {
   });
 });
 
+describe("quick status change in the opportunity list", () => {
+  it("saves a new status straight from the list and reloads it", async () => {
+    const api = createApi([{ ...legacyRecord, status: "Başvuruldu" }]);
+    render(<CrmWorkspace api={api} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    const status = await screen.findByLabelText("Eski Şirket durumu");
+    expect(status.value).toBe("Başvuruldu");
+    fireEvent.change(status, { target: { value: "Teknik mülakat" } });
+
+    await waitFor(() => expect(api.request).toHaveBeenCalledWith("/opportunities/3", expect.objectContaining({
+      method: "PATCH",
+      body: JSON.stringify({ status: "Teknik mülakat" }),
+    })));
+    expect((await screen.findByRole("status")).textContent).toContain("Teknik mülakat");
+    await waitFor(() => expect(api.requestPage).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows a legacy status without offering it as a new choice", async () => {
+    render(<CrmWorkspace api={createApi([legacyRecord])} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    const status = await screen.findByLabelText("Eski Şirket durumu");
+    expect(status.value).toBe("mülakat bekliyor");
+    expect(status.options[0].textContent).toBe("mülakat bekliyor (eski değer)");
+    expect(status.options[0].disabled).toBe(true);
+  });
+
+  it("keeps the record and explains when the status update fails", async () => {
+    const api = createApi([{ ...legacyRecord, status: "Başvuruldu" }]);
+    api.request.mockRejectedValueOnce(new Error("network"));
+    render(<CrmWorkspace api={api} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    fireEvent.change(await screen.findByLabelText("Eski Şirket durumu"), { target: { value: "Teklif" } });
+
+    expect((await screen.findByRole("alert")).textContent).toContain("Başvuru durumu güncellenemedi");
+    expect(screen.getByLabelText("Eski Şirket durumu").value).toBe("Başvuruldu");
+  });
+});
+
 function localToday() {
   const date = new Date();
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
