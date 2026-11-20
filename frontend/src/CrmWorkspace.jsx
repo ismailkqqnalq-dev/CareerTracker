@@ -341,11 +341,19 @@ function StatCard({ label, value, hint, accent = "" }) {
   );
 }
 
+function dueLabel(dueDate, todayValue) {
+  const due = String(dueDate).slice(0, 10);
+  if (due < todayValue) return "Gecikti";
+  if (due === todayValue) return "Bugün";
+  return displayDate(due);
+}
+
 function Overview({ api, token, onNavigate }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
+  const [busyKey, setBusyKey] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -353,22 +361,17 @@ function Overview({ api, token, onNavigate }) {
     setError("");
     async function load() {
       try {
-        const [stats, opportunities, contacts, tasks, activities] = await Promise.all([
+        const [stats, opportunities, contacts, activities, agenda] = await Promise.all([
           api.request("/dashboard", { token }),
           api.requestPage("/opportunities", { token, limit: 5, offset: 0 }),
           api.requestPage("/contacts", { token, limit: 1, offset: 0 }),
-          api.requestPage("/tasks", { token, limit: 5, offset: 0 }),
           api.requestPage("/activities", { token, limit: 1, offset: 0 }),
+          api.request(`/agenda?today=${today()}`, { token }),
         ]);
-        const [recentOpportunities, recentTasks] = await Promise.all([
-          opportunities.totalCount > 5
-            ? api.requestPage("/opportunities", { token, limit: 5, offset: opportunities.totalCount - 5 })
-            : Promise.resolve(opportunities),
-          tasks.totalCount > 5
-            ? api.requestPage("/tasks", { token, limit: 5, offset: tasks.totalCount - 5 })
-            : Promise.resolve(tasks),
-        ]);
-        if (active) setData({ stats, opportunities: recentOpportunities.items, contacts, tasks: recentTasks.items, activities });
+        const recentOpportunities = opportunities.totalCount > 5
+          ? await api.requestPage("/opportunities", { token, limit: 5, offset: opportunities.totalCount - 5 })
+          : opportunities;
+        if (active) setData({ stats, opportunities: recentOpportunities.items, contacts, activities, agenda });
       } catch {
         if (active) setError("Genel bakış yüklenemedi. Bağlantını kontrol edip tekrar deneyebilirsin.");
       } finally {
@@ -381,6 +384,20 @@ function Overview({ api, token, onNavigate }) {
 
   const statusEntries = Object.entries(data?.stats?.by_status || {}).sort((left, right) => right[1] - left[1]);
   const maxStatus = Math.max(1, ...statusEntries.map(([, count]) => count));
+  const todayValue = today();
+
+  async function quickUpdate(key, path, body, failureMessage) {
+    setBusyKey(key);
+    setError("");
+    try {
+      await api.request(path, { method: "PATCH", token, body: JSON.stringify(body) });
+      setReloadKey((value) => value + 1);
+    } catch (updateError) {
+      if (updateError.status !== 401) setError(failureMessage);
+    } finally {
+      setBusyKey(null);
+    }
+  }
 
   return (
     <section className="crm-overview" aria-labelledby="overview-title">
@@ -403,6 +420,31 @@ function Overview({ api, token, onNavigate }) {
         </div>
 
         <div className="crm-overview-grid">
+          <section className="crm-overview-card" aria-labelledby="agenda-tasks-title">
+            <div className="crm-card-heading"><div><h3 id="agenda-tasks-title">Bugün ve bu hafta</h3><p>Geciken ve 7 gün içindeki açık görevlerin</p></div><button className="text-button" type="button" onClick={() => onNavigate("tasks")}>Görevleri aç</button></div>
+            {data.agenda.tasks.length ? <ul className="crm-task-summary">{data.agenda.tasks.map((task) => (
+              <li key={task.id}>
+                <span className={`crm-task-dot${dueLabel(task.due_date, todayValue) === "Gecikti" ? " overdue" : ""}`} />
+                <div><strong>{task.description}</strong><small>{dueLabel(task.due_date, todayValue)} · {task.company || "Şirket"} · {task.position || "Pozisyon"}</small></div>
+                <button className="text-button" type="button" disabled={busyKey !== null} aria-label={`${task.description} tamamlandı`} onClick={() => quickUpdate(`task-${task.id}`, `/tasks/${task.id}`, { is_completed: true }, "Görev tamamlanamadı. Tekrar deneyebilirsin.")}>Tamamla</button>
+              </li>
+            ))}</ul> : <p className="crm-empty-inline">Bu hafta için açık görevin yok.</p>}
+          </section>
+
+          <section className="crm-overview-card" aria-labelledby="follow-ups-title">
+            <div className="crm-card-heading"><div><h3 id="follow-ups-title">Takip zamanı gelenler</h3><p>Süreçteki ve 7 günden uzun süredir temas olmayan başvurular</p></div><button className="text-button" type="button" onClick={() => onNavigate("opportunities")}>Başvurular</button></div>
+            {data.agenda.follow_ups.length ? <ul className="crm-task-summary">{data.agenda.follow_ups.map((item) => (
+              <li key={item.id}>
+                <span className="crm-task-dot" />
+                <div>
+                  <strong>{item.company || "Şirket"} · {item.position || "Pozisyon"}</strong>
+                  <small>{item.status} · {item.days_since_contact == null ? "İletişim tarihi yok" : `${item.days_since_contact} gündür temas yok`}{item.next_action ? ` · Sonraki adım: ${item.next_action}` : ""}</small>
+                </div>
+                <button className="text-button" type="button" disabled={busyKey !== null} aria-label={`${item.company || "Şirket"} ile bugün iletişime geçtim`} onClick={() => quickUpdate(`opp-${item.id}`, `/opportunities/${item.id}`, { last_contact_date: todayValue }, "Başvuru güncellenemedi. Tekrar deneyebilirsin.")}>İletişime geçtim</button>
+              </li>
+            ))}</ul> : <p className="crm-empty-inline">Takip bekleyen başvurun yok.</p>}
+          </section>
+
           <section className="crm-overview-card" aria-labelledby="status-breakdown-title">
             <div className="crm-card-heading"><div><h3 id="status-breakdown-title">Başvuru durumları</h3><p>Fırsatların hangi aşamada?</p></div><button className="text-button" type="button" onClick={() => onNavigate("opportunities")}>Tüm başvurular</button></div>
             {statusEntries.length ? <ul className="crm-status-breakdown">{statusEntries.map(([status, count]) => (
@@ -419,13 +461,6 @@ function Overview({ api, token, onNavigate }) {
             {data.opportunities.length ? <ul className="crm-recent-list">{[...data.opportunities].reverse().map((item) => (
               <li key={item.id}><span className="crm-recent-mark">{(item.company || "Ş").slice(0, 1).toLocaleUpperCase("tr-TR")}</span><div><strong>{item.company || "Şirket"}</strong><small>{item.position || "Pozisyon belirtilmedi"}</small></div><span className="crm-status-pill">{item.status || "Durum yok"}</span></li>
             ))}</ul> : <p className="crm-empty-inline">İlk başvurunu ekleyerek başlayabilirsin.</p>}
-          </section>
-
-          <section className="crm-overview-card" aria-labelledby="tasks-summary-title">
-            <div className="crm-card-heading"><div><h3 id="tasks-summary-title">Takip görevleri</h3><p>{data.tasks.totalCount} görev kayıtlı</p></div><button className="text-button" type="button" onClick={() => onNavigate("tasks")}>Görevleri aç</button></div>
-            {data.tasks.length ? <ul className="crm-task-summary">{[...data.tasks].reverse().map((task) => (
-              <li key={task.id}><span className={`crm-task-dot${task.is_completed ? " done" : ""}`} /><div><strong>{task.description}</strong><small>{displayDate(task.due_date)}</small></div><span>{task.is_completed ? "Tamamlandı" : "Açık"}</span></li>
-            ))}</ul> : <p className="crm-empty-inline">Takip etmen gereken bir görev yok.</p>}
           </section>
 
           <section className="crm-overview-card crm-shortcuts" aria-labelledby="shortcuts-title">
