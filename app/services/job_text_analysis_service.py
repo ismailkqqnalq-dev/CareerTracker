@@ -589,6 +589,87 @@ def _section_profile_match(
     }
 
 
+MAX_UNRECOGNIZED_TERMS = 20
+MAX_UNRECOGNIZED_TERM_LENGTH = 40
+MAX_UNRECOGNIZED_TERM_WORDS = 3
+# "/" is deliberately not a separator: names such as "CI/CD" contain it.
+# No surrounding \s*: on long whitespace runs that backtracks quadratically.
+# Items are stripped afterwards instead.
+_LIST_SEPARATOR = re.compile(r"[,;|•·]|\s(?:ve|veya|and|or)\s", re.IGNORECASE)
+_TERM_EDGE_CHARACTERS = " \t-*•·()[]{}.:'\"“”‘’"
+_GENERIC_LIST_WORDS = frozenset(
+    _fold_for_matching(word)
+    for word in (
+        "vb", "vs", "etc", "benzeri", "gibi", "similar", "such",
+        "deneyim", "deneyimi", "tecrübe", "tecrübesi", "bilgi", "bilgisi", "hakimiyet",
+        "experience", "knowledge", "skills", "beceri", "becerisi",
+        "teknoloji", "teknolojiler", "technologies", "araçlar", "tools",
+        "yıl", "years", "plus", "artı", "tercihen", "preferably",
+    )
+)
+
+
+def _unrecognized_list_terms(line: str, recognized_spans, matched_spans) -> list[str]:
+    """Return uncatalogued items from a separator-delimited skill list.
+
+    A line counts as a skill list only when at least two of its items contain
+    an accepted catalog match. Any item that overlaps any alias match (even one
+    rejected for missing context) is never reported.
+    """
+    if len(recognized_spans) < 2:
+        return []
+    items = []
+    start = 0
+    for separator in _LIST_SEPARATOR.finditer(line):
+        items.append((start, separator.start()))
+        start = separator.end()
+    items.append((start, len(line)))
+    if len(items) < 3:
+        return []
+
+    # Prefix counts of covered characters keep the overlap test linear in the
+    # line length; comparing every item with every span is quadratic on a
+    # 100 KB comma-separated line.
+    def covered_prefix(spans):
+        marks = [0] * (len(line) + 1)
+        for span_start, span_end in spans:
+            marks[span_start] += 1
+            marks[span_end] -= 1
+        prefix = [0] * (len(line) + 1)
+        depth = covered = 0
+        for index in range(len(line)):
+            depth += marks[index]
+            covered += depth > 0
+            prefix[index + 1] = covered
+        return prefix
+
+    recognized = covered_prefix(recognized_spans)
+    recognized_items = sum(1 for start, end in items if recognized[end] > recognized[start])
+    if recognized_items < 2:
+        return []
+
+    matched = covered_prefix(matched_spans)
+    terms = []
+    for item_start, item_end in items:
+        if matched[item_end] > matched[item_start]:
+            continue
+        term = line[item_start:item_end]
+        if ":" in term:
+            term = term.rsplit(":", 1)[1]
+        term = term.strip(_TERM_EDGE_CHARACTERS)
+        words = term.split()
+        if not (2 <= len(term) <= MAX_UNRECOGNIZED_TERM_LENGTH):
+            continue
+        if not words or len(words) > MAX_UNRECOGNIZED_TERM_WORDS:
+            continue
+        if not any(character.isalpha() for character in term):
+            continue
+        if any(_fold_for_matching(word.strip(".")) in _GENERIC_LIST_WORDS for word in words):
+            continue
+        terms.append(term)
+    return terms
+
+
 def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
     """Extract explicit labels and skill mentions; compare them to this user's profile."""
     aliases = _visible_aliases(db, user_id)
@@ -625,6 +706,7 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
     }
     section = "unspecified"
     extracted: dict[int, dict] = {}
+    unrecognized_terms: dict[str, dict] = {}
     headline_role = None
     headline_role_line_number = None
 
@@ -751,6 +833,21 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
             source_length=len(line),
         )
 
+        if len(unrecognized_terms) < MAX_UNRECOGNIZED_TERMS:
+            recognized_spans = [
+                (source_start, source_end)
+                for _start, _end, _alias, skill_id, source_start, source_end in accepted_matches
+                if skill_id is not None
+            ]
+            matched_spans = [
+                (source_start, source_end)
+                for _start, _end, _alias, _skill_id, source_start, source_end in candidate_matches
+            ]
+            for term in _unrecognized_list_terms(line, recognized_spans, matched_spans):
+                key = _fold_for_matching(term)
+                if key not in unrecognized_terms and len(unrecognized_terms) < MAX_UNRECOGNIZED_TERMS:
+                    unrecognized_terms[key] = {"term": term, "line_number": line_number}
+
         for (
             _match_start,
             _match_end,
@@ -826,6 +923,7 @@ def analyze_job_text(db: Session, *, user_id: int, text: str) -> dict:
         "role_source": role_source,
         "metadata": metadata,
         "skills": results,
+        "unrecognized_terms": list(unrecognized_terms.values()),
         "profile_match": {
             section_name: _section_profile_match(
                 skill_ids,

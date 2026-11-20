@@ -69,7 +69,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Fırsat skill'i | `DELETE /opportunities/{opportunity_id}/skills/{skill_id}` | Evet | Bağlantıyı kaldırır (`204`); skill katalogda kalır. Bağlı değilse `404 skill_not_attached` |
 | Fırsat skill eşleşmesi | `GET /opportunities/{opportunity_id}/skill-match` | Evet | Profilde bulunan ve eksik skill'leri karşılaştırır |
 | OCR | `POST /ocr/extract` | Evet | PNG/JPEG ham ikili gövdesini bellekte işler, metin ve görsel ölçülerini döndürür; sonuç saklanmaz |
-| İlan analizi | `POST /job-analysis` | Evet | En fazla 100 KB metinden etiketli ilan alanlarını, rol etiketini veya baştaki kısa unvan satırını ve görünür katalog becerilerini çıkarır; becerileri profilinle karşılaştırır; sonucu saklamaz |
+| İlan analizi | `POST /job-analysis` | Evet | En fazla 100 KB metinden etiketli ilan alanlarını, rol etiketini veya baştaki kısa unvan satırını ve görünür katalog becerilerini çıkarır; becerileri profilinle karşılaştırır; beceri listelerinde katalogda olmayan aday terimleri `unrecognized_terms` olarak döndürür; sonucu saklamaz |
 | Fırsatlar | `GET, POST /opportunities`; `GET, PATCH, DELETE /opportunities/{id}` | Evet | Kullanıcının fırsatlarını yönetir. `POST` isteğe bağlı `skill_ids` listesi (en fazla 100) alır: beceriler başvuruyla aynı işlemde bağlanır; görünmeyen veya başka kullanıcıya ait bir beceri varsa hiçbir şey kaydedilmez ve `404 unknown_skill` döner |
 | Kişiler | `GET, POST /contacts`; `GET, PATCH, DELETE /contacts/{id}` | Evet | Kullanıcının kişilerini yönetir |
 | Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
@@ -163,6 +163,15 @@ eşleşen becerileri özgün satırlarıyla ve her becerinin mevcut kullanıcın
 profilinde kayıtlı olup olmadığını döndürür. `profile_match`, her benzersiz
 beceri için zorunlu/tercih edilen/bölümü belirtilmeyen gruplarda profilinde
 kayıtlı olma oranını verir; bu bir işe uygunluk veya başarı olasılığı değildir.
+
+`unrecognized_terms`, katalogda karşılığı olmayan aday terimleri ilk görüldükleri
+satırla (en fazla 20, büyük/küçük harf duyarsız tekil) listeler. Kural temkinlidir:
+yalnızca virgül, noktalı virgül, `|`, madde işareti veya "ve/veya/and/or" ile
+ayrılmış ve en az iki öğesi katalogda tanınan satırlara bakılır; en fazla üç
+kelimelik, "deneyim", "bilgi", "vb." gibi genel sözcük içermeyen öğeler aday olur.
+`/` ayırıcı sayılmaz (`CI/CD`). Tek bir tanınan beceri içeren satırlar ve düz
+cümleler bilerek atlanır. Adaylar saklanmaz; arayüzde kullanıcı istediğini
+"Öneri olarak gönder" ile beceri önerisine çevirir.
 
 | `error_code` | HTTP | Anlamı |
 |---|---:|---|
