@@ -130,7 +130,7 @@ function App() {
   const [jobImage, setJobImage] = useState(null);
   const [ocrResult, setOcrResult] = useState(null);
   const [extractingText, setExtractingText] = useState(false);
-  const [activeView, setActiveView] = useState("suggestions");
+  const [activeView, setActiveView] = useState("overview");
 
   const logout = useCallback(() => {
     sessionStorage.removeItem("careertracker_token");
