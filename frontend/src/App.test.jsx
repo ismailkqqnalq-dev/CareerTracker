@@ -440,6 +440,67 @@ describe("job text analysis", () => {
     expect(screen.queryByRole("link", { name: "https://example.test/jobs/1" })).toBeNull();
   });
 
+  function mockAnalysisWithUnrecognizedTerm(fetchMock, suggestionResponse) {
+    const posted = [];
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
+      if (url.endsWith("/job-analysis")) {
+        return jsonResponse(200, {
+          role: null,
+          skills: [],
+          unrecognized_terms: [{ term: "Zedflux", line_number: 2 }],
+        });
+      }
+      if (url.endsWith("/skills/suggestions") && options.method === "POST") {
+        posted.push(JSON.parse(options.body));
+        return suggestionResponse();
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    return posted;
+  }
+
+  async function analyzeAndSuggestZedflux() {
+    fireEvent.change(await screen.findByLabelText("İlan metni"), { target: { value: "Python, Docker\nZedflux" } });
+    fireEvent.click(screen.getByRole("button", { name: "Metni analiz et" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Zedflux terimini öneri olarak gönder" }));
+  }
+
+  it("sends an unrecognized analysis term as a skill suggestion", async () => {
+    const fetchMock = setupLoggedInApp();
+    const posted = mockAnalysisWithUnrecognizedTerm(fetchMock, () => jsonResponse(200, {
+      id: 12, raw_name: "Zedflux", status: "pending", resolved_skill_id: null,
+    }));
+
+    await analyzeAndSuggestZedflux();
+
+    expect(await screen.findByText("Bekleyen önerilere eklendi.")).toBeTruthy();
+    expect(posted).toEqual([{ skill: "Zedflux" }]);
+    expect(screen.queryByRole("button", { name: "Zedflux terimini öneri olarak gönder" })).toBeNull();
+  });
+
+  it("explains when an unrecognized term is already in the catalog", async () => {
+    const fetchMock = setupLoggedInApp();
+    mockAnalysisWithUnrecognizedTerm(fetchMock, () => jsonResponse(409, { error_code: "skill_already_recognized" }));
+
+    await analyzeAndSuggestZedflux();
+
+    expect(await screen.findByText("Bu terim katalogda zaten tanınıyor.")).toBeTruthy();
+  });
+
+  it("keeps the send button for a retry when the suggestion fails", async () => {
+    const fetchMock = setupLoggedInApp();
+    mockAnalysisWithUnrecognizedTerm(fetchMock, () => jsonResponse(503, { detail: "private failure" }));
+
+    await analyzeAndSuggestZedflux();
+
+    expect(await screen.findByText("Gönderilemedi; tekrar deneyebilirsin.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Zedflux terimini öneri olarak gönder" }).disabled).toBe(false);
+    expect(screen.queryByText("private failure")).toBeNull();
+  });
+
   it("explains when the job text is larger than the API limit", async () => {
     const fetchMock = setupLoggedInApp();
     fetchMock.mockImplementation(async (url) => {

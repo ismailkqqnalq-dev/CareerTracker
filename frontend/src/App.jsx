@@ -235,6 +235,27 @@ function App() {
     }
   }
 
+  async function suggestAnalysisTerm(term) {
+    try {
+      const result = await api.request("/skills/suggestions", {
+        method: "POST",
+        token,
+        body: JSON.stringify({ skill: term }),
+      });
+      if (result.status === "pending") {
+        await load(token);
+        return { sent: true, message: "Bekleyen önerilere eklendi." };
+      }
+      if (result.status === "accepted") return { sent: true, message: "Bu öneri daha önce kabul edilmiş." };
+      return { sent: false, message: "Beklenmeyen bir yanıt geldi; tekrar deneyebilirsin." };
+    } catch (suggestError) {
+      if (suggestError.status === 409 && suggestError.errorCode === "skill_already_recognized") {
+        return { sent: true, message: "Bu terim katalogda zaten tanınıyor." };
+      }
+      return { sent: false, message: suggestError.status === 401 ? "" : "Gönderilemedi; tekrar deneyebilirsin." };
+    }
+  }
+
   async function submitSuggestion(event) {
     event.preventDefault();
     const skill = newSkill.trim();
@@ -460,7 +481,7 @@ function App() {
               {analyzingJob ? "Analiz ediliyor…" : "Metni analiz et"}
             </button>
           </form>
-          {jobAnalysis && <JobAnalysisResults result={jobAnalysis} />}
+          {jobAnalysis && <JobAnalysisResults result={jobAnalysis} onSuggestTerm={suggestAnalysisTerm} />}
           {jobAnalysis && <SaveAnalysisAsOpportunity result={jobAnalysis} api={api} token={token} onNavigate={setActiveView} />}
         </section>
 
