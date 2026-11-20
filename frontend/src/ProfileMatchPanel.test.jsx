@@ -126,3 +126,22 @@ describe("profile skills and opportunity matching", () => {
     expect(await screen.findByText("Beceri fırsatın gereksinimlerine eklendi.")).toBeTruthy();
   });
 });
+
+describe("removing an opportunity skill", () => {
+  it("detaches the skill from the selected opportunity and updates the list", async () => {
+    const api = createApi();
+    const original = api.request.getMockImplementation();
+    api.request.mockImplementation(async (path, options = {}) => (
+      path === "/opportunities/17/skills/1" && options.method === "DELETE" ? null : original(path, options)
+    ));
+    render(<ProfileMatchPanel {...props(api)} />);
+
+    await screen.findByLabelText("Python yetkinlik seviyesi");
+    fireEvent.change(screen.getByLabelText("Fırsat seç"), { target: { value: "17" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Python gereksinimini kaldır" }));
+
+    expect(await screen.findByText("Python fırsatın gereksinimlerinden kaldırıldı.")).toBeTruthy();
+    expect(api.request).toHaveBeenCalledWith("/opportunities/17/skills/1", expect.objectContaining({ method: "DELETE", token: "test-token" }));
+    expect(screen.queryByRole("button", { name: "Python gereksinimini kaldır" })).toBeNull();
+  });
+});
