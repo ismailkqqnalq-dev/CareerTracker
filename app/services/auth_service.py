@@ -56,6 +56,16 @@ def authenticate_user(
     return user
 
 
+def change_password(db: Session, user: User, current_password: str, new_password: str) -> bool:
+    """Replace the authenticated user's password after confirming the current one."""
+    if not verify_password(current_password, user.hashed_password):
+        return False
+
+    user.hashed_password = hash_password(new_password)
+    db.commit()
+    return True
+
+
 def delete_user(db: Session, user: User, password: str) -> bool:
     """Delete the authenticated user's account after password confirmation."""
     if not verify_password(password, user.hashed_password):
