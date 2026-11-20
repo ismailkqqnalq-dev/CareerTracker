@@ -3,12 +3,13 @@ from datetime import date, datetime
 from sqlalchemy import func
 
 from app.models.opportunity import Opportunity
+from app.models.opportunity_skills import OpportunitySkill
 from app.models.users import User
 from app.pagination import paginate_query
 from app.record_limits import OpportunityQuotaExceeded
 
 
-def create_opportunity(db, opportunity_data, user_id, max_per_user):
+def create_opportunity(db, opportunity_data, user_id, max_per_user, skill_ids=()):
     # Serialize quota checks for one account on PostgreSQL, so simultaneous
     # requests cannot both pass the same count check.
     db.query(User.id).filter(User.id == user_id).with_for_update().one()
@@ -28,6 +29,9 @@ def create_opportunity(db, opportunity_data, user_id, max_per_user):
     )
     try:
         db.add(new_opportunity)
+        db.flush()  # id'yi al; beceri bağlantıları aynı commit'te yazılsın
+        for skill_id in skill_ids:
+            db.add(OpportunitySkill(opportunity_id=new_opportunity.id, skill_id=skill_id))
         db.commit()
         db.refresh(new_opportunity)
     except Exception:

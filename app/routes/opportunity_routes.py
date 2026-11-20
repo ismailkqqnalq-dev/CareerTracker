@@ -31,8 +31,14 @@ def create_opportunity(
     try:
         return service.create_opportunity(
             db,
-            opportunity.model_dump(),
+            opportunity.model_dump(exclude={"skill_ids"}),
             user_id=current_user.id,
+            skill_ids=opportunity.skill_ids,
+        )
+    except service.UnknownSkillIdsError as error:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(error), "error_code": "unknown_skill"},
         )
     except OpportunityQuotaExceeded:
         return JSONResponse(
