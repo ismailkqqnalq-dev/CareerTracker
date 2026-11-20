@@ -17,6 +17,10 @@ class UnknownSkillError(LookupError):
         self.suggestion_id = suggestion_id
 
 
+class SkillNotAttachedError(LookupError):
+    pass
+
+
 def _get_opportunity(db, opportunity_id: int, user_id: int) -> Opportunity:
     opportunity = (
         db.query(Opportunity)
@@ -61,6 +65,23 @@ def attach_skill(
         )
         db.commit()
         return skill
+    except Exception:
+        db.rollback()
+        raise
+
+
+def detach_skill(db, opportunity_id: int, skill_id: int, user_id: int) -> None:
+    _get_opportunity(db, opportunity_id, user_id)
+
+    link = db.get(OpportunitySkill, (opportunity_id, skill_id))
+    if link is None:
+        raise SkillNotAttachedError(
+            f"Skill {skill_id} is not attached to opportunity {opportunity_id}"
+        )
+
+    try:
+        db.delete(link)
+        db.commit()
     except Exception:
         db.rollback()
         raise

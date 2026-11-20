@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const PAGE_SIZE = 50;
+// Genel bakıştaki görüşme/teklif sayıları bu adlarla hesaplanır; serbest yazım sayıları bozabiliyordu.
+export const OPPORTUNITY_STATUSES = ["Başvuruldu", "Ön görüşme", "Teknik mülakat", "Son mülakat", "Teklif", "Reddedildi"];
 const today = () => {
   const date = new Date();
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -18,7 +20,7 @@ const RESOURCES = {
       { name: "position", label: "Pozisyon", kind: "text", required: true, maxLength: 200 },
       { name: "type", label: "Fırsat türü", kind: "text", required: true, maxLength: 50, placeholder: "İş, staj, freelance…", list: "opportunity-types" },
       { name: "application_date", label: "Başvuru tarihi", kind: "date", required: true },
-      { name: "status", label: "Durum", kind: "text", required: true, maxLength: 50, list: "opportunity-statuses" },
+      { name: "status", label: "Durum", kind: "select", required: true, options: OPPORTUNITY_STATUSES },
       { name: "salary", label: "Maaş / ücret", kind: "number", required: true, min: 0 },
       { name: "location", label: "Konum", kind: "text", required: true, maxLength: 200 },
       { name: "job_link", label: "İlan bağlantısı", kind: "url", required: true, maxLength: 2048, placeholder: "https://…" },
@@ -107,6 +109,7 @@ function initialValues(config, record) {
     if (field.kind === "date") value = value ? String(value).slice(0, 10) : today();
     else if (field.kind === "checkbox") value = Boolean(value);
     else if (field.kind === "number") value = value ?? (record ? "" : 0);
+    else if (field.kind === "select") value = value ? String(value) : field.options[0];
     else value = value == null ? "" : String(value);
     return [field.name, value];
   }));
@@ -213,6 +216,18 @@ function RecordEditor({ config, record, related, onCancel, onSave, busy }) {
                 value={values[field.name]}
                 onChange={(event) => change(field.name, event.target.value)}
               />
+            ) : field.kind === "select" ? (
+              <select
+                id={`crm-${field.name}`}
+                required={field.required}
+                value={values[field.name]}
+                onChange={(event) => change(field.name, event.target.value)}
+              >
+                {!field.options.includes(values[field.name]) && (
+                  <option value={values[field.name]}>{values[field.name]} (eski değer)</option>
+                )}
+                {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
             ) : field.kind === "checkbox" ? (
               <label className="crm-checkbox" htmlFor={`crm-${field.name}`}>
                 <input
@@ -240,10 +255,6 @@ function RecordEditor({ config, record, related, onCancel, onSave, busy }) {
         ))}
         <datalist id="opportunity-types">
           <option value="İş" /><option value="Staj" /><option value="Freelance" />
-        </datalist>
-        <datalist id="opportunity-statuses">
-          <option value="Başvuruldu" /><option value="Ön görüşme" /><option value="Teknik mülakat" />
-          <option value="Son mülakat" /><option value="Teklif" /><option value="Reddedildi" />
         </datalist>
         {saveError && <p className="form-error crm-field-wide" role="alert">{saveError}</p>}
         <div className="crm-form-actions crm-field-wide">

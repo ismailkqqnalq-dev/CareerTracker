@@ -57,10 +57,12 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Beceri önerileri | `POST /skills/suggestions` | Evet | Tanınmayan skill adı için öneri oluşturur veya mevcut öneriyi döndürür |
 | Beceri önerileri | `GET /skills/suggestions` | Evet | Kullanıcının önerilerini listeler; `status` ile süzülebilir |
 | Beceri önerisi | `PATCH /skills/suggestions/{suggestion_id}` | Evet | Öneriyi görünür bir skill ile kişisel olarak eşleştirir |
+| Beceri önerisi | `POST /skills/suggestions/{suggestion_id}/reject` | Evet | Bekleyen öneriyi reddeder; beklemede değilse `409 suggestion_not_pending` |
 | Adaylar | `GET /skills/suggestions/{suggestion_id}/candidates` | Evet | Bekleyen öneri için `strategy=lexical` (varsayılan) veya isteğe bağlı `strategy=semantic` ile adayları sıralar |
 | Profil skill'leri | `GET, POST /users/me/skills` | Evet | Profil skill'lerini listeler veya ekler |
 | Profil skill'i | `PATCH, DELETE /users/me/skills/{user_skill_id}` | Evet | Profil kaydını günceller veya siler |
 | Fırsat skill'leri | `POST, GET /opportunities/{opportunity_id}/skills` | Evet | Fırsata skill bağlar veya bağlı skill'leri listeler |
+| Fırsat skill'i | `DELETE /opportunities/{opportunity_id}/skills/{skill_id}` | Evet | Bağlantıyı kaldırır (`204`); skill katalogda kalır. Bağlı değilse `404 skill_not_attached` |
 | Fırsat skill eşleşmesi | `GET /opportunities/{opportunity_id}/skill-match` | Evet | Profilde bulunan ve eksik skill'leri karşılaştırır |
 | OCR | `POST /ocr/extract` | Evet | PNG/JPEG ham ikili gövdesini bellekte işler, metin ve görsel ölçülerini döndürür; sonuç saklanmaz |
 | İlan analizi | `POST /job-analysis` | Evet | En fazla 100 KB metinden etiketli ilan alanlarını, rol etiketini veya baştaki kısa unvan satırını ve görünür katalog becerilerini çıkarır; becerileri profilinle karşılaştırır; sonucu saklamaz |
@@ -84,7 +86,8 @@ dışa aktarılan hücre içeriğini değiştirir. Türkçe UTF-8 BOM korunur.
 CRM yazma şemaları alan uzunluklarını sınırlar. Fırsat `job_link` ve kişi
 `linkedin` alanları boş olabilir; doluysa yalnızca HTTP/HTTPS URL kabul edilir.
 Maaş 0 ile PostgreSQL `INTEGER` üst sınırı arasında olmalıdır. `type` ve `status`
-serbest metin olarak kalır; yanıt şemaları eski verilerle uyum için uzunluk kısıtı
+API'de serbest metin olarak kalır; arayüz `status` için sabit listeden (Başvuruldu, Ön görüşme,
+Teknik mülakat, Son mülakat, Teklif, Reddedildi) seçtirir ve listede olmayan eski değeri korur; yanıt şemaları eski verilerle uyum için uzunluk kısıtı
 uygulamaz.
 
 Her hesap varsayılan olarak en fazla 5000 fırsat oluşturabilir. Sınır
@@ -142,6 +145,8 @@ JSON hata gövdesindeki sabit kodlar:
 | `semantic_engine_failed` | `GET /skills/suggestions/{suggestion_id}/candidates?strategy=semantic` | Yerel embedding motoru çıkarım yapamadı (502) |
 | `opportunity_not_found` | `POST, GET /opportunities/{opportunity_id}/skills`; `GET /opportunities/{opportunity_id}/skill-match` | Fırsat bulunamadı veya kullanıcıya ait değil (404) |
 | `unknown_skill` | `POST /opportunities/{opportunity_id}/skills` | Skill tanınmadı (404); öneri kaydedildiyse gövdede `suggestion_id` de bulunur |
+| `skill_not_attached` | `DELETE /opportunities/{opportunity_id}/skills/{skill_id}` | Skill bu fırsata bağlı değil (404) |
+| `suggestion_not_pending` | `POST /skills/suggestions/{suggestion_id}/reject` | Yalnızca bekleyen öneri reddedilebilir (409) |
 
 ### İlan analizi hata kodları
 
@@ -511,7 +516,6 @@ aylık başvuru analizini sunar. Mobil istemci ve üretim dağıtımı yapılmam
 
 ## Bilinen sınırlar
 
-- Beceri önerisini reddetmek için endpoint veya arayüz akışı yoktur.
 - `PATCH /skills/suggestions/{suggestion_id}` kabul edilmiş öneriyi yeniden
   eşleştirebilir.
 - Kabul edilmiş önerinin hedef skill'i silinirse foreign key `resolved_skill_id`'yi
@@ -519,7 +523,6 @@ aylık başvuru analizini sunar. Mobil istemci ve üretim dağıtımı yapılmam
 - Aday sıralamasının varsayılanı yazım/metin benzerliği heuristiğidir. İsteğe bağlı
   semantik model küçük sentetik kümede denenmiştir; gerçek kullanıcı/ilan verisinde
   başarı ölçümü değildir. Her iki stratejinin skoru doğruluk olasılığı değildir.
-- Bir fırsata bağlanan skill'i kaldırmak için endpoint yoktur; yalnızca profil skill'i silinebilir.
 - Fırsat silinince ona bağlı kişiler, görevler, aktiviteler ve fırsat-skill
   bağlantıları veritabanı `CASCADE` kurallarıyla silinir. Kişi silinince aktivite
   kaydı korunur ve `contact_id` boşaltılır (`SET NULL`).
