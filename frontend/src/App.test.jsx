@@ -730,6 +730,33 @@ describe("account settings navigation", () => {
   });
 });
 
+describe("assistant navigation", () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("opens the assistant and answers through the API", async () => {
+    const fetchMock = setupLoggedInApp();
+    fetchMock.mockImplementation(async (url, options = {}) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      if (url.includes("/skills/suggestions?status=pending")) return jsonResponse(200, []);
+      if (new URL(url, "http://localhost").pathname.endsWith("/skills")) return jsonResponse(200, []);
+      if (url.endsWith("/assistant/ask") && options.method === "POST") {
+        return jsonResponse(200, { intent: "genel_durum", confidence: 0.99, reply: "Toplam 2 başvurun var.", items: [], suggestions: [] });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Asistan" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kaç başvurum var?" }));
+
+    expect(await screen.findByText("Toplam 2 başvurun var.")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Asistan" })).toBeTruthy();
+  });
+});
+
 describe("skill suggestion rejection", () => {
   beforeEach(() => sessionStorage.clear());
   afterEach(() => {
