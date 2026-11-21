@@ -6,6 +6,7 @@ import JobAnalysisResults from "./JobAnalysisResults.jsx";
 import SaveAnalysisAsOpportunity from "./SaveAnalysisAsOpportunity.jsx";
 import CrmWorkspace, { VIEW_TITLES } from "./CrmWorkspace.jsx";
 import AccountPanel from "./AccountPanel.jsx";
+import AssistantPanel from "./AssistantPanel.jsx";
 
 const authApi = createApiClient();
 const MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -393,6 +394,7 @@ function App() {
             {[["overview", "Genel bakış"], ["opportunities", "Başvurular"], ["contacts", "Kişiler"], ["tasks", "Görevler"], ["activities", "Aktiviteler"]].map(([view, label]) => (
               <button key={view} type="button" aria-current={activeView === view ? "page" : undefined} onClick={() => setActiveView(view)}><span className="nav-icon" aria-hidden="true">{({ overview: "⌂", opportunities: "▣", contacts: "♧", tasks: "✓", activities: "◷" })[view]}</span>{label}</button>
             ))}
+            <button type="button" aria-current={activeView === "assistant" ? "page" : undefined} onClick={() => setActiveView("assistant")}><span className="nav-icon" aria-hidden="true">❝</span>Asistan</button>
             <p className="nav-group-label nav-group-secondary">BECERİ VE ANALİZ</p>
             <button type="button" aria-current={activeView === "suggestions" ? "page" : undefined} onClick={() => setActiveView("suggestions")}><span className="nav-icon" aria-hidden="true">✧</span>Beceri önerileri</button>
             <button type="button" aria-current={activeView === "profile" ? "page" : undefined} onClick={() => setActiveView("profile")}><span className="nav-icon" aria-hidden="true">◎</span>Profil ve eşleşme</button>
@@ -404,15 +406,17 @@ function App() {
           <div className="app-main-view">
         <div className="page-heading">
           <div>
-            <p className="eyebrow">{VIEW_TITLES[activeView] ? "KİŞİSEL ÇALIŞMA ALANIN" : activeView === "account" ? "HESAP" : "BECERİ VE İLAN MERKEZİ"}</p>
-            <h1>{VIEW_TITLES[activeView] || (activeView === "suggestions" ? "Beceri önerileri" : activeView === "profile" ? "Profil ve fırsat eşleşmesi" : activeView === "account" ? "Hesap ayarları" : "Başvuru analizi")}</h1>
-            <p className="muted heading-copy">{VIEW_TITLES[activeView] ? "Kariyer sürecini düzenle ve takip adımlarını yönet." : activeView === "suggestions" ? "Sistemin tanımadığı becerileri eşleştir, ilan metnini incele ve beceri analizini kullan." : activeView === "profile" ? "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır." : activeView === "account" ? "Şifreni değiştir veya hesabını kalıcı olarak sil." : "Başvurularının aylara göre dağılımını incele."}</p>
+            <p className="eyebrow">{VIEW_TITLES[activeView] || activeView === "assistant" ? "KİŞİSEL ÇALIŞMA ALANIN" : activeView === "account" ? "HESAP" : "BECERİ VE İLAN MERKEZİ"}</p>
+            <h1>{VIEW_TITLES[activeView] || (activeView === "suggestions" ? "Beceri önerileri" : activeView === "profile" ? "Profil ve fırsat eşleşmesi" : activeView === "account" ? "Hesap ayarları" : activeView === "assistant" ? "Asistan" : "Başvuru analizi")}</h1>
+            <p className="muted heading-copy">{VIEW_TITLES[activeView] ? "Kariyer sürecini düzenle ve takip adımlarını yönet." : activeView === "suggestions" ? "Sistemin tanımadığı becerileri eşleştir, ilan metnini incele ve beceri analizini kullan." : activeView === "profile" ? "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır." : activeView === "account" ? "Şifreni değiştir veya hesabını kalıcı olarak sil." : activeView === "assistant" ? "Başvuruların, görevlerin ve becerilerin hakkında soru sor." : "Başvurularının aylara göre dağılımını incele."}</p>
           </div>
           {activeView === "suggestions" && <div className="count-card"><span className="count-number">{pendingCount}</span><span>bekleyen öneri</span></div>}
         </div>
 
         {VIEW_TITLES[activeView] ? (
           <CrmWorkspace api={api} token={token} view={activeView} onNavigate={setActiveView} />
+        ) : activeView === "assistant" ? (
+          <AssistantPanel api={api} token={token} />
         ) : activeView === "account" ? (
           <AccountPanel api={api} token={token} email={user?.email} onAccountDeleted={() => { setActiveView("overview"); logout(); }} />
         ) : activeView === "analytics" ? (
