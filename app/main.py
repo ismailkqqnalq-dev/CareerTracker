@@ -18,6 +18,7 @@ from app.routes.skill_routes import router as skill_router
 from app.routes.task_routes import router as task_router
 from app.routes.auth_routes import router as auth_router
 from app.routes.agenda_routes import router as agenda_router
+from app.routes.assistant_routes import router as assistant_router
 
 
 @asynccontextmanager
@@ -41,6 +42,7 @@ app.include_router(auth_router)
 app.include_router(ocr_router)
 app.include_router(job_analysis_router)
 app.include_router(agenda_router)
+app.include_router(assistant_router)
 
 
 @app.get("/")

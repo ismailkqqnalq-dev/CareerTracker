@@ -18,6 +18,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Genel bakışta gündem: geciken ve 7 gün içindeki açık görevler, süreçte olup 7 günden uzun süredir temas olmayan başvurular; görevi tamamlama ve "bugün iletişime geçtim" tek tıkla
 - Başvurular listesinde durumu kart üzerinden tek seçimle değiştirme
 - Hesap ayarları ekranında şifre değiştirme ve hesabı kalıcı olarak silme
+- Asistan: "Trendyol başvurum ne alemde?", "Kimden ses çıkmadı?" gibi soruları eğitilmiş bir niyet modeliyle anlayıp kullanıcının kendi kayıtlarından cevaplar; dış servis kullanmaz
 - Kullanıcıya özel, seçilen dönem için aylık başvuru hacmi analizi
 - Fırsatları CSV olarak dışa aktarma (Türkçe karakter desteği)
 - Başvurular, kişiler, görevler ve aktiviteler için React arayüzünden listeleme, ekleme, güncelleme ve silme
@@ -75,6 +76,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
 | Görevler | `GET, POST /tasks`; `GET, PATCH, DELETE /tasks/{id}` | Evet | Kullanıcının görevlerini yönetir |
 | Dashboard | `GET /dashboard` | Evet | Kullanıcının fırsat istatistiklerini döndürür |
+| Asistan | `POST /assistant/ask` | Evet | `{message, today?}` alır; niyeti (başvuru durumu, bugünün işleri, takip, beceri açığı, genel durum, yardım, anlaşılamadı) sınıflandırır ve cevabı yalnızca kullanıcının kayıtlarından üretir. Mesaj saklanmaz, yanıt `Cache-Control: no-store` döner |
 | Gündem | `GET /agenda?today=YYYY-AA-GG` | Evet | Geciken ve 7 gün içinde son tarihi olan açık görevleri (son tarihe göre) ve durumu Başvuruldu/Ön görüşme/Teknik mülakat/Son mülakat olup son teması en az 7 gün önce olan başvuruları döndürür; her liste en fazla 20 kayıt. `today` kullanıcının yerel tarihidir, verilmezse sunucu tarihi kullanılır |
 | Analitik | `GET /analytics/applications?months=12` | Evet | Sunucunun geçerli takvim ayı dahil son 1–60 aydaki başvuru sayılarını döndürür; boş aylar sıfırdır |
 | CSV | `GET /opportunities/export` | Evet | Kullanıcının fırsatlarını CSV olarak indirir |
@@ -406,6 +408,35 @@ saklanır; ilan metninin kendisi saklanmaz. Görsel ve OCR sonucu veritabanına 
 tarayıcı depolamasına yazılmaz; OCR isteği kimlik doğrulamalı API'ye gönderilir.
 OCR motoru isteğe bağlıdır; kurulumu ve yerel kullanım adımları için
 [`docs/ocr-baseline.md`](docs/ocr-baseline.md) belgesine bak.
+
+### Asistan ve niyet modeli
+
+Asistan iki parçadan oluşur. Sorunun ne tür bir soru olduğunu **eğitilmiş bir niyet
+modeli** bulur; cevabı ise kurallar kullanıcının kendi kayıtlarından üretir. Hiçbir
+cevap uydurulmaz ve hiçbir dış servis (dil modeli API'si vb.) kullanılmaz.
+
+- **Model:** Bağımlılıksız, saf Python Multinomial Naive Bayes
+  ([`app/assistant/intent_model.py`](app/assistant/intent_model.py)). Metin Türkçe
+  harfler ASCII'ye katlanarak sadeleştirilir; özellikler kelimeler ve kelime sınırlı
+  2-4 harflik parçalardır, böylece "Trendyol'dan" gibi ekli biçimler de tanınır.
+  Model uygulama ilk soruyu aldığında eğitim setinden milisaniyeler içinde eğitilir;
+  diske ikili model dosyası yazılmaz.
+- **Veri:** Elle yazılmış sentetik Türkçe sorular. Eğitim seti 7 niyette 245 cümle
+  (`intents_train.json`), ayrı yazılmış test seti 70 cümledir (`intents_test.json`);
+  iki setin ortak cümlesi olmadığı testle korunur.
+- **Seçim:** Aynı veriyle scikit-learn'ün MultinomialNB ve TF-IDF + LogisticRegression
+  modelleri de denendi; üçü test setinde aynı doğruluğu verdi. Bağımlılık ve Docker
+  imajı yükü getirmediği için kendi uygulamamız seçildi.
+- **Güven eşiği:** 0.98'in altındaki tahminler "anlaşılamadı" sayılır. Eşik yalnızca
+  eğitim setinde leave-one-out ile seçildi; test seti seçime karışmadı.
+- **Ölçüm:** `python -m scripts.evaluate_assistant_intents` doğruluğu, niyet bazında
+  precision/recall değerlerini, karışıklık matrisini ve hataları raporlar. Mevcut
+  sonuç: test setinde %88,6 doğruluk, 70 soruda 6 yanlış cevap. Hataların çoğu konu
+  dışı sorular ("euro ne kadar") ve çok kısa selamlaşmalardır ("slm").
+- **Sınırlar:** Veri seti küçük ve sentetiktir; gerçek kullanıcı soruları daha
+  çeşitli olacaktır. Asistan bir sohbet botu değildir; desteklenen soru türleri
+  dışında örnek sorular önerir. Şirket eşleşmesi, şirket adının ilk ayırt edici
+  kelimesinin mesajdaki bir kelimenin başında geçmesine dayanır.
 
 ## Testler
 
