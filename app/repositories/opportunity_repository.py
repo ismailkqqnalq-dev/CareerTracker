@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app.models.activities import Activity
 from app.models.contacts import Contact
@@ -44,9 +44,47 @@ def create_opportunity(db, opportunity_data, user_id, max_per_user, skill_ids=()
     return new_opportunity
 
 
-def get_all_opportunities(db, user_id, limit=50, offset=0):
+# SQLite'ın lower() fonksiyonu yalnızca ASCII harfleri küçültür; "İstanbul"u "istanbul"
+# ile bulmak için Türkçe harfler iki tarafta da aynı biçimde ASCII'ye katlanır.
+# replace() ve lower() SQLite ile PostgreSQL'de aynı davranır.
+_TURKISH_FOLD = (
+    ("İ", "i"), ("I", "i"), ("ı", "i"),
+    ("Ş", "s"), ("ş", "s"), ("Ğ", "g"), ("ğ", "g"),
+    ("Ü", "u"), ("ü", "u"), ("Ö", "o"), ("ö", "o"), ("Ç", "c"), ("ç", "c"),
+)
+_SEARCH_COLUMNS = (
+    Opportunity.company,
+    Opportunity.position,
+    Opportunity.type,
+    Opportunity.location,
+    Opportunity.next_action,
+    Opportunity.notes,
+)
+
+
+def fold_search_text(value: str) -> str:
+    for source, target in _TURKISH_FOLD:
+        value = value.replace(source, target)
+    return value.lower()
+
+
+def _folded(column):
+    expression = func.coalesce(column, "")
+    for source, target in _TURKISH_FOLD:
+        expression = func.replace(expression, source, target)
+    return func.lower(expression)
+
+
+def get_all_opportunities(db, user_id, limit=50, offset=0, search=None, status=None):
+    query = db.query(Opportunity).filter(Opportunity.user_id == user_id)
+    if search:
+        needle = fold_search_text(search)
+        # autoescape: kullanıcının yazdığı % ve _ joker değil, düz karakter sayılır.
+        query = query.filter(or_(*(_folded(column).contains(needle, autoescape=True) for column in _SEARCH_COLUMNS)))
+    if status:
+        query = query.filter(_folded(Opportunity.status) == fold_search_text(status))
     return paginate_query(
-        db.query(Opportunity).filter(Opportunity.user_id == user_id),
+        query,
         order_by=Opportunity.id,
         limit=limit,
         offset=offset,

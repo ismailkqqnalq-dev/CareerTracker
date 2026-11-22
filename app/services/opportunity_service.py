@@ -31,8 +31,8 @@ def create_opportunity(db, opportunity_data, user_id, skill_ids=()):
     )
 
 
-def get_all_opportunities(db, user_id, limit=50, offset=0):
-    return op.get_all_opportunities(db, user_id, limit, offset)
+def get_all_opportunities(db, user_id, limit=50, offset=0, search=None, status=None):
+    return op.get_all_opportunities(db, user_id, limit, offset, search=search, status=status)
 
 
 def iter_opportunities(db, user_id, batch_size=500):

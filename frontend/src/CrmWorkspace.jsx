@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OPPORTUNITY_STATUSES, displayDate, safeHttpUrl, today } from "./crmUtils.js";
 import OpportunityDetail from "./OpportunityDetail.jsx";
 
 export { OPPORTUNITY_STATUSES };
 
 const PAGE_SIZE = 50;
+// Başvurularda arama sunucuda yapılır; her tuşta değil, yazma durunca istek gider.
+const SEARCH_DEBOUNCE_MS = 300;
 
 const RESOURCES = {
   opportunities: {
@@ -496,15 +498,39 @@ function ResourceWorkspace({ api, token, view }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [statusBusyId, setStatusBusyId] = useState(null);
   const [detailId, setDetailId] = useState(null);
+  // Yalnızca başvurular tüm kayıtlarda sunucu tarafında aranır; diğer listeler sayfayı süzer.
+  const serverSearch = view === "opportunities";
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const latestRequest = useRef(0);
 
   // Bileşen görünümler arasında korunur (sayfa konumları için); açık detay ise kapanır.
   useEffect(() => { setDetailId(null); }, [view]);
 
+  useEffect(() => {
+    if (!serverSearch) return undefined;
+    const timer = setTimeout(() => setAppliedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query, serverSearch]);
+
+  // Arama değişince sonuçlar ilk sayfadan başlar.
+  useEffect(() => {
+    setOffsets((current) => (current.opportunities ? { ...current, opportunities: 0 } : current));
+  }, [appliedQuery]);
+
   const load = useCallback(async () => {
+    const requestId = latestRequest.current + 1;
+    latestRequest.current = requestId;
     setLoading(true);
     setError("");
     try {
-      const page = await api.requestPage(config.path, { token, limit: PAGE_SIZE, offset });
+      const params = new URLSearchParams();
+      if (serverSearch && appliedQuery) params.set("q", appliedQuery);
+      if (serverSearch && statusFilter) params.set("status", statusFilter);
+      const path = params.toString() ? `${config.path}?${params}` : config.path;
+      const page = await api.requestPage(path, { token, limit: PAGE_SIZE, offset });
+      // Hızlı yazarken eski bir aramanın geç gelen yanıtı yenisinin üzerine yazmasın.
+      if (requestId !== latestRequest.current) return;
       setRecords(page.items);
       setTotal(page.totalCount);
       if (view === "opportunities") {
@@ -517,19 +543,26 @@ function ResourceWorkspace({ api, token, view }) {
         setRelated({ opportunities, contacts });
       }
     } catch {
-      setError(`${config.title} yüklenemedi. Bağlantını kontrol edip yeniden dene.`);
+      if (requestId === latestRequest.current) setError(`${config.title} yüklenemedi. Bağlantını kontrol edip yeniden dene.`);
     } finally {
-      setLoading(false);
+      if (requestId === latestRequest.current) setLoading(false);
     }
-  }, [api, config.path, config.title, offset, token, view]);
+  }, [api, config.path, config.title, offset, token, view, serverSearch, appliedQuery, statusFilter]);
 
   useEffect(() => { load(); }, [load, reloadKey]);
 
   const filteredRecords = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase("tr-TR");
+    const needle = serverSearch ? "" : query.trim().toLocaleLowerCase("tr-TR");
     const rows = needle ? records.filter((record) => Object.values(record).some((value) => String(value ?? "").toLocaleLowerCase("tr-TR").includes(needle))) : records;
     return [...rows].sort((left, right) => right.id - left.id);
-  }, [query, records]);
+  }, [query, records, serverSearch]);
+  const hasFilter = Boolean(query.trim() || (serverSearch && statusFilter));
+
+  function clearFilters() {
+    setQuery("");
+    setAppliedQuery("");
+    setStatusFilter("");
+  }
 
   async function save(payload) {
     setBusy(true);
@@ -643,8 +676,24 @@ function ResourceWorkspace({ api, token, view }) {
       )}
 
       <div className="crm-list-toolbar">
-        <label htmlFor="crm-search">Bu sayfada ara</label>
-        <input id="crm-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`${config.title} içinde ara…`} />
+        <label htmlFor="crm-search">{serverSearch ? "Başvurularda ara" : "Bu sayfada ara"}</label>
+        <input id="crm-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={serverSearch ? "Şirket, pozisyon, konum, not…" : `${config.title} içinde ara…`} />
+        {serverSearch && (
+          <>
+            <label htmlFor="crm-status-filter">Durum filtresi</label>
+            <select
+              id="crm-status-filter"
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setOffsets((current) => ({ ...current, opportunities: 0 }));
+              }}
+            >
+              <option value="">Tüm durumlar</option>
+              {OPPORTUNITY_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+          </>
+        )}
         <button className="button button-quiet" type="button" onClick={() => setReloadKey((value) => value + 1)} disabled={loading}>Yenile</button>
       </div>
 
@@ -666,15 +715,15 @@ function ResourceWorkspace({ api, token, view }) {
               />
             ))}
           </div>
-          {query && filteredRecords.length < records.length && <p className="crm-filter-note">Arama yalnızca bu sayfadaki {records.length} kaydı süzer.</p>}
+          {!serverSearch && query && filteredRecords.length < records.length && <p className="crm-filter-note">Arama yalnızca bu sayfadaki {records.length} kaydı süzer.</p>}
         </>
       ) : (
         <section className="crm-empty-state">
-          <span>{query ? "⌕" : "＋"}</span>
-          <h3>{query ? "Eşleşen kayıt yok" : `Henüz ${config.singular} yok`}</h3>
-          <p>{query ? "Arama ifadesini kısaltabilir veya silebilirsin." : `${config.description} İlk kaydını ekleyerek başlayabilirsin.`}</p>
-          {!query && <button className="button button-primary" type="button" onClick={() => setEditor({ mode: "create" })}>İlk {config.singular} kaydını ekle</button>}
-          {query && <button className="button button-quiet" type="button" onClick={() => setQuery("")}>Aramayı temizle</button>}
+          <span>{hasFilter ? "⌕" : "＋"}</span>
+          <h3>{hasFilter ? "Eşleşen kayıt yok" : `Henüz ${config.singular} yok`}</h3>
+          <p>{hasFilter ? "Arama ifadesini kısaltabilir veya filtreyi kaldırabilirsin." : `${config.description} İlk kaydını ekleyerek başlayabilirsin.`}</p>
+          {!hasFilter && <button className="button button-primary" type="button" onClick={() => setEditor({ mode: "create" })}>İlk {config.singular} kaydını ekle</button>}
+          {hasFilter && <button className="button button-quiet" type="button" onClick={clearFilters}>Aramayı temizle</button>}
         </section>
       )}
 
