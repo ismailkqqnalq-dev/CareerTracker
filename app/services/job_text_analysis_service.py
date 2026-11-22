@@ -250,6 +250,16 @@ _CONTEXTUAL_ALIAS_CONTEXT = {
         r"\b(?:search|query|nlp|text|language[ -]+model)\b",
         re.IGNORECASE,
     ),
+    # Bağlam katlanmış metinde aranır (küçük harf, ş→s, ö→o): "yönetimi" → "yonetimi".
+    "thread": re.compile(
+        r"\b(?:yonetim\w*|management|memory|bellek\w*|senkron\w*|synchron\w*|async\w*|"
+        r"concurren\w*|paralel\w*|parallel\w*|android|java|kotlin|lock\w*|deadlock\w*|ipc)\b",
+        re.IGNORECASE,
+    ),
+    "espresso": re.compile(
+        r"\b(?:android|junit|kotlin|instrumentation|ui[ -]+test\w*|unit[ -]+test\w*|test\w*)\b",
+        re.IGNORECASE,
+    ),
 }
 _ABOUT_ORGANIZATION_HEADING = re.compile(
     r"About[ \t]+(?:(?:the|our)[ \t]+)?[A-Z][\w&'-]*"
