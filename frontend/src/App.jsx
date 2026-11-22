@@ -175,7 +175,14 @@ function App() {
     setOcrResult(null);
   }, []);
 
-  const api = useMemo(() => createApiClient({ onUnauthorized: logout, onTokenRefreshed: setToken }), [logout]);
+  // Token, durumdan önce eş zamanlı olarak saklanır: bir efekte bırakılırsa çizim ile
+  // efekt arasında yenilenen sayfa yeni token'ı kaybedebilir.
+  const applyToken = useCallback((value) => {
+    sessionStorage.setItem(TOKEN_KEY, value);
+    setToken(value);
+  }, []);
+
+  const api = useMemo(() => createApiClient({ onUnauthorized: logout, onTokenRefreshed: applyToken }), [logout, applyToken]);
 
   const signOut = useCallback(async () => {
     // Sunucudaki yenileme token'ı iptal edilir; ağ hatası çıkışı engellemez.
@@ -433,7 +440,7 @@ function App() {
   if (!token && restoring) {
     return <main className="auth-layout"><p className="muted" role="status">Oturumun açılıyor…</p></main>;
   }
-  if (!token) return <AuthScreen onAuthenticated={setToken} />;
+  if (!token) return <AuthScreen onAuthenticated={applyToken} />;
 
   return (
     <div className="app-shell">

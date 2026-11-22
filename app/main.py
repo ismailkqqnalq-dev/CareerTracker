@@ -19,6 +19,7 @@ from app.routes.task_routes import router as task_router
 from app.routes.auth_routes import router as auth_router
 from app.routes.agenda_routes import router as agenda_router
 from app.routes.assistant_routes import router as assistant_router
+from app.routes.email_insight_routes import router as email_insight_router
 
 
 @asynccontextmanager
@@ -43,6 +44,7 @@ app.include_router(ocr_router)
 app.include_router(job_analysis_router)
 app.include_router(agenda_router)
 app.include_router(assistant_router)
+app.include_router(email_insight_router)
 
 
 @app.get("/")

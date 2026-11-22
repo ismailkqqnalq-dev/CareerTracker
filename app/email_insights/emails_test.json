@@ -1,0 +1,74 @@
+{
+  "basvuru_alindi": [
+    {"subject": "Başvurunuz değerlendirme sürecindedir", "body": "Merhaba, Mobil Uygulama Geliştirici ilanımıza başvurunuz tarafımıza ulaşmış olup değerlendirme sürecindedir. Sonuç hakkında ayrıca bilgilendirileceksiniz."},
+    {"subject": "Basvurunuz alindi", "body": "Merhaba, Yazilim Gelistirme Uzmani pozisyonu icin basvurunuz basariyla alinmistir. Ilginiz icin tesekkur ederiz."},
+    {"subject": "Thanks for applying to Globex", "body": "Hi, we have received your application for the Site Reliability Engineer position. Someone from our talent team will review it soon."},
+    {"subject": "Başvurunuz için teşekkür ederiz - Ar-Ge Mühendisi", "body": "Sayın aday, Ar-Ge Mühendisi ilanımıza yaptığınız başvuru kayıt altına alınmıştır. Başvurunuz uygun bulunursa İK uzmanımız sizinle iletişime geçecektir."},
+    {"subject": "Application received: Frontend Engineer", "body": "This is an automated confirmation that your application for Frontend Engineer has been received. We review applications on a rolling basis."},
+    {"subject": "Başvurunuzu aldık", "body": "Merhaba, ilanımıza başvurunuzu aldık. Başvurunuz ilgili yöneticiye iletilecek, uygun görülmesi halinde görüşme için sizinle iletişime geçilecektir."},
+    {"subject": "Application confirmation - Embedded Systems", "body": "Thank you for submitting your application. We confirm we have your documents and will assess your profile for the Embedded Systems Engineer role."},
+    {"subject": "Başvuru bilgilendirme", "body": "Değerli aday, kariyer sitemiz aracılığıyla gerçekleştirdiğiniz başvuru alınmıştır. Başvuru sürecinizi aday hesabınızdan takip edebilirsiniz."},
+    {"subject": "Your application was submitted", "body": "Hello, your application for the Junior Data Scientist role was submitted successfully. We will contact you if your profile is a match."},
+    {"subject": "Başvurunuz bize iletildi", "body": "Merhaba, Gömülü Yazılım Mühendisi pozisyonu için başvurunuz bize iletilmiştir. Yoğunluk nedeniyle her başvuruya ayrı dönüş yapamayabiliriz."}
+  ],
+  "mulakat_daveti": [
+    {"subject": "Gecikme için özür dileriz - görüşme daveti", "body": "Merhaba, dönüşümüz geciktiği için özür dileriz. Başvurunuzu olumlu bulduk ve sizinle bir görüşme ayarlamak istiyoruz. Hangi gün uygun olursunuz?"},
+    {"subject": "Gorusme daveti", "body": "Merhaba, basvurunuzu inceledik ve sizinle online bir gorusme yapmak istiyoruz. Bu hafta icin uygun oldugunuz saatleri paylasir misiniz?"},
+    {"subject": "Interview request - Platform Engineer", "body": "Hi, the team reviewed your profile and would like to invite you to an interview for the Platform Engineer role. Please pick a slot that suits you."},
+    {"subject": "Teknik mülakat daveti", "body": "Sayın aday, ön görüşmenin ardından sizi ekip liderimizle yapılacak teknik mülakata davet ediyoruz. Mülakat yaklaşık bir saat sürecektir."},
+    {"subject": "Quick chat this week?", "body": "Hello, I am reaching out from the recruiting team. Would you be available for a quick call this week to talk about the Backend Engineer opening?"},
+    {"subject": "Mülakat randevusu", "body": "Merhaba, mülakatınız 4 Aralık Perşembe saat 13:00 için planlanmıştır. Görüşmeye kimliğinizle birlikte ofisimize gelmenizi rica ederiz."},
+    {"subject": "Onsite interview", "body": "We would like to invite you to an onsite interview at our Ankara office. The day will include meetings with the hiring manager and two engineers."},
+    {"subject": "Sizinle görüşmek istiyoruz", "body": "Merhaba, özgeçmişiniz dikkatimizi çekti. Pozisyonu konuşmak için sizinle 30 dakikalık bir görüşme yapmak isteriz. Uygunluğunuzu bekliyoruz."},
+    {"subject": "Final round", "body": "Good news, you have been invited to the final round interview with our CTO. Please confirm whether Friday at 10 AM works for you."},
+    {"subject": "Mülakat planlama bağlantısı", "body": "Merhaba, görüşme sürecinin bir sonraki adımı için aşağıdaki bağlantı üzerinden mülakat zamanınızı seçmenizi rica ederiz."}
+  ],
+  "degerlendirme": [
+    {"subject": "Online test bağlantınız", "body": "Merhaba, başvurunuz ön değerlendirmeyi geçti. Süreç kapsamında aşağıdaki bağlantıdan online teknik testi 4 gün içinde tamamlamanızı rica ederiz."},
+    {"subject": "Kodlama odevi", "body": "Merhaba, teknik surec kapsaminda size bir kodlama odevi gonderiyoruz. Cozumunuzu bir hafta icinde GitHub uzerinden paylasmanizi bekliyoruz."},
+    {"subject": "Assessment: next step", "body": "As the next step, please complete our online assessment. It includes two coding problems and a short SQL section and must be finished within five days."},
+    {"subject": "Vaka analizi ödevi", "body": "Sayın aday, değerlendirme sürecinin bir sonraki aşamasında hazırlamanızı istediğimiz vaka analizinin detayları ektedir. Teslim tarihi gelecek Salı."},
+    {"subject": "Take home exercise", "body": "Thanks for speaking with us. Please complete the attached take home exercise and send back your solution along with a short write-up."},
+    {"subject": "Yetenek ve kişilik testi", "body": "Merhaba, işe alım sürecimizin bu aşamasında online yetenek ve kişilik testlerini tamamlamanızı rica ederiz. Testler yaklaşık bir saat sürmektedir."},
+    {"subject": "Technical test link", "body": "Here is your link to the technical test for the Embedded Engineer role. It covers C, microcontrollers and debugging and has a 75 minute time limit."},
+    {"subject": "Teknik ödev teslimi", "body": "Merhaba, teknik ödevinizi tamamladıktan sonra çözümünüzü bu e-postaya yanıt olarak iletebilirsiniz. Teslim için 5 iş gününüz bulunmaktadır."},
+    {"subject": "Codility invitation", "body": "You have been invited to take a Codility test for the Software Engineer role. The invitation link will remain valid for three days."},
+    {"subject": "Online sınava davet", "body": "Değerli aday, online genel yetenek ve İngilizce sınavımıza katılmaya hak kazandınız. Sınav giriş bilgileriniz aşağıda yer almaktadır."}
+  ],
+  "teklif": [
+    {"subject": "Teklifimizi sunmaktan mutluluk duyuyoruz", "body": "Merhaba, süreç sonunda size Gömülü Yazılım Mühendisi pozisyonu için teklif sunmaktan mutluluk duyuyoruz. Ücret ve yan haklar ekte yer almaktadır."},
+    {"subject": "Is teklifi", "body": "Merhaba, sizi ekibimizde gormek istiyoruz. Pozisyon icin is teklifimizi ve ise baslama tarihini ekte bulabilirsiniz."},
+    {"subject": "Offer: Site Reliability Engineer", "body": "We are pleased to offer you the Site Reliability Engineer role. The attached letter contains the base salary, bonus structure and proposed start date."},
+    {"subject": "Teklif mektubunuz", "body": "Sayın aday, teklif mektubunuzu ekte bulabilirsiniz. Teklifi kabul etmek için imzalı nüshayı en geç Perşembe günü iletmenizi rica ederiz."},
+    {"subject": "We want you on the team", "body": "Congratulations! After the final interview we decided to offer you the Backend Engineer position. Our HR team will send the contract shortly."},
+    {"subject": "İşe alım kararımız", "body": "Merhaba, değerlendirme sonucunda sizinle çalışma kararı aldık. Size sunduğumuz teklifin detaylarını görüşmek üzere yarın arayacağız."},
+    {"subject": "Internship offer letter", "body": "We are happy to offer you an internship position in our R&D department. Please review the attached offer letter and confirm by next week."},
+    {"subject": "Staj teklifi", "body": "Merhaba, yaz stajı programımız için seçildiniz. Staj teklifimizi ve başlangıç tarihini ekte paylaşıyoruz. Kabul durumunuzu bildirmenizi rica ederiz."},
+    {"subject": "Compensation and offer", "body": "Following your interviews, we are extending an offer for the Data Engineer role. Please find the compensation details and benefits summary attached."},
+    {"subject": "Tebrikler, teklifimiz ekte", "body": "Değerli aday, mülakat sürecini başarıyla tamamladığınız için tebrik ederiz. İş teklifimiz ve sözleşme taslağı ekte yer almaktadır."}
+  ],
+  "ret": [
+    {"subject": "Başvurunuz hakkında bilgilendirme", "body": "Merhaba, başvurunuz için teşekkür ederiz. Profilinizi beğendik ancak bu pozisyon için başka bir adayla ilerlemeye karar verdik. İleride uygun bir pozisyonda tekrar görüşmek isteriz."},
+    {"subject": "Basvuru sonucu", "body": "Merhaba, degerlendirmemiz sonucunda maalesef bu pozisyon icin sizinle ilerleyemeyecegiz. Ilginiz icin tesekkur ederiz."},
+    {"subject": "Application update - Platform Engineer", "body": "Thank you for your time. After reviewing all candidates, we have decided not to move forward with your application for the Platform Engineer role."},
+    {"subject": "Mülakat sonrası değerlendirme", "body": "Sayın aday, teknik mülakatınız için teşekkür ederiz. Yapılan değerlendirme sonucunda bu pozisyon için olumlu dönüş yapamadığımızı bildirmek isteriz."},
+    {"subject": "Regarding the Frontend Engineer role", "body": "We appreciate your interest. Unfortunately, the role has been filled internally and we will not be continuing with external candidates."},
+    {"subject": "Süreç sonucunuz", "body": "Merhaba, ne yazık ki başvurunuz bu aşamada olumlu sonuçlanmamıştır. Özgeçmişiniz veri tabanımızda saklanacak, uygun pozisyon açıldığında sizinle iletişime geçeceğiz."},
+    {"subject": "Thank you for your interest", "body": "We regret to inform you that you have not been selected for this position. We wish you every success in your future career."},
+    {"subject": "Değerlendirme sonucunuz", "body": "Değerli aday, online test sonuçlarınız değerlendirilmiştir. Maalesef bu sonuçlarla sürece devam edemeyeceğinizi bildirmek isteriz."},
+    {"subject": "Your application to Globex", "body": "Hi, thanks for applying. After careful review we will be moving forward with candidates who more closely match the requirements for this role."},
+    {"subject": "Pozisyon kapandı", "body": "Merhaba, başvurduğunuz pozisyon için işe alım süreci tamamlanmış ve pozisyon kapatılmıştır. İlginiz için teşekkür eder, başarılar dileriz."}
+  ],
+  "diger": [
+    {"subject": "Bu hafta öne çıkan ilanlar", "body": "Merhaba, aradığın kriterlere uygun bu haftanın öne çıkan ilanlarını derledik. Beğendiğin ilanlara tek tıkla başvurabilirsin."},
+    {"subject": "Hesap dogrulama", "body": "Merhaba, hesabinizi dogrulamak icin asagidaki koda ihtiyaciniz var. Kod 10 dakika boyunca gecerlidir."},
+    {"subject": "New jobs in Ankara", "body": "We found 8 new Embedded Engineer jobs in Ankara that match your preferences. Tap to view and apply."},
+    {"subject": "Teknoloji bülteni", "body": "Bu sayımızda yapay zekâ araçları, yeni çıkan geliştirici kütüphaneleri ve uzaktan çalışma ipuçları sizi bekliyor."},
+    {"subject": "Workshop: Kubernetes basics", "body": "Register for our hands-on workshop on Kubernetes basics. Seats are limited and the session will be held online next Thursday."},
+    {"subject": "Kampüs buluşması", "body": "Bilgisayar mühendisliği bölümü öğrencileri için düzenlenen kampüs buluşmasında mezunlarımız deneyimlerini paylaşacak. Herkes davetlidir."},
+    {"subject": "Your profile is 80% complete", "body": "Add your skills and work experience to get more relevant job recommendations and stand out to employers."},
+    {"subject": "Kargo bilgilendirmesi", "body": "Siparişiniz kargoya verilmiştir. Gönderinizi kargo takip numarası ile takip edebilirsiniz."},
+    {"subject": "Monthly salary survey", "body": "Help us build the most accurate salary report by answering a few anonymous questions about your current compensation."},
+    {"subject": "Yeni bağlantı isteği", "body": "Merhaba, bir sektör profesyoneli sizinle bağlantı kurmak istiyor. İsteği görüntülemek için uygulamayı açın."}
+  ]
+}
