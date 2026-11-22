@@ -117,6 +117,10 @@ def run(cmd: list[str], cwd: Path, env: dict) -> tuple[bool, str]:
             env=env,
             capture_output=True,
             text=True,
+            # Windows'ta varsayılan kodlama cp1254'tür; vitest UTF-8 yazar ("❯", "→").
+            # Çözülemeyen bayt okuma iş parçacığını çökertip çıktıyı yutuyordu.
+            encoding="utf-8",
+            errors="replace",
             timeout=TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:
