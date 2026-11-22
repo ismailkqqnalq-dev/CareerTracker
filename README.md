@@ -17,6 +17,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Başvuru istatistiklerini sunan dashboard
 - Genel bakışta gündem: geciken ve 7 gün içindeki açık görevler, süreçte olup 7 günden uzun süredir temas olmayan başvurular; görevi tamamlama ve "bugün iletişime geçtim" tek tıkla
 - Başvurular listesinde durumu kart üzerinden tek seçimle değiştirme
+- Başvuru detay ekranı: kişiler, ilan becerileri, görev ve aktivitelerden oluşan tek zaman çizelgesi; oradan görev tamamlama, görev ve not ekleme, durum değiştirme ve "bugün iletişime geçtim"
 - Hesap ayarları ekranında şifre değiştirme ve hesabı kalıcı olarak silme
 - Asistan: "Trendyol başvurum ne alemde?", "Kimden ses çıkmadı?" gibi soruları eğitilmiş bir niyet modeliyle anlayıp kullanıcının kendi kayıtlarından cevaplar; dış servis kullanmaz
 - Kullanıcıya özel, seçilen dönem için aylık başvuru hacmi analizi
@@ -68,6 +69,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Adaylar | `GET /skills/suggestions/{suggestion_id}/candidates` | Evet | Bekleyen öneri için `strategy=lexical` (varsayılan) veya isteğe bağlı `strategy=semantic` ile adayları sıralar |
 | Profil skill'leri | `GET, POST /users/me/skills` | Evet | Profil skill'lerini listeler veya ekler |
 | Profil skill'i | `PATCH, DELETE /users/me/skills/{user_skill_id}` | Evet | Profil kaydını günceller veya siler |
+| Fırsat detayı | `GET /opportunities/{opportunity_id}/detail` | Evet | Fırsatı, bağlı kişileri, görevleri (açıklar önce, en yakın son tarih başta), aktiviteleri (en yeni önce) ve becerileri tek yanıtta döndürür; her liste en fazla 200 kayıt. Başka kullanıcının fırsatı `404` |
 | Fırsat skill'leri | `POST, GET /opportunities/{opportunity_id}/skills` | Evet | Fırsata skill bağlar veya bağlı skill'leri listeler |
 | Fırsat skill'i | `DELETE /opportunities/{opportunity_id}/skills/{skill_id}` | Evet | Bağlantıyı kaldırır (`204`); skill katalogda kalır. Bağlı değilse `404 skill_not_attached` |
 | Fırsat skill eşleşmesi | `GET /opportunities/{opportunity_id}/skill-match` | Evet | Profilde bulunan ve eksik skill'leri karşılaştırır |

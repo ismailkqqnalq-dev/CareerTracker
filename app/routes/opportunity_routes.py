@@ -13,6 +13,7 @@ from app.record_limits import OpportunityQuotaExceeded
 from app.schemas.analytics import ApplicationAnalyticsResponse
 from app.schemas.opportunity import (
     OpportunityCreate,
+    OpportunityDetailResponse,
     OpportunityResponse,
     OpportunityUpdate,
 )
@@ -121,6 +122,22 @@ def export_opportunities_csv(
                 "attachment; filename=careertracker_export.csv"
         },
     )
+
+
+@router.get(
+    "/opportunities/{opportunity_id}/detail",
+    response_model=OpportunityDetailResponse,
+    responses={404: {"description": "Opportunity not found"}},
+)
+def get_opportunity_detail(
+    opportunity_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    detail = service.get_opportunity_detail(db, opportunity_id, user_id=current_user.id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    return detail
 
 
 @router.get("/opportunities/{opportunity_id}", response_model=OpportunityResponse)

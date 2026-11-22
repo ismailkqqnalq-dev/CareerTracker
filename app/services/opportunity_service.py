@@ -43,6 +43,10 @@ def get_opportunity_by_id(db, opportunity_id, user_id):
     return op.get_opportunity_by_id(db, opportunity_id, user_id)
 
 
+def get_opportunity_detail(db, opportunity_id, user_id):
+    return op.get_opportunity_detail(db, opportunity_id, user_id)
+
+
 def update_opportunity(db, opportunity_id, update_data, user_id):
     return op.update_opportunity(db, opportunity_id, update_data, user_id)
 
