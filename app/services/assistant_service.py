@@ -10,6 +10,7 @@ from datetime import date, datetime
 from sqlalchemy import or_
 
 from app.assistant.intent_model import classify, fold_text
+from app.models.email_insights import EmailSuggestion
 from app.models.opportunity import Opportunity
 from app.models.opportunity_skills import OpportunitySkill
 from app.models.skills import Skill, UserSkill
@@ -32,6 +33,14 @@ _GENERIC_COMPANY_WORDS = {
     "teknoloji", "teknolojileri", "yazilim", "bilisim", "sistemleri", "group", "grup",
 }
 _ACTIVE_KEYS = {_status_key(status) for status in ACTIVE_STATUSES}
+# E-posta sınıflandırıcısının bulduğu türler, asistan cevabında kısa adlarıyla.
+_EMAIL_TYPE_LABELS = {
+    "basvuru_alindi": "başvuru alındı bildirimi",
+    "mulakat_daveti": "mülakat daveti",
+    "degerlendirme": "test/ödev daveti",
+    "teklif": "iş teklifi",
+    "ret": "olumsuz dönüş",
+}
 
 
 def _as_date(value):
@@ -119,6 +128,15 @@ def _opportunity_status(db, user_id: int, message: str, today: date) -> dict:
         if task:
             due = f" (son tarih {_display(task.due_date)})" if task.due_date else ""
             details.append(f"Açık görev: {task.description}{due}")
+        # İki model birlikte: e-posta sınıflandırıcısının bu başvuru için bulduğu son olay.
+        email = (
+            db.query(EmailSuggestion)
+            .filter(EmailSuggestion.user_id == user_id, EmailSuggestion.opportunity_id == opportunity.id)
+            .order_by(EmailSuggestion.received_at.desc(), EmailSuggestion.id.desc())
+            .first()
+        )
+        if email and email.email_type in _EMAIL_TYPE_LABELS:
+            details.append(f"Son e-posta ({_display(email.received_at)}): {_EMAIL_TYPE_LABELS[email.email_type]}")
         items.append({"title": f"{opportunity.company} · {opportunity.position}", "details": details})
 
     count = len(matches)

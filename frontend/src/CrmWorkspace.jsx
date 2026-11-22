@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OPPORTUNITY_STATUSES, displayDate, safeHttpUrl, today } from "./crmUtils.js";
 import OpportunityDetail from "./OpportunityDetail.jsx";
+import EmailSuggestionsCard from "./EmailSuggestionsCard.jsx";
 
 export { OPPORTUNITY_STATUSES };
 
@@ -419,6 +420,7 @@ function Overview({ api, token, onNavigate }) {
         </div>
 
         <div className="crm-overview-grid">
+          <EmailSuggestionsCard api={api} token={token} reloadKey={reloadKey} onChanged={() => setReloadKey((value) => value + 1)} />
           <section className="crm-overview-card" aria-labelledby="agenda-tasks-title">
             <div className="crm-card-heading"><div><h3 id="agenda-tasks-title">Bugün ve bu hafta</h3><p>Geciken ve 7 gün içindeki açık görevlerin</p></div><button className="text-button" type="button" onClick={() => onNavigate("tasks")}>Görevleri aç</button></div>
             {data.agenda.tasks.length ? <ul className="crm-task-summary">{data.agenda.tasks.map((task) => (
