@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { OPPORTUNITY_STATUSES, displayDate, safeHttpUrl, today } from "./crmUtils.js";
+import EmailUpdatePanel from "./EmailUpdatePanel.jsx";
 
 function timelineOf(detail) {
   const contactNames = Object.fromEntries(detail.contacts.map((contact) => [contact.id, contact.name]));
@@ -247,6 +248,14 @@ export default function OpportunityDetail({ api, token, opportunityId, onBack })
         <QuickTaskForm busy={busy} onAdd={(task) => change("/tasks", "POST", { ...task, opportunity_id: id }, "Görev eklendi.", "Görev eklenemedi. Tekrar dene.")} />
         <QuickActivityForm contacts={contacts} busy={busy} onAdd={(activity) => change("/activities", "POST", { ...activity, opportunity_id: id }, "Not eklendi.", "Not eklenemedi. Tekrar dene.")} />
       </div>
+
+      <EmailUpdatePanel
+        api={api}
+        token={token}
+        opportunityId={id}
+        currentStatus={opportunity.status}
+        onApplied={(message) => { setNotice(message); setReloadKey((value) => value + 1); }}
+      />
     </section>
   );
 }

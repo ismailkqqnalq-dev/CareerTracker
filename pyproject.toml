@@ -41,5 +41,6 @@ dev = [
 include = ["app*"]
 [tool.setuptools.package-data]
 "app.assistant" = ["*.json"]
+"app.email_insights" = ["*.json"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
