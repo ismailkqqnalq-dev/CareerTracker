@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -19,11 +19,51 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
-from app.security import create_access_token, registration_is_enabled
-from app.services import auth_service
+from app.security import (
+    CSRF_HEADER_NAME,
+    CSRF_HEADER_VALUE,
+    REFRESH_COOKIE_NAME,
+    create_access_token,
+    refresh_cookie_is_secure,
+    registration_is_enabled,
+)
+from app.services import auth_service, session_service
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _set_refresh_cookie(response: Response, raw_token: str, persistent: bool) -> None:
+    response.set_cookie(
+        REFRESH_COOKIE_NAME,
+        raw_token,
+        # Kalıcı değilse çerez tarayıcı kapanınca silinir.
+        max_age=int(session_service.PERSISTENT_LIFETIME.total_seconds()) if persistent else None,
+        httponly=True,
+        secure=refresh_cookie_is_secure(),
+        samesite="strict",
+        # Proxy /api önekini siler; tarayıcı ile backend farklı yol gördüğü için kök yol.
+        path="/",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        REFRESH_COOKIE_NAME,
+        httponly=True,
+        secure=refresh_cookie_is_secure(),
+        samesite="strict",
+        path="/",
+    )
+
+
+def _csrf_rejected(request: Request) -> JSONResponse | None:
+    if request.headers.get(CSRF_HEADER_NAME) == CSRF_HEADER_VALUE:
+        return None
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content={"detail": "Missing request header", "error_code": "csrf_header_missing"},
+    )
 
 
 @router.post(
@@ -75,7 +115,9 @@ def register(
 )
 def login(
     request: Request,
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
+    remember_me: bool = Form(default=False),
     db: Session = Depends(get_db),
 ):
     # Swagger'daki "username" alanına e-posta adresini gir.
@@ -113,7 +155,67 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    _set_refresh_cookie(response, session_service.issue(db, user, remember_me), remember_me)
     return TokenResponse(access_token=create_access_token(str(user.id)))
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    responses={
+        401: {"description": "Refresh cookie missing, invalid, expired, rotated or reused"},
+        403: {"description": "CSRF header missing"},
+        429: {"description": "Refresh rate limit exceeded"},
+    },
+)
+def refresh(request: Request, db: Session = Depends(get_db)):
+    rejected = _csrf_rejected(request)
+    if rejected:
+        return rejected
+
+    settings = get_rate_limit_settings()
+    decision = rate_limit_manager.check(
+        "refresh-ip",
+        get_client_ip(request),
+        settings.login_ip_per_minute,
+        "minute",
+    )
+    if not decision.allowed:
+        return rate_limited_response(decision.retry_after)
+
+    try:
+        issued = session_service.rotate(db, request.cookies.get(REFRESH_COOKIE_NAME))
+    except session_service.SessionError as error:
+        failure = JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": "Session expired", "error_code": error.error_code},
+        )
+        # Başka sekmenin yeni çerezi tarayıcıda zaten olabilir; onu silme.
+        if error.error_code != "refresh_token_rotated":
+            _clear_refresh_cookie(failure)
+        return failure
+
+    success = JSONResponse(
+        content=TokenResponse(access_token=create_access_token(str(issued.user.id))).model_dump()
+    )
+    _set_refresh_cookie(success, issued.refresh_token, issued.persistent)
+    return success
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses={403: {"description": "CSRF header missing"}},
+)
+def logout(request: Request, db: Session = Depends(get_db)):
+    rejected = _csrf_rejected(request)
+    if rejected:
+        return rejected
+    session_service.revoke(db, request.cookies.get(REFRESH_COOKIE_NAME))
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    _clear_refresh_cookie(response)
+    return response
 
 
 @router.get("/me", response_model=UserResponse)
@@ -130,6 +232,7 @@ def read_current_user(
     responses={403: {"description": "Current password confirmation failed"}},
 )
 def change_current_user_password(
+    request: Request,
     data: ChangePasswordRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -144,7 +247,14 @@ def change_current_user_password(
                 "error_code": "password_confirmation_failed",
             },
         )
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    # Diğer cihazlardaki oturumlar kapanır; bu tarayıcıya aynı kalıcılıkta yeni oturum verilir.
+    persistent = session_service.is_persistent(
+        db, current_user.id, request.cookies.get(REFRESH_COOKIE_NAME)
+    )
+    session_service.revoke_all_for_user(db, current_user.id)
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    _set_refresh_cookie(response, session_service.issue(db, current_user, persistent), persistent)
+    return response
 
 
 @router.delete(
@@ -166,4 +276,7 @@ def delete_current_user(
                 "error_code": "password_confirmation_failed",
             },
         )
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    # Yenileme kayıtları CASCADE ile silindi; tarayıcıdaki çerez de temizlenir.
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    _clear_refresh_cookie(response)
+    return response

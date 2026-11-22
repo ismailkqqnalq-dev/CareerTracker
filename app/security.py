@@ -12,7 +12,13 @@ password_hash = PasswordHash.recommended()
 DUMMY_PASSWORD_HASH = password_hash.hash("careertracker-dummy-password")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# Kısa ömürlü erişim token'ı; oturum httpOnly yenileme çereziyle sürer.
+ACCESS_TOKEN_EXPIRE_MINUTES = 15
+REFRESH_COOKIE_NAME = "careertracker_refresh"
+# Çerezle çalışan uç noktalar bu başlığı ister: başka bir site, CORS izni
+# olmadan özel başlık gönderemez (SameSite=Strict'e ek CSRF katmanı).
+CSRF_HEADER_NAME = "X-Requested-With"
+CSRF_HEADER_VALUE = "CareerTracker"
 MIN_JWT_SECRET_BYTES = 32
 _PLACEHOLDER_SECRET_VALUES = frozenset(
     {
@@ -52,9 +58,24 @@ def registration_is_enabled() -> bool:
     raise RuntimeError("REGISTRATION_ENABLED must be a boolean value.")
 
 
+def refresh_cookie_is_secure() -> bool:
+    """Varsayılan: geliştirme dışında yalnızca HTTPS; COOKIE_SECURE açıkça ezebilir."""
+    configured = os.getenv("COOKIE_SECURE")
+    if configured is None:
+        return os.getenv("APP_ENV", "").strip().casefold() != "development"
+
+    value = configured.strip().casefold()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    raise RuntimeError("COOKIE_SECURE must be a boolean value.")
+
+
 def validate_security_configuration() -> None:
     validate_jwt_secret_key()
     registration_is_enabled()
+    refresh_cookie_is_secure()
 
 
 def hash_password(password: str) -> str:

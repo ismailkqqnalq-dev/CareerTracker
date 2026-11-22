@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { createApiClient } from "./api.js";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SESSION_HEADERS, createApiClient } from "./api.js";
 import ProfileMatchPanel from "./ProfileMatchPanel.jsx";
 import ApplicationAnalyticsPanel from "./ApplicationAnalyticsPanel.jsx";
 import JobAnalysisResults from "./JobAnalysisResults.jsx";
@@ -9,7 +9,28 @@ import AccountPanel from "./AccountPanel.jsx";
 import AssistantPanel from "./AssistantPanel.jsx";
 
 const authApi = createApiClient();
+const TOKEN_KEY = "careertracker_token";
+// Gizli değil: yalnızca "bu tarayıcıda daha önce oturum açıldı" işareti. Sessiz yenileme
+// yalnızca bu işaret varsa denenir; asıl yenileme token'ı JavaScript'in okuyamadığı çerezde.
+const SESSION_HINT_KEY = "careertracker_session";
 const MAX_OCR_IMAGE_BYTES = 10 * 1024 * 1024;
+
+function hasSessionHint() {
+  try {
+    return localStorage.getItem(SESSION_HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setSessionHint(active) {
+  try {
+    if (active) localStorage.setItem(SESSION_HINT_KEY, "1");
+    else localStorage.removeItem(SESSION_HINT_KEY);
+  } catch {
+    // Depolama kapalıysa sessiz geri yükleme olmaz; oturum yine de çalışır.
+  }
+}
 const OCR_IMAGE_TYPES = new Set(["image/png", "image/jpeg"]);
 
 function errorMessage(error, context = "İstek") {
@@ -53,6 +74,7 @@ function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -67,11 +89,12 @@ function AuthScreen({ onAuthenticated }) {
           body: JSON.stringify({ email, password }),
         });
       }
-      const form = new URLSearchParams({ username: email, password });
+      const form = new URLSearchParams({ username: email, password, remember_me: String(rememberMe) });
       const result = await authApi.request("/auth/token", {
         method: "POST",
         body: form,
       });
+      setSessionHint(true);
       onAuthenticated(result.access_token);
     } catch (submitError) {
       setError(errorMessage(submitError, mode === "login" ? "Giriş" : "Kayıt"));
@@ -92,6 +115,10 @@ function AuthScreen({ onAuthenticated }) {
           <input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           <label htmlFor="password">Şifre</label>
           <input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required value={password} onChange={(e) => setPassword(e.target.value)} />
+          <label className="remember-me" htmlFor="remember-me">
+            <input id="remember-me" type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+            Beni hatırla (30 gün açık kalır; ortak bilgisayarda işaretleme)
+          </label>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="button button-primary full-width" disabled={busy}>
             {busy ? "İşleniyor…" : mode === "login" ? "Giriş yap" : "Kayıt ol"}
@@ -113,7 +140,10 @@ function Brand() {
 }
 
 function App() {
-  const [token, setToken] = useState(() => sessionStorage.getItem("careertracker_token"));
+  const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY));
+  // Sekme yeniden açıldıysa erişim token'ı yoktur ama yenileme çerezi olabilir.
+  const [restoring, setRestoring] = useState(() => !sessionStorage.getItem(TOKEN_KEY) && hasSessionHint());
+  const sessionLoaded = useRef(false);
   const [user, setUser] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [skills, setSkills] = useState([]);
@@ -135,7 +165,9 @@ function App() {
   const [activeView, setActiveView] = useState("overview");
 
   const logout = useCallback(() => {
-    sessionStorage.removeItem("careertracker_token");
+    sessionStorage.removeItem(TOKEN_KEY);
+    setSessionHint(false);
+    sessionLoaded.current = false;
     setToken(null);
     setUser(null);
     setSuggestions([]);
@@ -143,7 +175,24 @@ function App() {
     setOcrResult(null);
   }, []);
 
-  const api = useMemo(() => createApiClient({ onUnauthorized: logout }), [logout]);
+  const api = useMemo(() => createApiClient({ onUnauthorized: logout, onTokenRefreshed: setToken }), [logout]);
+
+  const signOut = useCallback(async () => {
+    // Sunucudaki yenileme token'ı iptal edilir; ağ hatası çıkışı engellemez.
+    await api.request("/auth/logout", { method: "POST", headers: SESSION_HEADERS }).catch(() => {});
+    logout();
+  }, [api, logout]);
+
+  useEffect(() => {
+    if (!restoring) return;
+    let active = true;
+    api.refreshSession().then((restoredToken) => {
+      if (!active) return;
+      if (!restoredToken) setSessionHint(false);
+      setRestoring(false);
+    });
+    return () => { active = false; };
+  }, [api, restoring]);
 
   const load = useCallback(async (authToken) => {
     setLoading(true);
@@ -175,7 +224,10 @@ function App() {
 
   useEffect(() => {
     if (!token) return;
-    sessionStorage.setItem("careertracker_token", token);
+    sessionStorage.setItem(TOKEN_KEY, token);
+    // Token her 15 dakikada yenilenir; veriler yalnızca oturum başında yüklenir.
+    if (sessionLoaded.current) return;
+    sessionLoaded.current = true;
     load(token);
   }, [token, load]);
 
@@ -378,13 +430,16 @@ function App() {
     setNotice("Çıkarılan metin ilan analizi alanına aktarıldı.");
   }
 
+  if (!token && restoring) {
+    return <main className="auth-layout"><p className="muted" role="status">Oturumun açılıyor…</p></main>;
+  }
   if (!token) return <AuthScreen onAuthenticated={setToken} />;
 
   return (
     <div className="app-shell">
       <header className="topbar">
         <Brand />
-        <div className="account"><span className="account-email">{user?.email || ""}</span><button className="button button-quiet" onClick={logout}>Çıkış yap</button></div>
+        <div className="account"><span className="account-email">{user?.email || ""}</span><button className="button button-quiet" onClick={signOut}>Çıkış yap</button></div>
       </header>
 
       <main className="page-content">
