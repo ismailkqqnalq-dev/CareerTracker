@@ -260,6 +260,44 @@ _CONTEXTUAL_ALIAS_CONTEXT = {
         r"\b(?:android|junit|kotlin|instrumentation|ui[ -]+test\w*|unit[ -]+test\w*|test\w*)\b",
         re.IGNORECASE,
     ),
+    # İngilizce fiil ("can") ve Türkçe isim ("Can"); yalnızca haberleşme protokolleri yanında.
+    "can": re.compile(
+        r"\b(?:spi|i2c|iic|uart|rs[ -]?232|rs[ -]?485|modbus|lin|usb|ethernet|"
+        r"protokol\w*|protocols?|haberlesme\w*|otomotiv|automotive)\b",
+        re.IGNORECASE,
+    ),
+    "solid": re.compile(
+        r"\b(?:prensip\w*|principles?|clean|oop|nesne\w*|design[ -]+patterns?|"
+        r"tasarim\w*|mimari\w*|architecture)\b",
+        re.IGNORECASE,
+    ),
+    "soap": re.compile(
+        r"\b(?:web[ -]+servis\w*|web[ -]+services?|wsdl|xml|rest\w*|wcf|api\w*)\b",
+        re.IGNORECASE,
+    ),
+    "leaflet": re.compile(
+        r"\b(?:harita\w*|maps?|mapping|gis|cbs|openlayers|mapbox|cesium\w*|cografi|javascript)\b",
+        re.IGNORECASE,
+    ),
+    "cbs": re.compile(
+        r"\b(?:harita\w*|maps?|gis|cografi|mekansal|arcgis|qgis|geoserver|openlayers|leaflet|postgis)\b",
+        re.IGNORECASE,
+    ),
+    # "c++" kelime sınırı (\b) taşımadığı için ayrı seçenek olarak aranır.
+    "qt": re.compile(
+        r"c\+\+|\b(?:cpp|framework\w*|widgets?|qml|arayuz\w*|gui|linux|signal|slot|desktop|masaustu|pyside\w*)\b",
+        re.IGNORECASE,
+    ),
+    # Türkçede "aks" araç dingilidir; yalnızca bulut/konteyner bağlamında Azure Kubernetes Service.
+    "aks": re.compile(
+        r"\b(?:azure|kubernetes|k8s|container\w*|konteyner\w*|cloud|bulut|helm|docker)\b",
+        re.IGNORECASE,
+    ),
+    "rtl": re.compile(
+        r"\b(?:fpga|verilog|systemverilog|vhdl|asic|sentez|synthesis|simulasyon|simulation|"
+        r"vivado|tasarim\w*|design)\b",
+        re.IGNORECASE,
+    ),
 }
 _ABOUT_ORGANIZATION_HEADING = re.compile(
     r"About[ \t]+(?:(?:the|our)[ \t]+)?[A-Z][\w&'-]*"

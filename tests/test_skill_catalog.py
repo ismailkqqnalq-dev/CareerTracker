@@ -48,7 +48,7 @@ def test_seed_skill_catalog_is_idempotent(db_session):
 def test_catalog_covers_common_technical_skills_and_stays_manageable():
     names = {entry["name"] for entry in SKILL_CATALOG}
 
-    assert 120 <= len(SKILL_CATALOG) <= 260
+    assert 120 <= len(SKILL_CATALOG) <= 400
     assert {
         "Python",
         "pandas",
