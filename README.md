@@ -51,7 +51,9 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Alan | Metot ve yol | Giriş | Açıklama |
 |---|---|---|---|
 | Hesap | `POST /auth/register` | Hayır | Hesap oluşturur |
-| Oturum | `POST /auth/token` | Hayır | E-posta (`username` alanında) ve parola ile JWT alır |
+| Oturum | `POST /auth/token` | Hayır | E-posta (`username` alanında) ve parola ile 15 dakikalık JWT alır; ayrıca httpOnly yenileme çerezi kurar. `remember_me=true` ise çerez 30 gün, değilse tarayıcı kapanana kadar yaşar |
+| Oturum | `POST /auth/refresh` | Çerez | `X-Requested-With: CareerTracker` başlığı ister. Yenileme çerezini döndürür (rotasyon) ve yeni erişim token'ı verir; geçersiz, süresi dolmuş veya yeniden kullanılmış çerezde `401` ve `error_code` döner |
+| Oturum | `POST /auth/logout` | Çerez | Aynı başlığı ister; yenileme token'ını iptal eder ve çerezi siler (`204`) |
 | Oturum | `GET /auth/me` | Evet | Oturum açmış kullanıcıyı döndürür |
 | Hesap | `POST /auth/me/password` | Evet | `current_password` doğrulanırsa parolayı `new_password` ile değiştirir; `204`, yanlış parolada `403 password_confirmation_failed` |
 | Hesap | `DELETE /auth/me` | Evet | Mevcut parolayı yeniden doğrular, hesabı ve kişisel kayıtlarını siler |
@@ -275,10 +277,37 @@ hesap bulunamadığı için sonraki istekte geçersiz olur. Yanlış parola
 `403 password_confirmation_failed` döndürür. İşlem geri alınamaz; arayüzde
 "Hesap ayarları" ekranından şifre onayı ve ek bir onay penceresiyle yapılır.
 
-`POST /auth/me/password` mevcut parolayı doğrulayıp yenisini kaydeder. JWT'ler
-durumsuz olduğu için değişiklikten önce verilmiş bir token süresi dolana kadar
-(en fazla 30 dakika) geçerli kalır. E-posta gönderim altyapısı olmadığından
-"şifremi unuttum" akışı yoktur.
+`POST /auth/me/password` mevcut parolayı doğrulayıp yenisini kaydeder ve diğer
+cihazlardaki tüm oturumları kapatır; şifreyi değiştiren tarayıcının oturumu aynı
+kalıcılıkla yenilenir. Erişim token'ları durumsuz JWT olduğu için zaten verilmiş
+bir erişim token'ı süresi dolana kadar (en fazla 15 dakika) geçerli kalır.
+E-posta gönderim altyapısı olmadığından "şifremi unuttum" akışı yoktur.
+
+### Oturumlar
+
+- **İki token:** Erişim token'ı 15 dakikalık bir JWT'dir ve isteklerde
+  `Authorization: Bearer` başlığıyla gönderilir. Uzun ömürlü yenileme token'ı
+  `httpOnly`, `SameSite=Strict`, `Path=/` bir çerezde (`careertracker_refresh`)
+  durur; JavaScript onu okuyamaz.
+- **Saklama:** Veritabanında (`refresh_tokens`) yalnızca SHA-256 özeti tutulur.
+- **Rotasyon:** Her yenilemede eski token iptal edilir ve aynı aileden yenisi verilir.
+  İptal edilmiş bir token 30 saniyelik tolerans süresinden sonra yeniden gelirse
+  bu çalınma belirtisi sayılır ve ailenin tüm token'ları iptal edilir. Tolerans,
+  iki sekmenin aynı anda yenilemesini yanlış alarm olmaktan çıkarır. Eski token
+  koşullu bir `UPDATE` ile iptal edildiği için aynı token'la eş zamanlı gelen
+  isteklerden yalnızca biri yeni token alır; diğerleri `refresh_token_rotated` alır.
+- **Süreler:** "Beni hatırla" ile 30 gün, onsuz 1 gün (tarayıcı oturumu çerezi);
+  süre her yenilemede baştan başlar.
+- **CSRF:** Çerezle çalışan `/auth/refresh` ve `/auth/logout`,
+  `SameSite=Strict` çereze ek olarak `X-Requested-With: CareerTracker` başlığı ister.
+  Başka bir site, CORS izni olmadan bu başlığı gönderemez.
+- **Secure bayrağı:** Çerez `APP_ENV=development` dışında yalnızca HTTPS üzerinden
+  gönderilir. `COOKIE_SECURE=true|false` ile açıkça ayarlanabilir; geçersiz değer
+  uygulamanın açılmasını engeller.
+- **Arayüz:** Erişim token'ı sekmeye özel `sessionStorage`'da kalır. 401 alan istek
+  bir kez sessizce yenilenip tekrarlanır; eş zamanlı 401'ler tek yenilemeyi paylaşır.
+  `localStorage`'daki gizli olmayan `careertracker_session` işareti, sekme yeniden
+  açıldığında oturumun sessizce geri yüklenmesini sağlar.
 
 Kabul edilmiş risk: kayıtlı e-posta için `POST /auth/register` mevcut davranış
 gereği `409` döndürür ve bu, e-posta adresinin sistemde olup olmadığını ortaya

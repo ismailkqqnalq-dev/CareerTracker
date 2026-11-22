@@ -9,6 +9,7 @@ from app.models.activities import Activity
 from app.models.tasks import Task
 from app.models.skills import Skill, SkillAliases, UserSkill, SkillSuggestion
 from app.models.opportunity_skills import OpportunitySkill
+from app.models.refresh_tokens import RefreshToken
 from alembic import context
 from app.models.users import User
 from dotenv import load_dotenv

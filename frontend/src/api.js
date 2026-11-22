@@ -18,8 +18,42 @@ export class ApiError extends Error {
   }
 }
 
-export function createApiClient({ onUnauthorized } = {}) {
-  async function perform(path, { token, ...options } = {}) {
+// Çerezle çalışan oturum uç noktaları bu başlığı ister (CSRF koruması).
+export const SESSION_HEADERS = { "X-Requested-With": "CareerTracker" };
+// Bu isteklerin 401'i "şifre yanlış" veya "oturum yok" demektir; yenileme denenmez.
+const NO_REFRESH_PATHS = ["/auth/token", "/auth/register", "/auth/refresh", "/auth/logout"];
+
+export function createApiClient({ onUnauthorized, onTokenRefreshed } = {}) {
+  let pendingRefresh = null;
+
+  async function callRefresh() {
+    const response = await fetch(`${API_BASE}/auth/refresh`, { method: "POST", headers: SESSION_HEADERS });
+    const body = await response.json().catch(() => null);
+    if (response.ok && typeof body?.access_token === "string") return { token: body.access_token };
+    return { token: null, errorCode: body?.error_code ?? null };
+  }
+
+  // httpOnly çerezle yeni erişim token'ı alır; aynı anda gelen çağrılar tek isteği paylaşır.
+  function refreshSession() {
+    if (!pendingRefresh) {
+      pendingRefresh = (async () => {
+        try {
+          let result = await callRefresh();
+          // Başka bir sekme çerezi az önce yeniledi; tarayıcıda artık yenisi var.
+          if (!result.token && result.errorCode === "refresh_token_rotated") result = await callRefresh();
+          if (result.token) onTokenRefreshed?.(result.token);
+          return result.token;
+        } catch {
+          return null;
+        } finally {
+          pendingRefresh = null;
+        }
+      })();
+    }
+    return pendingRefresh;
+  }
+
+  async function perform(path, { token, ...options } = {}, retried = false) {
     const headers = new Headers(options.headers || {});
     if (options.body && !(options.body instanceof URLSearchParams) && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
@@ -32,6 +66,10 @@ export function createApiClient({ onUnauthorized } = {}) {
       : await response.json().catch(() => null);
 
     if (!response.ok) {
+      if (response.status === 401 && token && !retried && !NO_REFRESH_PATHS.some((prefix) => path.startsWith(prefix))) {
+        const freshToken = await refreshSession();
+        if (freshToken) return perform(path, { ...options, token: freshToken }, true);
+      }
       if (response.status === 401) onUnauthorized?.();
       const retryAfter = response.headers?.get?.("Retry-After") ?? null;
       throw new ApiError(response.status, body?.error_code ?? null, retryAfter);
@@ -87,5 +125,5 @@ export function createApiClient({ onUnauthorized } = {}) {
     }
   }
 
-  return { request, requestAll, requestPage };
+  return { request, requestAll, requestPage, refreshSession };
 }

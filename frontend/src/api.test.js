@@ -68,6 +68,72 @@ describe("createApiClient", () => {
     expect(onUnauthorized).toHaveBeenCalledOnce();
   });
 
+  it("refreshes an expired session once and retries the request with the new token", async () => {
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (url.endsWith("/auth/refresh")) return response(200, { access_token: "fresh-token" });
+      const auth = options.headers.get("Authorization");
+      return auth === "Bearer fresh-token" ? response(200, { email: "me@example.com" }) : response(401, {});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const onUnauthorized = vi.fn();
+    const onTokenRefreshed = vi.fn();
+    const api = createApiClient({ onUnauthorized, onTokenRefreshed });
+
+    const me = await api.request("/auth/me", { token: "expired" });
+
+    expect(me).toEqual({ email: "me@example.com" });
+    expect(onTokenRefreshed).toHaveBeenCalledWith("fresh-token");
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    const [, refreshOptions] = fetchMock.mock.calls.find(([url]) => url.endsWith("/auth/refresh"));
+    expect(refreshOptions.method).toBe("POST");
+    expect(refreshOptions.headers["X-Requested-With"]).toBe("CareerTracker");
+  });
+
+  it("shares one refresh between requests that expire at the same time", async () => {
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (url.endsWith("/auth/refresh")) return response(200, { access_token: "fresh-token" });
+      return options.headers.get("Authorization") === "Bearer fresh-token" ? response(200, []) : response(401, {});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const api = createApiClient();
+
+    await Promise.all([
+      api.request("/tasks", { token: "expired" }),
+      api.request("/contacts", { token: "expired" }),
+    ]);
+
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith("/auth/refresh"))).toHaveLength(1);
+  });
+
+  it("tries once more when another tab has just rotated the refresh cookie", async () => {
+    const refreshReplies = [
+      response(401, { error_code: "refresh_token_rotated" }),
+      response(200, { access_token: "fresh-token" }),
+    ];
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (url.endsWith("/auth/refresh")) return refreshReplies.shift();
+      return options.headers.get("Authorization") === "Bearer fresh-token" ? response(200, {}) : response(401, {});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const onUnauthorized = vi.fn();
+    const api = createApiClient({ onUnauthorized });
+
+    await api.request("/auth/me", { token: "expired" });
+
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith("/auth/refresh"))).toHaveLength(2);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it("does not try to refresh when the login request itself is rejected", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response(401, { detail: "Invalid credentials" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const api = createApiClient();
+
+    await expect(api.request("/auth/token", { method: "POST", token: "irrelevant" }))
+      .rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("preserves an explicitly supplied content type for binary request bodies", async () => {
     const file = new File([new Uint8Array([1, 2, 3])], "posting.png", { type: "image/png" });
     const fetchMock = vi.fn().mockResolvedValue(response(200, { text: "Python" }));
