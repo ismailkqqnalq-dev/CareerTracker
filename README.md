@@ -26,7 +26,7 @@ Proje aşamalı geliştirilir: önce sağlam bir backend, sonra her yapay zekâ 
 - Genel bakış ekranında kullanıcıya özel başvuru durumları, görüşme/teklif sayıları ve son kayıtlar
 - Alembic veritabanı migration'ları
 - GitHub Actions ile otomatik test çalıştırma
-- 256 becerilik ortak teknik seed kataloğu (Android, OOP, design patterns, multithreading, bellek yönetimi, IPC, birim testi ve Espresso gibi mobil geliştirme becerileri Türkçe yazımlarıyla dahil), kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
+- 344 becerilik ortak teknik seed kataloğu (Android ve mobil geliştirme; Kariyer.net yazılım ve elektrik-elektronik ilanlarından .NET, Azure, CBS/GIS, gömülü sistemler, haberleşme protokolleri, FPGA/HDL, test ve üretim becerileri Türkçe yazımlarıyla dahil), kullanıcıya özel skill/alias yönetimi ve normalize edilmiş adla skill bulma
 - Fırsatlara skill bağlama ve bağlı skill'leri listeleme
 - İlan analizi sonucunu düzenlenebilir, önceden doldurulmuş formla başvuru olarak kaydetme; seçilen beceriler başvuruyla aynı veritabanı işleminde bağlanır
 - Profil becerilerini yönetme, fırsat gereksinimlerine katalog becerisi ekleme ve profil/fırsat eşleşmesini görme (`frontend/` MVP arayüzü)
