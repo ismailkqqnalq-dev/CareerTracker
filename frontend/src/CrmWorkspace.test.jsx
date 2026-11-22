@@ -91,6 +91,51 @@ describe("quick status change in the opportunity list", () => {
   });
 });
 
+describe("server-side opportunity search", () => {
+  const lastPath = (api) => api.requestPage.mock.calls.at(-1)[0];
+
+  it("searches all opportunities on the server once typing stops", async () => {
+    const api = createApi([{ ...legacyRecord, status: "Başvuruldu" }]);
+    render(<CrmWorkspace api={api} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    fireEvent.change(await screen.findByLabelText("Başvurularda ara"), { target: { value: "  Trendyol " } });
+
+    await waitFor(() => expect(lastPath(api)).toBe("/opportunities?q=Trendyol"));
+    expect(api.requestPage.mock.calls.at(-1)[1]).toMatchObject({ offset: 0 });
+    expect(screen.queryByText(/yalnızca bu sayfadaki/)).toBeNull();
+  });
+
+  it("filters by status and combines it with the search", async () => {
+    const api = createApi([{ ...legacyRecord, status: "Teklif" }]);
+    render(<CrmWorkspace api={api} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    fireEvent.change(await screen.findByLabelText("Durum filtresi"), { target: { value: "Teklif" } });
+    await waitFor(() => expect(lastPath(api)).toBe("/opportunities?status=Teklif"));
+
+    fireEvent.change(screen.getByLabelText("Başvurularda ara"), { target: { value: "eski" } });
+    await waitFor(() => expect(lastPath(api)).toBe("/opportunities?q=eski&status=Teklif"));
+  });
+
+  it("offers to clear the search when nothing matches", async () => {
+    const api = createApi([]);
+    render(<CrmWorkspace api={api} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    fireEvent.change(await screen.findByLabelText("Durum filtresi"), { target: { value: "Reddedildi" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Aramayı temizle" }));
+
+    await waitFor(() => expect(lastPath(api)).toBe("/opportunities"));
+    expect(screen.getByLabelText("Durum filtresi").value).toBe("");
+  });
+
+  it("keeps page-only search for the other lists", async () => {
+    const api = createApi([]);
+    render(<CrmWorkspace api={api} token="test-token" view="contacts" onNavigate={vi.fn()} />);
+
+    expect(await screen.findByLabelText("Bu sayfada ara")).toBeTruthy();
+    expect(screen.queryByLabelText("Durum filtresi")).toBeNull();
+  });
+});
+
 describe("opportunity detail navigation", () => {
   it("opens an opportunity's detail from the list and returns to a refreshed list", async () => {
     const api = createApi([{ ...legacyRecord, status: "Başvuruldu" }]);

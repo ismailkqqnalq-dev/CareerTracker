@@ -55,11 +55,22 @@ def create_opportunity(
 def get_all_opportunities(
     response: Response,
     pagination: tuple[int, int] = Depends(pagination_params),
+    q: str | None = Query(
+        default=None,
+        max_length=200,
+        description="Şirket, pozisyon, tür, konum, sıradaki adım ve notlarda arar; Türkçe harf ve büyük/küçük harf duyarsız.",
+    ),
+    status: str | None = Query(default=None, max_length=50, description="Duruma göre filtreler; büyük/küçük harf duyarsız."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     items, total = service.get_all_opportunities(
-        db, user_id=current_user.id, limit=pagination[0], offset=pagination[1]
+        db,
+        user_id=current_user.id,
+        limit=pagination[0],
+        offset=pagination[1],
+        search=(q or "").strip() or None,
+        status=(status or "").strip() or None,
     )
     set_total_count(response, total)
     return items
