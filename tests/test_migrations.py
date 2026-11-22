@@ -23,12 +23,12 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE_TABLES = {"opportunities", "contacts", "activities", "tasks"}
 SKILL_TABLES = {"skills", "skill_aliases", "opportunity_skills"}
 PRE_USER_TABLES = BASE_TABLES | SKILL_TABLES
-ALL_TABLES = PRE_USER_TABLES | {"users", "user_skills", "skill_suggestions", "personal_skill_aliases", "refresh_tokens"}
+ALL_TABLES = PRE_USER_TABLES | {"users", "user_skills", "skill_suggestions", "personal_skill_aliases", "refresh_tokens", "inbound_addresses", "email_suggestions"}
 
 
 INITIAL = "d0fe616da34f"
 PRE_USER_HEAD = "b3b24fd6d532"
-HEAD = "713efa9f736b"
+HEAD = "0635a0875c3f"
 
 def _alembic(url, *args):
     env = os.environ.copy()

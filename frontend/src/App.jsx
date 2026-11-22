@@ -7,6 +7,7 @@ import SaveAnalysisAsOpportunity from "./SaveAnalysisAsOpportunity.jsx";
 import CrmWorkspace, { VIEW_TITLES } from "./CrmWorkspace.jsx";
 import AccountPanel from "./AccountPanel.jsx";
 import AssistantPanel from "./AssistantPanel.jsx";
+import EmailForwardingPanel from "./EmailForwardingPanel.jsx";
 
 const authApi = createApiClient();
 const TOKEN_KEY = "careertracker_token";
@@ -480,7 +481,10 @@ function App() {
         ) : activeView === "assistant" ? (
           <AssistantPanel api={api} token={token} />
         ) : activeView === "account" ? (
-          <AccountPanel api={api} token={token} email={user?.email} onAccountDeleted={() => { setActiveView("overview"); logout(); }} />
+          <>
+            <AccountPanel api={api} token={token} email={user?.email} onAccountDeleted={() => { setActiveView("overview"); logout(); }} />
+            <div className="account-panel"><EmailForwardingPanel api={api} token={token} /></div>
+          </>
         ) : activeView === "analytics" ? (
           <ApplicationAnalyticsPanel api={api} token={token} />
         ) : activeView === "profile" ? (

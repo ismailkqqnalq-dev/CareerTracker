@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -49,3 +49,36 @@ class EmailAnalysisResponse(BaseModel):
     candidates: list[OpportunitySummary]
     suggestion: SuggestedUpdate
     explanation: str
+
+
+class InboundAddressResponse(BaseModel):
+    enabled: bool
+    # Sunucuda INBOUND_EMAIL_DOMAIN tanımlı değilse tam adres gösterilemez.
+    address: str | None
+    domain_configured: bool
+    created_at: datetime | None
+    verification_code: str | None
+    verification_received_at: datetime | None
+
+
+class InboundEmail(BaseModel):
+    """Gelen e-posta servisinden gelen, servisten bağımsız biçim."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    recipient: str = Field(max_length=320)
+    sender: str = Field(default="", max_length=320)
+    subject: str = Field(default="", max_length=1000)
+    text: str = Field(default="", max_length=100_000)
+
+
+class EmailSuggestionResponse(BaseModel):
+    id: int
+    opportunity: OpportunitySummary
+    email_type: EmailType
+    confidence: float
+    sender: str
+    subject: str
+    received_at: datetime
+    suggestion: SuggestedUpdate
+    state: Literal["pending", "applied", "dismissed"]

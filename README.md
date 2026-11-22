@@ -82,6 +82,9 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
 | Görevler | `GET, POST /tasks`; `GET, PATCH, DELETE /tasks/{id}` | Evet | Kullanıcının görevlerini yönetir |
 | Dashboard | `GET /dashboard` | Evet | Kullanıcının fırsat istatistiklerini döndürür |
+| E-posta yönlendirme | `GET, POST, DELETE /email-insights/address` | Evet | Kullanıcının yönlendirme adresini gösterir, oluşturur/yeniler veya kapatır; Gmail doğrulama kodu da burada döner |
+| E-posta önerileri | `GET /email-insights/suggestions`; `POST /email-insights/suggestions/{id}/apply`, `/dismiss` | Evet | Bekleyen önerileri listeler; uygular (durum, son temas ve görev tek işlemde) veya reddeder. Bekleyen olmayan öneride `409 suggestion_not_pending` |
+| Gelen e-posta | `POST /inbound/email` | Gizli anahtar | Gelen e-posta servisinin çağırdığı uç nokta; `X-Inbound-Secret` ister, her durumda `202` döner |
 | E-posta analizi | `POST /email-insights/analyze` | Evet | `{body, subject?, sender?, opportunity_id?, today?}` alır; e-postanın türünü (başvuru alındı, mülakat daveti, test/ödev, teklif, ret, diğer) ve eşleşen başvuru için önerilen değişikliği döndürür. Hiçbir şey kaydetmez ve değiştirmez; başkasının başvurusu `404`, yanıt `Cache-Control: no-store` |
 | Asistan | `POST /assistant/ask` | Evet | `{message, today?}` alır; niyeti (başvuru durumu, bugünün işleri, takip, beceri açığı, genel durum, yardım, anlaşılamadı) sınıflandırır ve cevabı yalnızca kullanıcının kayıtlarından üretir. Mesaj saklanmaz, yanıt `Cache-Control: no-store` döner |
 | Gündem | `GET /agenda?today=YYYY-AA-GG` | Evet | Geciken ve 7 gün içinde son tarihi olan açık görevleri (son tarihe göre) ve durumu Başvuruldu/Ön görüşme/Teknik mülakat/Son mülakat olup son teması en az 7 gün önce olan başvuruları döndürür; her liste en fazla 20 kayıt. `today` kullanıcının yerel tarihidir, verilmezse sunucu tarihi kullanılır |
@@ -498,8 +501,35 @@ türünü bulur ve başvuru için değişiklik **önerir**. Kullanıcı onaylama
   veya metinde geçen şirket adıyla kullanıcının kendi başvurularına eşleştirilir; birden
   fazla eşleşmede tahmin yapılmaz, adaylar döner.
 - **Sınırlar:** Sentetik e-postalar gerçeklerden daha düzenli ve kalıplıdır; ölçülen
-  doğruluk gerçek gelen kutularındaki başarıyı kanıtlamaz. Yönlendirme adresiyle
-  otomatik alım henüz yoktur; yayına alma aşamasında eklenecektir.
+  doğruluk gerçek gelen kutularındaki başarıyı kanıtlamaz.
+
+### E-posta yönlendirme (otomatik öneriler)
+
+Kullanıcı "Hesap ayarları"nda kendisine özel, tahmin edilemeyen bir adres oluşturur
+(`<20 hex karakter>@INBOUND_EMAIL_DOMAIN`) ve şirketlerden gelen e-postaları oraya
+yönlendirir (ör. Gmail filtresiyle). Gelen e-posta servisi (Mailgun, Postmark vb.)
+her e-postayı `POST /inbound/email` ile iletir.
+
+- **İşleme:** E-posta sınıflandırılır ve kullanıcının başvurularıyla eşleştirilir.
+  Yalnızca tek bir başvuruyla eşleşen ve değişiklik doğuran e-postalar **bekleyen öneri**
+  olarak kaydedilir; genel bakışta "E-postadan gelen öneriler" kartında tek tıkla
+  uygulanır veya reddedilir. Aynı bekleyen öneri ikinci kez oluşturulmaz.
+- **Saklanan:** gönderen, konu, tür, güven ve önerilen değişiklik. E-postanın metni
+  saklanmaz; eşleşmeyen e-postalardan hiçbir iz kalmaz.
+- **Gmail doğrulaması:** Gmail yönlendirme adresine gönderdiği onay kodunu tanıyıp
+  kullanıcının ayarlar ekranında gösterir.
+- **Güvenlik:** `POST /inbound/email` kullanıcı oturumu değil, `X-Inbound-Secret`
+  başlığıyla paylaşılan gizli anahtar ister (sabit süreli karşılaştırma).
+  `INBOUND_EMAIL_SECRET` tanımlı değilse uç nokta `503 inbound_disabled` döner.
+  Bilinmeyen veya yenilenmiş bir adrese gelen e-posta da aynı `202` yanıtını alır;
+  hangi adreslerin var olduğu dışarıdan anlaşılamaz. Adres yenilenince eskisine gelenler
+  işlenmez.
+- **Asistan bağlantısı:** "X başvurum ne alemde?" cevabı, o başvuru için gelen son
+  e-postanın türünü de gösterir (ör. "Son e-posta (22.11.2026): olumsuz dönüş").
+- **Yayına alırken:** Alan adının MX kayıtlarını gelen e-posta servisine yönlendirin,
+  servisin "inbound route/webhook" ayarında hedefi `https://<site>/api/inbound/email`
+  yapın ve `X-Inbound-Secret` başlığını ekleyin. Servisin kendi gövde biçimini
+  `{recipient, sender, subject, text}` alanlarına çeviren küçük bir uyarlama gerekebilir.
 
 ## Testler
 
