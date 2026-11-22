@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { OPPORTUNITY_STATUSES, displayDate, safeHttpUrl, today } from "./crmUtils.js";
+import OpportunityDetail from "./OpportunityDetail.jsx";
+
+export { OPPORTUNITY_STATUSES };
 
 const PAGE_SIZE = 50;
-// Genel bakıştaki görüşme/teklif sayıları bu adlarla hesaplanır; serbest yazım sayıları bozabiliyordu.
-export const OPPORTUNITY_STATUSES = ["Başvuruldu", "Ön görüşme", "Teknik mülakat", "Son mülakat", "Teklif", "Reddedildi"];
-const today = () => {
-  const date = new Date();
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 10);
-};
 
 const RESOURCES = {
   opportunities: {
@@ -76,22 +73,6 @@ const VIEW_TITLES = {
   tasks: "Görevler",
   activities: "Aktiviteler",
 };
-
-function displayDate(value) {
-  if (!value) return "Tarih yok";
-  const parsed = new Date(`${String(value).slice(0, 10)}T12:00:00`);
-  return Number.isNaN(parsed.valueOf()) ? String(value) : new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(parsed);
-}
-
-function safeHttpUrl(value) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return ["http:", "https:"].includes(url.protocol) ? url.href : null;
-  } catch {
-    return null;
-  }
-}
 
 function relationName(resource, id, related) {
   if (!id) return "Bağlı kayıt yok";
@@ -266,7 +247,7 @@ function RecordEditor({ config, record, related, onCancel, onSave, busy }) {
   );
 }
 
-function RecordCard({ view, record, related, onEdit, onDelete, onToggleTask, onStatusChange, statusBusy }) {
+function RecordCard({ view, record, related, onEdit, onDelete, onToggleTask, onStatusChange, statusBusy, onOpen }) {
   const opportunity = view === "opportunities";
   const contact = view === "contacts";
   const task = view === "tasks";
@@ -337,6 +318,9 @@ function RecordCard({ view, record, related, onEdit, onDelete, onToggleTask, onS
         {safeLink && <a className="crm-record-link" href={safeLink} target="_blank" rel="noreferrer">{opportunity ? "İlanı aç" : "LinkedIn profilini aç"} ↗</a>}
       </div>
       <div className="crm-record-actions">
+        {opportunity && (
+          <button type="button" className="button button-quiet" aria-label={`${record.company || "Başvuru"} ayrıntıları`} onClick={() => onOpen(record)}>Ayrıntılar</button>
+        )}
         <button type="button" className="button button-quiet" onClick={() => onEdit(record)}>Düzenle</button>
         <button type="button" className="button button-danger-quiet" onClick={() => onDelete(record)}>Sil</button>
       </div>
@@ -511,6 +495,10 @@ function ResourceWorkspace({ api, token, view }) {
   const [editor, setEditor] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [statusBusyId, setStatusBusyId] = useState(null);
+  const [detailId, setDetailId] = useState(null);
+
+  // Bileşen görünümler arasında korunur (sayfa konumları için); açık detay ise kapanır.
+  useEffect(() => { setDetailId(null); }, [view]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -621,6 +609,17 @@ function ResourceWorkspace({ api, token, view }) {
   const pageNumber = Math.floor(offset / PAGE_SIZE) + 1;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  if (view === "opportunities" && detailId !== null) {
+    return (
+      <OpportunityDetail
+        api={api}
+        token={token}
+        opportunityId={detailId}
+        onBack={() => { setDetailId(null); setReloadKey((value) => value + 1); }}
+      />
+    );
+  }
+
   return (
     <section className="crm-resource" aria-labelledby="crm-resource-title">
       <div className="crm-resource-heading">
@@ -662,6 +661,7 @@ function ResourceWorkspace({ api, token, view }) {
                 onDelete={remove}
                 onToggleTask={toggleTask}
                 onStatusChange={changeStatus}
+                onOpen={(item) => setDetailId(item.id)}
                 statusBusy={statusBusyId === record.id}
               />
             ))}

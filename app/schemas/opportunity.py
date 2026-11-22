@@ -3,6 +3,9 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
+from app.schemas.activities import ActivityResponse
+from app.schemas.contacts import ContactResponse
+from app.schemas.tasks import TaskResponse
 from app.schemas.validators import validate_http_url
 
 
@@ -54,6 +57,21 @@ class OpportunityResponse(BaseModel):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class OpportunitySkillSummary(BaseModel):
+    id: int
+    name: str
+
+
+class OpportunityDetailResponse(BaseModel):
+    """Bir başvurunun tek ekranda gösterilen her şeyi; hepsi aynı kullanıcıya ait."""
+
+    opportunity: OpportunityResponse
+    contacts: list[ContactResponse]
+    tasks: list[TaskResponse]
+    activities: list[ActivityResponse]
+    skills: list[OpportunitySkillSummary]
 
 
 class OpportunityUpdate(BaseModel):

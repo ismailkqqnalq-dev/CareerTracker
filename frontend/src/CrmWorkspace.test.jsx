@@ -91,6 +91,29 @@ describe("quick status change in the opportunity list", () => {
   });
 });
 
+describe("opportunity detail navigation", () => {
+  it("opens an opportunity's detail from the list and returns to a refreshed list", async () => {
+    const api = createApi([{ ...legacyRecord, status: "Başvuruldu" }]);
+    api.request.mockImplementation(async (path) => {
+      if (path === "/opportunities/3/detail") {
+        return { opportunity: { ...legacyRecord, status: "Başvuruldu" }, contacts: [], tasks: [], activities: [], skills: [] };
+      }
+      return {};
+    });
+    render(<CrmWorkspace api={api} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Eski Şirket ayrıntıları" }));
+
+    expect(await screen.findByRole("heading", { name: "Stajyer" })).toBeTruthy();
+    expect(api.request).toHaveBeenCalledWith("/opportunities/3/detail", expect.anything());
+
+    fireEvent.click(screen.getByRole("button", { name: "← Başvurulara dön" }));
+
+    expect(await screen.findByRole("button", { name: "Eski Şirket ayrıntıları" })).toBeTruthy();
+    await waitFor(() => expect(api.requestPage).toHaveBeenCalledTimes(2));
+  });
+});
+
 function localToday() {
   const date = new Date();
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);

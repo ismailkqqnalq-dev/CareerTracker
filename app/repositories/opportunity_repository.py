@@ -2,8 +2,12 @@ from datetime import date, datetime
 
 from sqlalchemy import func
 
+from app.models.activities import Activity
+from app.models.contacts import Contact
 from app.models.opportunity import Opportunity
 from app.models.opportunity_skills import OpportunitySkill
+from app.models.skills import Skill
+from app.models.tasks import Task
 from app.models.users import User
 from app.pagination import paginate_query
 from app.record_limits import OpportunityQuotaExceeded
@@ -67,6 +71,41 @@ def get_opportunity_by_id(db, opportunity_id, user_id):
         )
         .first()
     )
+
+
+DETAIL_LIMIT = 200
+
+
+def get_opportunity_detail(db, opportunity_id, user_id):
+    """Başvuru ve bağlı kayıtları; her sorgu hem başvuruya hem kullanıcıya göre süzülür."""
+    opportunity = get_opportunity_by_id(db, opportunity_id, user_id)
+    if opportunity is None:
+        return None
+
+    def owned(model):
+        return db.query(model).filter(model.user_id == user_id, model.opportunity_id == opportunity_id)
+
+    return {
+        "opportunity": opportunity,
+        "contacts": owned(Contact).order_by(Contact.id).limit(DETAIL_LIMIT).all(),
+        # Açık görevler önce, en yakın son tarih başta.
+        "tasks": owned(Task)
+        .order_by(Task.is_completed.is_(True), Task.due_date.is_(None), Task.due_date, Task.id)
+        .limit(DETAIL_LIMIT)
+        .all(),
+        "activities": owned(Activity)
+        .order_by(Activity.dates.is_(None), Activity.dates.desc(), Activity.id.desc())
+        .limit(DETAIL_LIMIT)
+        .all(),
+        "skills": [
+            {"id": skill_id, "name": name}
+            for skill_id, name in db.query(Skill.id, Skill.name)
+            .join(OpportunitySkill, OpportunitySkill.skill_id == Skill.id)
+            .filter(OpportunitySkill.opportunity_id == opportunity_id)
+            .order_by(Skill.name)
+            .all()
+        ],
+    }
 
 
 def update_opportunity(db, opportunity_id, update_data, user_id):
