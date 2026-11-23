@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -15,6 +15,8 @@ from app.rate_limits import (
 from app.schemas.auth import (
     ChangePasswordRequest,
     DeleteAccountRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
     RegisterRequest,
     TokenResponse,
     UserResponse,
@@ -27,7 +29,13 @@ from app.security import (
     refresh_cookie_is_secure,
     registration_is_enabled,
 )
-from app.services import account_export_service, auth_service, session_service
+from app.services import (
+    account_export_service,
+    auth_service,
+    mailer,
+    password_reset_service,
+    session_service,
+)
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -214,6 +222,86 @@ def logout(request: Request, db: Session = Depends(get_db)):
         return rejected
     session_service.revoke(db, request.cookies.get(REFRESH_COOKIE_NAME))
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    _clear_refresh_cookie(response)
+    return response
+
+
+@router.post(
+    "/password-reset/request",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        429: {"description": "Password reset rate limit exceeded"},
+        503: {"description": "Outgoing email is not configured"},
+    },
+)
+def request_password_reset(
+    request: Request,
+    data: PasswordResetRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Hesap varsa sıfırlama bağlantısı gönderir; yanıt hesabın var olup olmadığını söylemez."""
+    if not mailer.email_is_enabled():
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "detail": "Password reset is not available",
+                "error_code": "password_reset_unavailable",
+            },
+        )
+
+    settings = get_rate_limit_settings()
+    client_ip = get_client_ip(request)
+    for scope, identifier, limit in (
+        ("password-reset-ip", client_ip, settings.password_reset_ip_per_hour),
+        ("password-reset-email", str(data.email).strip().casefold(), settings.password_reset_email_per_hour),
+    ):
+        decision = rate_limit_manager.check(scope, identifier, limit, "hour")
+        if not decision.allowed:
+            return rate_limited_response(decision.retry_after)
+
+    created = password_reset_service.create_reset_token(db, str(data.email))
+    if created is not None:
+        user, raw_token = created
+        # SMTP birkaç saniye sürebilir; yanıt beklemeden döner.
+        background_tasks.add_task(password_reset_service.send_reset_email, user.email, raw_token)
+    return {"detail": "If the account exists, a reset link has been sent."}
+
+
+@router.post(
+    "/password-reset/confirm",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses={
+        400: {"description": "Reset link is invalid, used or expired"},
+        429: {"description": "Rate limit exceeded"},
+    },
+)
+def confirm_password_reset(
+    request: Request,
+    data: PasswordResetConfirm,
+    db: Session = Depends(get_db),
+):
+    settings = get_rate_limit_settings()
+    decision = rate_limit_manager.check(
+        "password-reset-confirm-ip",
+        get_client_ip(request),
+        settings.login_ip_per_minute,
+        "minute",
+    )
+    if not decision.allowed:
+        return rate_limited_response(decision.retry_after)
+
+    if not password_reset_service.reset_password(db, data.token, data.new_password):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={
+                "detail": "Reset link is invalid or expired",
+                "error_code": "reset_token_invalid",
+            },
+        )
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    # Bu tarayıcıda eski bir oturum çerezi kaldıysa o da geçersiz; temizlenir.
     _clear_refresh_cookie(response)
     return response
 

@@ -1,7 +1,7 @@
 """Kullanıcının tüm kayıtlarını tek bir JSON belgesinde toplar (KVKK m.11, erişim hakkı).
 
 Sütunlar model tanımından okunur; bir tabloya yeni sütun eklenince dışa aktarmaya da
-kendiliğinden girer. Kimlik doğrulama sırları (şifre özeti, oturum token özeti) asla
+kendiliğinden girer. Kimlik doğrulama sırları (şifre özeti, oturum ve sıfırlama token özetleri) asla
 belgeye girmez.
 """
 
@@ -15,6 +15,7 @@ from app.models.contacts import Contact
 from app.models.email_insights import EmailSuggestion, InboundAddress
 from app.models.opportunity import Opportunity
 from app.models.opportunity_skills import OpportunitySkill
+from app.models.password_reset_tokens import PasswordResetToken
 from app.models.refresh_tokens import RefreshToken
 from app.models.skills import PersonalSkillAlias, Skill, SkillSuggestion, UserSkill
 from app.models.tasks import Task
@@ -35,6 +36,7 @@ _SECTIONS = (
     ("email_forwarding_addresses", InboundAddress, InboundAddress.user_id, ()),
     ("email_suggestions", EmailSuggestion, EmailSuggestion.user_id, ()),
     ("sessions", RefreshToken, RefreshToken.user_id, ("token_hash", "family_id")),
+    ("password_reset_requests", PasswordResetToken, PasswordResetToken.user_id, ("token_hash",)),
 )
 
 # Kullanıcıya ait veri tutan tablolar; testler yeni bir tablonun unutulmadığını denetler.

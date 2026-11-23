@@ -129,7 +129,8 @@ Aşımda `429`, `{"detail","error_code":"rate_limited"}` ve
 
 Sınırlar ve bellek anahtarı üst sınırı `.env` içindeki
 `RATE_LIMIT_LOGIN_IP_PER_MINUTE`, `RATE_LIMIT_LOGIN_IP_EMAIL_PER_MINUTE`,
-`RATE_LIMIT_REGISTER_IP_PER_HOUR`, `RATE_LIMIT_OCR_PER_USER_PER_MINUTE`,
+`RATE_LIMIT_REGISTER_IP_PER_HOUR`, `RATE_LIMIT_PASSWORD_RESET_IP_PER_HOUR`,
+`RATE_LIMIT_PASSWORD_RESET_EMAIL_PER_HOUR`, `RATE_LIMIT_OCR_PER_USER_PER_MINUTE`,
 `RATE_LIMIT_JOB_ANALYSIS_PER_USER_PER_MINUTE`,
 `RATE_LIMIT_SEMANTIC_CANDIDATES_PER_USER_PER_MINUTE` ve
 `RATE_LIMIT_MAX_TRACKED_KEYS` ile ayarlanabilir. Limiter e-posta adreslerini
@@ -328,11 +329,33 @@ E-posta gönderim altyapısı olmadığından "şifremi unuttum" akışı yoktur
   `localStorage`'daki gizli olmayan `careertracker_session` işareti, sekme yeniden
   açıldığında oturumun sessizce geri yüklenmesini sağlar.
 
+### Şifremi unuttum
+
+- `POST /auth/password-reset/request` (`{"email"}`) hesap varsa e-postayla tek
+  kullanımlık, 30 dakika geçerli bir bağlantı gönderir ve her durumda aynı `202`
+  yanıtını verir. Yeni istek önceki kullanılmamış bağlantıları geçersiz kılar.
+  Sınırlar: IP başına 10/saat (`RATE_LIMIT_PASSWORD_RESET_IP_PER_HOUR`), e-posta
+  başına 3/saat (`RATE_LIMIT_PASSWORD_RESET_EMAIL_PER_HOUR`).
+- Bağlantı `PUBLIC_APP_URL/#sifre-sifirla=<token>` biçimindedir; token `#`
+  kısmında olduğu için sunucu günlüklerine ve `Referer` başlığına girmez. Arayüz
+  token'ı okuyunca adres çubuğundan siler.
+- `POST /auth/password-reset/confirm` (`{"token","new_password"}`) şifreyi değiştirir
+  ve kullanıcının tüm oturumlarını kapatır (`204`). Geçersiz, kullanılmış veya süresi
+  dolmuş bağlantı `400 reset_token_invalid` döner. Veritabanında
+  (`password_reset_tokens`) yalnızca token'ın SHA-256 özeti tutulur.
+- **Giden e-posta:** `EMAIL_BACKEND=smtp` ile `SMTP_HOST`, `SMTP_PORT` (varsayılan
+  587), `SMTP_SECURITY=starttls|ssl`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`
+  ve `PUBLIC_APP_URL` ayarlanır; SMTP veren her servis (Brevo, Resend, alan adı
+  e-postası…) çalışır. `APP_ENV=development` iken varsayılan `console`'dur: e-posta
+  gönderilmez, sunucu günlüğüne yazılır (üretimde `console` uygulamanın açılmasını
+  engeller). Üretimde ayar yoksa `disabled` olur ve istek `503
+  password_reset_unavailable` döner.
+
 Kabul edilmiş risk: kayıtlı e-posta için `POST /auth/register` mevcut davranış
 gereği `409` döndürür ve bu, e-posta adresinin sistemde olup olmadığını ortaya
 çıkarabilir. Şimdilik açık hata mesajı kayıt deneyimi için korunuyor. Bu yanıtı
-genelleştirmek, e-posta doğrulama ve parola kurtarma akışıyla birlikte ele
-alınmalıdır.
+genelleştirmek, e-posta doğrulama akışıyla birlikte ele alınmalıdır. Şifre
+sıfırlama isteği ise hesabın varlığını açığa vurmaz.
 
 ## Docker ile PostgreSQL
 

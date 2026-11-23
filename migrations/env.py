@@ -10,6 +10,7 @@ from app.models.tasks import Task
 from app.models.skills import Skill, SkillAliases, UserSkill, SkillSuggestion
 from app.models.opportunity_skills import OpportunitySkill
 from app.models.refresh_tokens import RefreshToken
+from app.models.password_reset_tokens import PasswordResetToken
 from app.models.email_insights import EmailSuggestion, InboundAddress
 from alembic import context
 from app.models.users import User
