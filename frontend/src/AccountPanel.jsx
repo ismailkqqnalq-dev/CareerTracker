@@ -60,6 +60,39 @@ function ChangePasswordForm({ api, token }) {
   );
 }
 
+function DataExportCard({ api, token }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function download() {
+    setError("");
+    setBusy(true);
+    try {
+      const exported = await api.request("/auth/me/export", { token });
+      const blob = new Blob([JSON.stringify(exported, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `careertracker-verilerim-${exported.exported_at.slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (exportError) {
+      if (exportError.status !== 401) setError("Veriler indirilemedi. Lütfen tekrar dene.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="account-card" aria-labelledby="data-export-title">
+      <h2 id="data-export-title">Verilerimi indir</h2>
+      <p className="muted">Başvuru, kişi, görev, aktivite, beceri ve e-posta önerisi kayıtlarının tamamı tek bir JSON dosyası olarak iner. Şifren dosyaya girmez.</p>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <button type="button" className="button" onClick={download} disabled={busy}>{busy ? "Hazırlanıyor…" : "Verilerimi indir"}</button>
+    </section>
+  );
+}
+
 function DeleteAccountForm({ api, token, onAccountDeleted }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -98,6 +131,7 @@ function AccountPanel({ api, token, email, onAccountDeleted }) {
     <div className="account-panel">
       {email && <p className="muted">Giriş yapılan hesap: <strong>{email}</strong></p>}
       <ChangePasswordForm api={api} token={token} />
+      <DataExportCard api={api} token={token} />
       <DeleteAccountForm api={api} token={token} onAccountDeleted={onAccountDeleted} />
     </div>
   );

@@ -27,7 +27,7 @@ from app.security import (
     refresh_cookie_is_secure,
     registration_is_enabled,
 )
-from app.services import auth_service, session_service
+from app.services import account_export_service, auth_service, session_service
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -223,6 +223,23 @@ def read_current_user(
     current_user: User = Depends(get_current_user),
 ):
     return current_user
+
+
+@router.get("/me/export", response_class=JSONResponse)
+def export_current_user_data(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Download every record of the signed-in user as one JSON document."""
+    document = account_export_service.build_export(db, current_user)
+    filename = f"careertracker-verilerim-{document['exported_at'][:10]}.json"
+    return JSONResponse(
+        document,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.post(
