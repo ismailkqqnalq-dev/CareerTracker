@@ -82,7 +82,7 @@ export function createApiClient({ onUnauthorized, onTokenRefreshed } = {}) {
     return body;
   }
 
-  async function requestPage(path, { token, limit = 50, offset = 0, ...options } = {}) {
+  async function requestPage(path, { token, limit = 50, offset = 0, newestFirst = false, ...options } = {}) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
       throw new RangeError("limit must be between 1 and 200");
     }
@@ -94,6 +94,8 @@ export function createApiClient({ onUnauthorized, onTokenRefreshed } = {}) {
     const params = new URLSearchParams(search);
     params.set("limit", String(limit));
     params.set("offset", String(offset));
+    // Sunucu varsayılan olarak eskiden yeniye sıralar; listeler en yeniyi ilk sayfada ister.
+    if (newestFirst) params.set("order", "newest");
     const { body, response } = await perform(`${pathname}?${params}`, { ...options, token });
     if (!Array.isArray(body)) throw new TypeError("Expected a paginated list response");
 

@@ -12,12 +12,13 @@ def create_activity(db, activity_data, user_id):
     return activity
 
 
-def get_all_activities(db, user_id, limit=50, offset=0):
+def get_all_activities(db, user_id, limit=50, offset=0, newest_first=False):
     return paginate_query(
         db.query(Activity).filter(Activity.user_id == user_id),
         order_by=Activity.id,
         limit=limit,
         offset=offset,
+        newest_first=newest_first,
     )
 
 

@@ -75,7 +75,7 @@ def _folded(column):
     return func.lower(expression)
 
 
-def get_all_opportunities(db, user_id, limit=50, offset=0, search=None, status=None):
+def get_all_opportunities(db, user_id, limit=50, offset=0, search=None, status=None, newest_first=False):
     query = db.query(Opportunity).filter(Opportunity.user_id == user_id)
     if search:
         needle = fold_search_text(search)
@@ -88,6 +88,7 @@ def get_all_opportunities(db, user_id, limit=50, offset=0, search=None, status=N
         order_by=Opportunity.id,
         limit=limit,
         offset=offset,
+        newest_first=newest_first,
     )
 
 

@@ -61,6 +61,19 @@ describe("authenticated API requests", () => {
     expect(sessionStorage.getItem("careertracker_token")).toBeNull();
   });
 
+  it("explains what to fix when registration is rejected as invalid", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(422, { detail: [] })));
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Kayıt ol" }));
+    expect(screen.getByText("En az 8 karakter.")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("E-posta"), { target: { value: "someone@example.com" } });
+    fireEvent.change(screen.getByLabelText("Şifre"), { target: { value: "StrongPass123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Kayıt ol" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("E-posta adresini kontrol et; şifre 8 ile 128 karakter arasında olmalı.");
+  });
+
   it("shows candidate request failures instead of treating them as empty results", async () => {
     sessionStorage.setItem("careertracker_token", "temporary-test-token");
     vi.stubGlobal("fetch", vi.fn(async (url) => {

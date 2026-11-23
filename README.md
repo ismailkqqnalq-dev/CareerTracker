@@ -78,9 +78,9 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Fırsat skill eşleşmesi | `GET /opportunities/{opportunity_id}/skill-match` | Evet | Profilde bulunan ve eksik skill'leri karşılaştırır |
 | OCR | `POST /ocr/extract` | Evet | PNG/JPEG ham ikili gövdesini bellekte işler, metin ve görsel ölçülerini döndürür; sonuç saklanmaz |
 | İlan analizi | `POST /job-analysis` | Evet | En fazla 100 KB metinden etiketli ilan alanlarını, rol etiketini veya baştaki kısa unvan satırını ve görünür katalog becerilerini çıkarır; becerileri profilinle karşılaştırır; beceri listelerinde katalogda olmayan aday terimleri `unrecognized_terms` olarak döndürür; sonucu saklamaz |
-| Fırsatlar | `GET, POST /opportunities`; `GET, PATCH, DELETE /opportunities/{id}` | Evet | Kullanıcının fırsatlarını yönetir. `GET` isteğe bağlı `q` (en fazla 200 karakter; şirket, pozisyon, tür, konum, sıradaki adım ve notlarda Türkçe harf ve büyük/küçük harf duyarsız arama, `%` ve `_` düz karakterdir) ve `status` (en fazla 50 karakter, büyük/küçük harf duyarsız tam eşleşme) alır; `X-Total-Count` süzülmüş toplamı verir. `POST` isteğe bağlı `skill_ids` listesi (en fazla 100) alır: beceriler başvuruyla aynı işlemde bağlanır; görünmeyen veya başka kullanıcıya ait bir beceri varsa hiçbir şey kaydedilmez ve `404 unknown_skill` döner |
-| Kişiler | `GET, POST /contacts`; `GET, PATCH, DELETE /contacts/{id}` | Evet | Kullanıcının kişilerini yönetir |
-| Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir |
+| Fırsatlar | `GET, POST /opportunities`; `GET, PATCH, DELETE /opportunities/{id}` | Evet | Kullanıcının fırsatlarını yönetir. `GET` isteğe bağlı `q` (en fazla 200 karakter; şirket, pozisyon, tür, konum, sıradaki adım ve notlarda Türkçe harf ve büyük/küçük harf duyarsız arama, `%` ve `_` düz karakterdir) ve `status` (en fazla 50 karakter, büyük/küçük harf duyarsız tam eşleşme) alır; `X-Total-Count` süzülmüş toplamı verir. `POST` için yalnızca `company` ve `position` zorunludur; `status` verilmezse `Başvuruldu` olur, diğer alanlar boş bırakılabilir. `POST` isteğe bağlı `skill_ids` listesi (en fazla 100) alır: beceriler başvuruyla aynı işlemde bağlanır; görünmeyen veya başka kullanıcıya ait bir beceri varsa hiçbir şey kaydedilmez ve `404 unknown_skill` döner |
+| Kişiler | `GET, POST /contacts`; `GET, PATCH, DELETE /contacts/{id}` | Evet | Kullanıcının kişilerini yönetir; yalnızca `name` ve `opportunity_id` zorunludur |
+| Aktiviteler | `GET, POST /activities`; `GET, PATCH, DELETE /activities/{id}` | Evet | Kullanıcının aktivitelerini yönetir; `notes` isteğe bağlıdır |
 | Görevler | `GET, POST /tasks`; `GET, PATCH, DELETE /tasks/{id}` | Evet | Kullanıcının görevlerini yönetir |
 | Dashboard | `GET /dashboard` | Evet | Kullanıcının fırsat istatistiklerini döndürür |
 | E-posta yönlendirme | `GET, POST, DELETE /email-insights/address` | Evet | Kullanıcının yönlendirme adresini gösterir, oluşturur/yeniler veya kapatır; Gmail doğrulama kodu da burada döner |
@@ -96,6 +96,8 @@ Koleksiyon liste uç noktaları `limit` (varsayılan `50`, en fazla `200`) ve
 `offset` (varsayılan `0`) parametrelerini kabul eder. Yanıt biçimi JSON listesi
 olarak kalır; filtre uygulanmış toplam kayıt sayısı `X-Total-Count` başlığında
 döner. `GET /skills/suggestions/{id}/candidates` kendi `limit` sınırını kullanır.
+Fırsat, kişi, görev ve aktivite listeleri ayrıca `order=oldest|newest` alır
+(varsayılan `oldest`); arayüz `newest` kullanır, böylece en yeni kayıtlar ilk sayfada görünür.
 
 CSV dışa aktarma kayıtları akışlı üretir. Elektronik tablo formülü olarak
 yorumlanabilecek metin hücrelerinin başına tek tırnak eklenir; güvenlik için bu,

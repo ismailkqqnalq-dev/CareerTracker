@@ -4,7 +4,7 @@ import ProfileMatchPanel from "./ProfileMatchPanel.jsx";
 import ApplicationAnalyticsPanel from "./ApplicationAnalyticsPanel.jsx";
 import JobAnalysisResults from "./JobAnalysisResults.jsx";
 import SaveAnalysisAsOpportunity from "./SaveAnalysisAsOpportunity.jsx";
-import CrmWorkspace, { VIEW_TITLES } from "./CrmWorkspace.jsx";
+import CrmWorkspace, { VIEW_DESCRIPTIONS, VIEW_TITLES } from "./CrmWorkspace.jsx";
 import AccountPanel from "./AccountPanel.jsx";
 import AssistantPanel from "./AssistantPanel.jsx";
 import EmailForwardingPanel from "./EmailForwardingPanel.jsx";
@@ -68,6 +68,10 @@ function errorMessage(error, context = "İstek") {
   if (error.status === 409 && context === "Kayıt") {
     return "Bu e-posta ile bir hesap zaten bulunuyor.";
   }
+  if (error.status === 422 && context === "Kayıt") {
+    return "E-posta adresini kontrol et; şifre 8 ile 128 karakter arasında olmalı.";
+  }
+  if (error.status === 429) return error.message;
   return `${context} tamamlanamadı. Lütfen tekrar dene.`;
 }
 
@@ -108,14 +112,15 @@ function AuthScreen({ onAuthenticated }) {
     <main className="auth-layout">
       <section className="auth-card">
         <Brand />
-        <p className="eyebrow">BECERİ KATALOĞU</p>
+        <p className="eyebrow">KARİYER TAKİBİ</p>
         <h1>{mode === "login" ? "Hesabına giriş yap" : "Hesabını oluştur"}</h1>
-        <p className="muted">Bekleyen beceri önerilerini inceleyip doğru beceriyle eşleştir.</p>
+        <p className="muted">İş, staj ve freelance başvurularını, görüşmelerini ve takip adımlarını tek yerde düzenli tut.</p>
         <form className="auth-form" onSubmit={submit}>
           <label htmlFor="email">E-posta</label>
           <input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           <label htmlFor="password">Şifre</label>
-          <input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} maxLength={128} required aria-describedby={mode === "register" ? "password-hint" : undefined} value={password} onChange={(e) => setPassword(e.target.value)} />
+          {mode === "register" && <small id="password-hint" className="muted">En az 8 karakter.</small>}
           <label className="remember-me" htmlFor="remember-me">
             <input id="remember-me" type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
             Beni hatırla (30 gün açık kalır; ortak bilgisayarda işaretleme)
@@ -471,7 +476,7 @@ function App() {
           <div>
             <p className="eyebrow">{VIEW_TITLES[activeView] || activeView === "assistant" ? "KİŞİSEL ÇALIŞMA ALANIN" : activeView === "account" ? "HESAP" : "BECERİ VE İLAN MERKEZİ"}</p>
             <h1>{VIEW_TITLES[activeView] || (activeView === "suggestions" ? "Beceri önerileri" : activeView === "profile" ? "Profil ve fırsat eşleşmesi" : activeView === "account" ? "Hesap ayarları" : activeView === "assistant" ? "Asistan" : "Başvuru analizi")}</h1>
-            <p className="muted heading-copy">{VIEW_TITLES[activeView] ? "Kariyer sürecini düzenle ve takip adımlarını yönet." : activeView === "suggestions" ? "Sistemin tanımadığı becerileri eşleştir, ilan metnini incele ve beceri analizini kullan." : activeView === "profile" ? "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır." : activeView === "account" ? "Şifreni değiştir veya hesabını kalıcı olarak sil." : activeView === "assistant" ? "Başvuruların, görevlerin ve becerilerin hakkında soru sor." : "Başvurularının aylara göre dağılımını incele."}</p>
+            <p className="muted heading-copy">{VIEW_TITLES[activeView] ? VIEW_DESCRIPTIONS[activeView] : activeView === "suggestions" ? "Sistemin tanımadığı becerileri eşleştir, ilan metnini incele ve beceri analizini kullan." : activeView === "profile" ? "Profil becerilerini yönet ve kendi fırsatlarınla karşılaştır." : activeView === "account" ? "Şifreni değiştir, verilerini indir, e-posta yönlendirmeyi kur veya hesabını sil." : activeView === "assistant" ? "Başvuruların, görevlerin ve becerilerin hakkında soru sor." : "Başvurularının aylara göre dağılımını incele."}</p>
           </div>
           {activeView === "suggestions" && <div className="count-card"><span className="count-number">{pendingCount}</span><span>bekleyen öneri</span></div>}
         </div>

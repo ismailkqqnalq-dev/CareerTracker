@@ -22,23 +22,24 @@ SkillId = Annotated[int, Field(gt=0)]
 
 
 class OpportunityCreate(BaseModel):
+    # Hızlı kayıt için yalnızca şirket ve pozisyon zorunlu; gerisi sonradan doldurulabilir.
     company: Company
     position: Position
-    type: OpportunityType
-    application_date: date
-    job_link: JobLink
-    salary: Salary
-    location: Location
-    status: Status
-    notes: Notes
-    next_action: NextAction
-    last_contact_date: date
+    type: OpportunityType | None = None
+    application_date: date | None = None
+    job_link: JobLink | None = None
+    salary: Salary | None = None
+    location: Location | None = None
+    status: Status = "Başvuruldu"
+    notes: Notes | None = None
+    next_action: NextAction | None = None
+    last_contact_date: date | None = None
     # İsteğe bağlı: başvuruyla aynı işlemde bağlanacak, kullanıcıya görünür beceriler.
     skill_ids: list[SkillId] = Field(default_factory=list, max_length=100)
 
     @field_validator("job_link")
     @classmethod
-    def validate_job_link(cls, value: str) -> str:
+    def validate_job_link(cls, value: str | None) -> str | None:
         return validate_http_url(value)
 
 

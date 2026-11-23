@@ -14,14 +14,14 @@ LinkedIn = Annotated[str, StringConstraints(max_length=2048)]
 
 class ContactCreate(BaseModel):
     name: Name
-    role: Role
-    email: Email
-    linkedin: LinkedIn
+    role: Role | None = None
+    email: Email | None = None
+    linkedin: LinkedIn | None = None
     opportunity_id: int
 
     @field_validator("linkedin")
     @classmethod
-    def validate_linkedin(cls, value: str) -> str:
+    def validate_linkedin(cls, value: str | None) -> str | None:
         return validate_http_url(value)
 
 

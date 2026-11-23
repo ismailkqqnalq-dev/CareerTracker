@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database.session import get_db
 from app.models.users import User
-from app.pagination import pagination_params, set_total_count
+from app.pagination import newest_first_param, pagination_params, set_total_count
 from app.record_limits import OpportunityQuotaExceeded
 from app.schemas.analytics import ApplicationAnalyticsResponse
 from app.schemas.opportunity import (
@@ -61,6 +61,7 @@ def get_all_opportunities(
         description="Şirket, pozisyon, tür, konum, sıradaki adım ve notlarda arar; Türkçe harf ve büyük/küçük harf duyarsız.",
     ),
     status: str | None = Query(default=None, max_length=50, description="Duruma göre filtreler; büyük/küçük harf duyarsız."),
+    newest_first: bool = Depends(newest_first_param),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -71,6 +72,7 @@ def get_all_opportunities(
         offset=pagination[1],
         search=(q or "").strip() or None,
         status=(status or "").strip() or None,
+        newest_first=newest_first,
     )
     set_total_count(response, total)
     return items

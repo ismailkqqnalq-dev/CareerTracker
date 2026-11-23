@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import Query, Response
 
 
@@ -12,9 +14,19 @@ def pagination_params(
     return limit, offset
 
 
-def paginate_query(query, *, order_by, limit: int, offset: int):
+def newest_first_param(
+    order: Literal["oldest", "newest"] = Query(
+        default="oldest",
+        description="'newest' en yeni kaydı ilk sayfada döndürür; varsayılan eskiden yeniye.",
+    ),
+) -> bool:
+    return order == "newest"
+
+
+def paginate_query(query, *, order_by, limit: int, offset: int, newest_first: bool = False):
     total = query.order_by(None).count()
-    items = query.order_by(order_by).offset(offset).limit(limit).all()
+    ordering = order_by.desc() if newest_first else order_by
+    items = query.order_by(ordering).offset(offset).limit(limit).all()
     return items, total
 
 

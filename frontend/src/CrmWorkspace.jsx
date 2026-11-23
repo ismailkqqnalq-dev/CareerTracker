@@ -18,15 +18,15 @@ const RESOURCES = {
     fields: [
       { name: "company", label: "Şirket", kind: "text", required: true, maxLength: 200 },
       { name: "position", label: "Pozisyon", kind: "text", required: true, maxLength: 200 },
-      { name: "type", label: "Fırsat türü", kind: "text", required: true, maxLength: 50, placeholder: "İş, staj, freelance…", list: "opportunity-types" },
-      { name: "application_date", label: "Başvuru tarihi", kind: "date", required: true },
+      { name: "type", label: "Fırsat türü", kind: "text", maxLength: 50, placeholder: "İş, staj, freelance…", list: "opportunity-types" },
+      { name: "application_date", label: "Başvuru tarihi", kind: "date", defaultToday: true },
       { name: "status", label: "Durum", kind: "select", required: true, options: OPPORTUNITY_STATUSES },
-      { name: "salary", label: "Maaş / ücret", kind: "number", required: true, min: 0 },
-      { name: "location", label: "Konum", kind: "text", required: true, maxLength: 200 },
-      { name: "job_link", label: "İlan bağlantısı", kind: "url", required: true, maxLength: 2048, placeholder: "https://…" },
-      { name: "last_contact_date", label: "Son iletişim tarihi", kind: "date", required: true },
-      { name: "next_action", label: "Sonraki adım", kind: "text", required: true, maxLength: 500 },
-      { name: "notes", label: "Notlar", kind: "textarea", required: true, maxLength: 5000, wide: true },
+      { name: "salary", label: "Maaş / ücret", kind: "number", min: 0 },
+      { name: "location", label: "Konum", kind: "text", maxLength: 200 },
+      { name: "job_link", label: "İlan bağlantısı", kind: "url", maxLength: 2048, placeholder: "https://…" },
+      { name: "last_contact_date", label: "Son iletişim tarihi", kind: "date", defaultToday: true },
+      { name: "next_action", label: "Sonraki adım", kind: "text", maxLength: 500 },
+      { name: "notes", label: "Notlar", kind: "textarea", maxLength: 5000, wide: true },
     ],
   },
   contacts: {
@@ -36,9 +36,9 @@ const RESOURCES = {
     description: "Başvuru sürecinde tanıştığın kişileri ve iletişim bilgilerini düzenle.",
     fields: [
       { name: "name", label: "Ad soyad", kind: "text", required: true, maxLength: 200 },
-      { name: "role", label: "Görev / rol", kind: "text", required: true, maxLength: 200 },
-      { name: "email", label: "E-posta", kind: "email", required: true, maxLength: 320 },
-      { name: "linkedin", label: "LinkedIn bağlantısı", kind: "url", required: true, maxLength: 2048, placeholder: "https://…" },
+      { name: "role", label: "Görev / rol", kind: "text", maxLength: 200 },
+      { name: "email", label: "E-posta", kind: "email", maxLength: 320 },
+      { name: "linkedin", label: "LinkedIn bağlantısı", kind: "url", maxLength: 2048, placeholder: "https://…" },
       { name: "opportunity_id", label: "Bağlı başvuru", kind: "relation", relation: "opportunities", required: true, wide: true },
     ],
   },
@@ -50,7 +50,7 @@ const RESOURCES = {
     fields: [
       { name: "description", label: "Görev", kind: "textarea", required: true, maxLength: 2000, wide: true },
       { name: "opportunity_id", label: "Bağlı başvuru", kind: "relation", relation: "opportunities", required: true, wide: true },
-      { name: "due_date", label: "Son tarih", kind: "date", required: true },
+      { name: "due_date", label: "Son tarih", kind: "date", required: true, defaultToday: true },
       { name: "is_completed", label: "Tamamlandı", kind: "checkbox", wide: true },
     ],
   },
@@ -61,10 +61,10 @@ const RESOURCES = {
     description: "Görüşme, e-posta ve diğer başvuru temaslarını zaman çizelgesinde tut.",
     fields: [
       { name: "activity_type", label: "Aktivite türü", kind: "text", required: true, maxLength: 100, placeholder: "Görüşme, e-posta…" },
-      { name: "dates", label: "Tarih", kind: "date", required: true },
+      { name: "dates", label: "Tarih", kind: "date", required: true, defaultToday: true },
       { name: "opportunity_id", label: "Bağlı başvuru", kind: "relation", relation: "opportunities", required: true },
       { name: "contact_id", label: "İlgili kişi (isteğe bağlı)", kind: "relation", relation: "contacts", wide: true },
-      { name: "notes", label: "Notlar", kind: "textarea", required: true, maxLength: 5000, wide: true },
+      { name: "notes", label: "Notlar", kind: "textarea", maxLength: 5000, wide: true },
     ],
   },
 };
@@ -90,9 +90,10 @@ function relationName(resource, id, related) {
 function initialValues(config, record) {
   return Object.fromEntries(config.fields.map((field) => {
     let value = record?.[field.name];
-    if (field.kind === "date") value = value ? String(value).slice(0, 10) : today();
+    // Düzenlemede boş tarih boş kalır; bugünün tarihi yalnızca yeni kayıtta önerilir.
+    if (field.kind === "date") value = value ? String(value).slice(0, 10) : (!record && field.defaultToday ? today() : "");
     else if (field.kind === "checkbox") value = Boolean(value);
-    else if (field.kind === "number") value = value ?? (record ? "" : 0);
+    else if (field.kind === "number") value = value ?? "";
     else if (field.kind === "select") value = value ? String(value) : field.options[0];
     else value = value == null ? "" : String(value);
     return [field.name, value];
@@ -105,6 +106,8 @@ function toPayload(config, values) {
     if (field.kind === "relation") value = value === "" ? null : Number(value);
     if (field.kind === "number") value = value === "" ? null : Number(value);
     if (field.kind === "checkbox") value = Boolean(value);
+    // Boş bırakılan isteğe bağlı alan "değer yok" olarak gider (boş tarih sunucuda geçersizdir).
+    if (value === "" && !field.required) value = null;
     return [field.name, value];
   }));
 }
@@ -166,8 +169,11 @@ function RecordEditor({ config, record, related, onCancel, onSave, busy }) {
     setSaveError("");
     try {
       await onSave(toPayload(config, values));
-    } catch {
-      setSaveError("Kayıt kaydedilemedi. Alanları ve bağlı başvuruyu kontrol edip tekrar dene.");
+    } catch (error) {
+      if (error.status === 401) return;
+      setSaveError(error.quotaExceeded
+        ? "Başvuru sınırına ulaştın. Yeni kayıt eklemek için eski başvurulardan birini sil."
+        : "Kayıt kaydedilemedi. Alanları ve bağlı başvuruyu kontrol edip tekrar dene.");
     }
   }
 
@@ -297,10 +303,11 @@ function RecordCard({ view, record, related, onEdit, onDelete, onToggleTask, onS
         </div>
         <div className="crm-record-meta">
           {opportunity && <>
-            <span>{record.type || "Tür belirtilmedi"}</span>
-            <span>{record.location || "Konum yok"}</span>
-            <span>{displayDate(record.application_date)}</span>
-            {record.salary != null && <span>{new Intl.NumberFormat("tr-TR").format(record.salary)} ücret</span>}
+            {/* Hızlı kayıtta boş kalan alanlar "belirtilmedi" kalabalığı yapmasın. */}
+            {record.type && <span>{record.type}</span>}
+            {record.location && <span>{record.location}</span>}
+            {record.application_date && <span>{displayDate(record.application_date)}</span>}
+            {record.salary > 0 && <span>{new Intl.NumberFormat("tr-TR").format(record.salary)} ücret</span>}
             {record.next_action && <span className="crm-meta-emphasis">Sonraki adım: {record.next_action}</span>}
           </>}
           {contact && <>
@@ -363,15 +370,12 @@ function Overview({ api, token, onNavigate }) {
       try {
         const [stats, opportunities, contacts, activities, agenda] = await Promise.all([
           api.request("/dashboard", { token }),
-          api.requestPage("/opportunities", { token, limit: 5, offset: 0 }),
+          api.requestPage("/opportunities", { token, limit: 5, offset: 0, newestFirst: true }),
           api.requestPage("/contacts", { token, limit: 1, offset: 0 }),
           api.requestPage("/activities", { token, limit: 1, offset: 0 }),
           api.request(`/agenda?today=${today()}`, { token }),
         ]);
-        const recentOpportunities = opportunities.totalCount > 5
-          ? await api.requestPage("/opportunities", { token, limit: 5, offset: opportunities.totalCount - 5 })
-          : opportunities;
-        if (active) setData({ stats, opportunities: recentOpportunities.items, contacts, activities, agenda });
+        if (active) setData({ stats, opportunities: opportunities.items, contacts, activities, agenda });
       } catch {
         if (active) setError("Genel bakış yüklenemedi. Bağlantını kontrol edip tekrar deneyebilirsin.");
       } finally {
@@ -401,12 +405,9 @@ function Overview({ api, token, onNavigate }) {
 
   return (
     <section className="crm-overview" aria-labelledby="overview-title">
-      <div className="crm-overview-intro">
-        <div>
-          <p className="eyebrow">KİŞİSEL ÇALIŞMA ALANIN</p>
-          <h2 id="overview-title">Kariyer sürecin, tek yerde.</h2>
-          <p className="muted">Başvurularını, görüşmelerini ve takip adımlarını düzenli tut.</p>
-        </div>
+      {/* Başlık ve açıklama sayfa başlığında; burada yalnızca eylem düğmesi kalır. */}
+      <div className="crm-overview-intro crm-actions-only">
+        <h2 id="overview-title" className="visually-hidden">Özet</h2>
         <button className="button button-primary" type="button" onClick={() => onNavigate("opportunities")}>+ Yeni başvuru</button>
       </div>
 
@@ -459,7 +460,7 @@ function Overview({ api, token, onNavigate }) {
 
           <section className="crm-overview-card" aria-labelledby="recent-opportunities-title">
             <div className="crm-card-heading"><div><h3 id="recent-opportunities-title">Son başvurular</h3><p>En son eklediğin fırsatlar</p></div><button className="text-button" type="button" onClick={() => onNavigate("opportunities")}>Hepsini gör</button></div>
-            {data.opportunities.length ? <ul className="crm-recent-list">{[...data.opportunities].reverse().map((item) => (
+            {data.opportunities.length ? <ul className="crm-recent-list">{data.opportunities.map((item) => (
               <li key={item.id}><span className="crm-recent-mark">{(item.company || "Ş").slice(0, 1).toLocaleUpperCase("tr-TR")}</span><div><strong>{item.company || "Şirket"}</strong><small>{item.position || "Pozisyon belirtilmedi"}</small></div><span className="crm-status-pill">{item.status || "Durum yok"}</span></li>
             ))}</ul> : <p className="crm-empty-inline">İlk başvurunu ekleyerek başlayabilirsin.</p>}
           </section>
@@ -530,7 +531,7 @@ function ResourceWorkspace({ api, token, view }) {
       if (serverSearch && appliedQuery) params.set("q", appliedQuery);
       if (serverSearch && statusFilter) params.set("status", statusFilter);
       const path = params.toString() ? `${config.path}?${params}` : config.path;
-      const page = await api.requestPage(path, { token, limit: PAGE_SIZE, offset });
+      const page = await api.requestPage(path, { token, limit: PAGE_SIZE, offset, newestFirst: true });
       // Hızlı yazarken eski bir aramanın geç gelen yanıtı yenisinin üzerine yazmasın.
       if (requestId !== latestRequest.current) return;
       setRecords(page.items);
@@ -579,9 +580,7 @@ function ResourceWorkspace({ api, token, view }) {
       setNotice(editing ? `${config.singular} güncellendi.` : `Yeni ${config.singular} eklendi.`);
       setReloadKey((value) => value + 1);
     } catch (saveError) {
-      if (saveError.status === 409 && saveError.errorCode === "quota_exceeded") {
-        throw new Error("Başvuru kotasına ulaşıldı.");
-      }
+      if (saveError.status === 409 && saveError.errorCode === "quota_exceeded") saveError.quotaExceeded = true;
       throw saveError;
     } finally {
       setBusy(false);
@@ -657,8 +656,8 @@ function ResourceWorkspace({ api, token, view }) {
 
   return (
     <section className="crm-resource" aria-labelledby="crm-resource-title">
-      <div className="crm-resource-heading">
-        <div><p className="eyebrow">KİŞİSEL CRM</p><h2 id="crm-resource-title">{config.title}</h2><p className="muted">{config.description}</p></div>
+      <div className="crm-resource-heading crm-actions-only">
+        <h2 id="crm-resource-title" className="visually-hidden">{config.title} listesi</h2>
         <button className="button button-primary" type="button" onClick={() => setEditor({ mode: "create" })}>+ Yeni {config.singular}</button>
       </div>
 
@@ -677,7 +676,7 @@ function ResourceWorkspace({ api, token, view }) {
         />
       )}
 
-      <div className="crm-list-toolbar">
+      <div className={`crm-list-toolbar${serverSearch ? " has-filter" : ""}`}>
         <label htmlFor="crm-search">{serverSearch ? "Başvurularda ara" : "Bu sayfada ara"}</label>
         <input id="crm-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={serverSearch ? "Şirket, pozisyon, konum, not…" : `${config.title} içinde ara…`} />
         {serverSearch && (
@@ -740,4 +739,9 @@ function ResourceWorkspace({ api, token, view }) {
   );
 }
 
-export { VIEW_TITLES };
+const VIEW_DESCRIPTIONS = {
+  overview: "Başvurularını, görüşmelerini ve takip adımlarını tek yerde düzenli tut.",
+  ...Object.fromEntries(Object.entries(RESOURCES).map(([view, config]) => [view, config.description])),
+};
+
+export { VIEW_DESCRIPTIONS, VIEW_TITLES };

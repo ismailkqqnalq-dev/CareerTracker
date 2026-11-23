@@ -53,6 +53,63 @@ describe("opportunity status field", () => {
   });
 });
 
+describe("quick capture", () => {
+  it("saves an opportunity with only company and position, sending empty optional fields as null", async () => {
+    const api = createApi();
+    render(<CrmWorkspace api={api} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "+ Yeni başvuru" }));
+    fireEvent.change(screen.getByLabelText("Şirket"), { target: { value: "Hızlı AŞ" } });
+    fireEvent.change(screen.getByLabelText("Pozisyon"), { target: { value: "Backend" } });
+    fireEvent.click(screen.getByRole("button", { name: "Kaydet" }));
+
+    await waitFor(() => expect(api.request).toHaveBeenCalledWith("/opportunities", expect.objectContaining({ method: "POST" })));
+    const payload = JSON.parse(api.request.mock.calls[0][1].body);
+    expect(payload).toMatchObject({
+      company: "Hızlı AŞ", position: "Backend", status: "Başvuruldu",
+      type: null, salary: null, location: null, job_link: null, next_action: null, notes: null,
+    });
+    expect(payload.application_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("keeps an empty date empty when editing instead of filling in today", async () => {
+    const api = createApi([{ ...legacyRecord, last_contact_date: null }]);
+    render(<CrmWorkspace api={api} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Düzenle" }));
+
+    expect(screen.getByLabelText("Son iletişim tarihi").value).toBe("");
+  });
+
+  it("does not show a zero salary in the list", async () => {
+    render(<CrmWorkspace api={createApi([legacyRecord])} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    await screen.findByLabelText("Eski Şirket durumu");
+    expect(screen.queryByText(/ücret/)).toBeNull();
+  });
+
+  it("asks the server for the newest records first", async () => {
+    const api = createApi();
+    render(<CrmWorkspace api={api} token="test-token" view="tasks" onNavigate={vi.fn()} />);
+
+    await waitFor(() => expect(api.requestPage).toHaveBeenCalled());
+    expect(api.requestPage.mock.calls[0][1]).toMatchObject({ newestFirst: true, offset: 0 });
+  });
+
+  it("explains when the opportunity limit is reached", async () => {
+    const api = createApi();
+    api.request.mockRejectedValueOnce(Object.assign(new Error("quota"), { status: 409, errorCode: "quota_exceeded" }));
+    render(<CrmWorkspace api={api} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "+ Yeni başvuru" }));
+    fireEvent.change(screen.getByLabelText("Şirket"), { target: { value: "Sınır AŞ" } });
+    fireEvent.change(screen.getByLabelText("Pozisyon"), { target: { value: "Backend" } });
+    fireEvent.click(screen.getByRole("button", { name: "Kaydet" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("Başvuru sınırına ulaştın");
+  });
+});
+
 describe("quick status change in the opportunity list", () => {
   it("saves a new status straight from the list and reloads it", async () => {
     const api = createApi([{ ...legacyRecord, status: "Başvuruldu" }]);
