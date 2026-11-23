@@ -3,7 +3,12 @@
 from threading import Lock
 from typing import Protocol
 
-from PIL import Image
+from PIL import Image, ImageOps
+
+# Text touching the image edge is often missed by the detector (a tightly
+# cropped 1073x120 strip lost 74% of its characters); a white margin fixes it.
+# See docs/ocr-baseline.md for the measurements behind these settings.
+EDGE_PADDING_PX = 40
 
 
 class OcrError(Exception):
@@ -66,6 +71,13 @@ class RapidOCREngine:
                         "Rec.ocr_version": ocr_version.PPOCRV6,
                         "Rec.model_type": model_type.SMALL,
                         "Rec.lang_type": self.lang,
+                        # Postings are upright screenshots; the rotation classifier
+                        # only added time and misread lines.
+                        "Global.use_cls": False,
+                        # The default ("min", 736) upscales the short side, so a wide
+                        # strip became a huge input; cap the long side instead.
+                        "Det.limit_type": "max",
+                        "Det.limit_side_len": 1600,
                     })
                 except Exception as exc:
                     raise OcrError("ocr_engine_initialization_failed", "The OCR motor could not be initialized.") from exc
@@ -74,7 +86,7 @@ class RapidOCREngine:
     def recognize(self, image: Image.Image) -> str:
         runtime = self._get_runtime()
         try:
-            result = runtime(image)
+            result = runtime(ImageOps.expand(image, border=EDGE_PADDING_PX, fill="white"))
             return "\n".join(result.txts) if result.txts is not None else ""
         except Exception as exc:
             raise OcrError("ocr_engine_failed", "The OCR motor could not process the image.") from exc
