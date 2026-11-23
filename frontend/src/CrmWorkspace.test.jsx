@@ -277,3 +277,34 @@ describe("overview agenda", () => {
     })));
   });
 });
+
+describe("polished opportunity list and form", () => {
+  it("leads each card with the company and colours the status by stage", async () => {
+    const records = [
+      { ...legacyRecord, id: 1, company: "Teklif AŞ", status: "Teklif" },
+      { ...legacyRecord, id: 2, company: "Mülakat AŞ", status: "Teknik mülakat" },
+    ];
+    render(<CrmWorkspace api={createApi(records)} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    expect(await screen.findByRole("heading", { name: "Teklif AŞ" })).toBeTruthy();
+    expect(screen.getByLabelText("Teklif AŞ durumu").className).toContain("tone-offer");
+    expect(screen.getByLabelText("Mülakat AŞ durumu").className).toContain("tone-interview");
+  });
+
+  it("keeps optional fields folded away for a new opportunity", async () => {
+    render(<CrmWorkspace api={createApi()} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "+ Yeni başvuru" }));
+
+    expect(screen.getByLabelText("Şirket").closest("details")).toBeNull();
+    expect(screen.getByLabelText("Konum").closest("details").open).toBe(false);
+  });
+
+  it("opens the optional fields when the record being edited already uses them", async () => {
+    render(<CrmWorkspace api={createApi([legacyRecord])} token="test-token" view="opportunities" onNavigate={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Düzenle" }));
+
+    expect(screen.getByLabelText("Konum").closest("details").open).toBe(true);
+  });
+});

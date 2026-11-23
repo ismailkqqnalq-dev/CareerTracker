@@ -795,3 +795,29 @@ describe("skill suggestion rejection", () => {
     expect(fetchMock.mock.calls.some(([url, options]) => url.endsWith("/skills/suggestions/2/reject") && options?.method === "POST")).toBe(true);
   });
 });
+
+describe("mobile section menu", () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("opens the full menu from the bottom bar and closes it after picking a section", async () => {
+    const fetchMock = setupLoggedInApp();
+    fetchMock.mockImplementation(async (url) => {
+      if (url.endsWith("/auth/me")) return jsonResponse(200, { email: "test@example.com" });
+      return jsonResponse(200, []);
+    });
+    const nav = screen.getByRole("navigation", { name: "CareerTracker bölümleri" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Menü" }));
+    expect(nav.className).toContain("is-open");
+    expect(screen.getByRole("button", { name: "Kapat" }).getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Hesap ayarları" }));
+
+    expect(nav.className).not.toContain("is-open");
+    expect(screen.getByRole("heading", { level: 1, name: "Hesap ayarları" })).toBeTruthy();
+  });
+});

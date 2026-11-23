@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { OPPORTUNITY_STATUSES, displayDate, safeHttpUrl, today } from "./crmUtils.js";
+import { OPPORTUNITY_STATUSES, displayDate, safeHttpUrl, statusTone, today } from "./crmUtils.js";
 import OpportunityDetail from "./OpportunityDetail.jsx";
 import EmailSuggestionsCard from "./EmailSuggestionsCard.jsx";
 
@@ -21,12 +21,12 @@ const RESOURCES = {
       { name: "type", label: "Fırsat türü", kind: "text", maxLength: 50, placeholder: "İş, staj, freelance…", list: "opportunity-types" },
       { name: "application_date", label: "Başvuru tarihi", kind: "date", defaultToday: true },
       { name: "status", label: "Durum", kind: "select", required: true, options: OPPORTUNITY_STATUSES },
-      { name: "salary", label: "Maaş / ücret", kind: "number", min: 0 },
-      { name: "location", label: "Konum", kind: "text", maxLength: 200 },
-      { name: "job_link", label: "İlan bağlantısı", kind: "url", maxLength: 2048, placeholder: "https://…" },
-      { name: "last_contact_date", label: "Son iletişim tarihi", kind: "date", defaultToday: true },
-      { name: "next_action", label: "Sonraki adım", kind: "text", maxLength: 500 },
-      { name: "notes", label: "Notlar", kind: "textarea", maxLength: 5000, wide: true },
+      { name: "salary", label: "Maaş / ücret", kind: "number", min: 0, more: true },
+      { name: "location", label: "Konum", kind: "text", maxLength: 200, more: true },
+      { name: "job_link", label: "İlan bağlantısı", kind: "url", maxLength: 2048, placeholder: "https://…", more: true },
+      { name: "last_contact_date", label: "Son iletişim tarihi", kind: "date", defaultToday: true, more: true },
+      { name: "next_action", label: "Sonraki adım", kind: "text", maxLength: 500, more: true },
+      { name: "notes", label: "Notlar", kind: "textarea", maxLength: 5000, wide: true, more: true },
     ],
   },
   contacts: {
@@ -177,6 +177,68 @@ function RecordEditor({ config, record, related, onCancel, onSave, busy }) {
     }
   }
 
+  const primaryFields = config.fields.filter((field) => !field.more);
+  const moreFields = config.fields.filter((field) => field.more);
+
+  function renderField(field) {
+    return (
+      <div key={field.name} className={`crm-field${field.wide ? " crm-field-wide" : ""}`}>
+        {field.kind !== "checkbox" && <label htmlFor={`crm-${field.name}`}>{field.label}</label>}
+        {field.kind === "relation" ? (
+          <RelationControl
+            field={field}
+            value={values[field.name]}
+            onChange={(value) => change(field.name, value)}
+            related={related}
+          />
+        ) : field.kind === "textarea" ? (
+          <textarea
+            id={`crm-${field.name}`}
+            required={field.required}
+            maxLength={field.maxLength ?? 2000}
+            rows={3}
+            value={values[field.name]}
+            onChange={(event) => change(field.name, event.target.value)}
+          />
+        ) : field.kind === "select" ? (
+          <select
+            id={`crm-${field.name}`}
+            required={field.required}
+            value={values[field.name]}
+            onChange={(event) => change(field.name, event.target.value)}
+          >
+            {!field.options.includes(values[field.name]) && (
+              <option value={values[field.name]}>{values[field.name]} (eski değer)</option>
+            )}
+            {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+        ) : field.kind === "checkbox" ? (
+          <label className="crm-checkbox" htmlFor={`crm-${field.name}`}>
+            <input
+              id={`crm-${field.name}`}
+              type="checkbox"
+              checked={values[field.name]}
+              onChange={(event) => change(field.name, event.target.checked)}
+            />
+            {field.label}
+          </label>
+        ) : (
+          <input
+            id={`crm-${field.name}`}
+            type={field.kind}
+            required={field.required}
+            min={field.min}
+            maxLength={field.maxLength ?? 500}
+            placeholder={field.placeholder}
+            list={field.list}
+            value={values[field.name]}
+            onChange={(event) => change(field.name, event.target.value)}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <section className="crm-editor" aria-labelledby="crm-editor-title">
       <div className="crm-editor-heading">
@@ -187,62 +249,14 @@ function RecordEditor({ config, record, related, onCancel, onSave, busy }) {
         <button type="button" className="button button-quiet" onClick={onCancel}>Kapat</button>
       </div>
       <form className="crm-form" onSubmit={submit}>
-        {config.fields.map((field) => (
-          <div key={field.name} className={`crm-field${field.wide ? " crm-field-wide" : ""}`}>
-            {field.kind !== "checkbox" && <label htmlFor={`crm-${field.name}`}>{field.label}</label>}
-            {field.kind === "relation" ? (
-              <RelationControl
-                field={field}
-                value={values[field.name]}
-                onChange={(value) => change(field.name, value)}
-                related={related}
-              />
-            ) : field.kind === "textarea" ? (
-              <textarea
-                id={`crm-${field.name}`}
-                required={field.required}
-                maxLength={field.maxLength ?? 2000}
-                rows={3}
-                value={values[field.name]}
-                onChange={(event) => change(field.name, event.target.value)}
-              />
-            ) : field.kind === "select" ? (
-              <select
-                id={`crm-${field.name}`}
-                required={field.required}
-                value={values[field.name]}
-                onChange={(event) => change(field.name, event.target.value)}
-              >
-                {!field.options.includes(values[field.name]) && (
-                  <option value={values[field.name]}>{values[field.name]} (eski değer)</option>
-                )}
-                {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            ) : field.kind === "checkbox" ? (
-              <label className="crm-checkbox" htmlFor={`crm-${field.name}`}>
-                <input
-                  id={`crm-${field.name}`}
-                  type="checkbox"
-                  checked={values[field.name]}
-                  onChange={(event) => change(field.name, event.target.checked)}
-                />
-                {field.label}
-              </label>
-            ) : (
-              <input
-                id={`crm-${field.name}`}
-                type={field.kind}
-                required={field.required}
-                min={field.min}
-                maxLength={field.maxLength ?? 500}
-                placeholder={field.placeholder}
-                list={field.list}
-                value={values[field.name]}
-                onChange={(event) => change(field.name, event.target.value)}
-              />
-            )}
-          </div>
-        ))}
+        {primaryFields.map(renderField)}
+        {moreFields.length > 0 && (
+          // Hızlı kayıt için yalnızca temel alanlar açık; dolu bir alan varsa bölüm açık gelir.
+          <details className="crm-more-fields crm-field-wide" open={moreFields.some((field) => record?.[field.name] != null && record[field.name] !== "")}>
+            <summary>Daha fazla ayrıntı <span>(isteğe bağlı)</span></summary>
+            <div className="crm-form">{moreFields.map(renderField)}</div>
+          </details>
+        )}
         <datalist id="opportunity-types">
           <option value="İş" /><option value="Staj" /><option value="Freelance" />
         </datalist>
@@ -262,7 +276,7 @@ function RecordCard({ view, record, related, onEdit, onDelete, onToggleTask, onS
   const task = view === "tasks";
   const safeLink = opportunity ? safeHttpUrl(record.job_link) : contact ? safeHttpUrl(record.linkedin) : null;
   const title = opportunity
-    ? (record.position || "Pozisyon belirtilmedi")
+    ? (record.company || "Şirket belirtilmedi")
     : contact ? (record.name || "İsimsiz kişi")
       : task ? (record.description || "Görev")
         : (record.activity_type || "Aktivite");
@@ -281,13 +295,16 @@ function RecordCard({ view, record, related, onEdit, onDelete, onToggleTask, onS
             >{record.is_completed ? "✓" : ""}</button>
           )}
           <div className="crm-record-title-copy">
-            {opportunity && <span className="crm-record-company">{record.company || "Şirket belirtilmedi"}</span>}
-            <h3>{title}</h3>
-            {contact && <p>{record.role || "Rol belirtilmedi"}</p>}
+            {opportunity && <span className="crm-record-mark" aria-hidden="true">{(record.company || "Ş").slice(0, 1).toLocaleUpperCase("tr-TR")}</span>}
+            <div className="crm-record-heading">
+              <h3>{title}</h3>
+              {opportunity && <p className="crm-record-position">{record.position || "Pozisyon belirtilmedi"}</p>}
+              {contact && <p>{record.role || "Rol belirtilmedi"}</p>}
+            </div>
           </div>
           {opportunity && (
             <select
-              className="crm-status-pill crm-status-select"
+              className={`crm-status-pill crm-status-select ${statusTone(record.status)}`}
               aria-label={`${record.company || "Başvuru"} durumu`}
               value={record.status || ""}
               disabled={statusBusy}
@@ -332,7 +349,7 @@ function RecordCard({ view, record, related, onEdit, onDelete, onToggleTask, onS
           <button type="button" className="button button-quiet" aria-label={`${record.company || "Başvuru"} ayrıntıları`} onClick={() => onOpen(record)}>Ayrıntılar</button>
         )}
         <button type="button" className="button button-quiet" onClick={() => onEdit(record)}>Düzenle</button>
-        <button type="button" className="button button-danger-quiet" onClick={() => onDelete(record)}>Sil</button>
+        <button type="button" className="button button-danger-quiet crm-delete" onClick={() => onDelete(record)}>Sil</button>
       </div>
     </article>
   );
@@ -461,7 +478,7 @@ function Overview({ api, token, onNavigate }) {
           <section className="crm-overview-card" aria-labelledby="recent-opportunities-title">
             <div className="crm-card-heading"><div><h3 id="recent-opportunities-title">Son başvurular</h3><p>En son eklediğin fırsatlar</p></div><button className="text-button" type="button" onClick={() => onNavigate("opportunities")}>Hepsini gör</button></div>
             {data.opportunities.length ? <ul className="crm-recent-list">{data.opportunities.map((item) => (
-              <li key={item.id}><span className="crm-recent-mark">{(item.company || "Ş").slice(0, 1).toLocaleUpperCase("tr-TR")}</span><div><strong>{item.company || "Şirket"}</strong><small>{item.position || "Pozisyon belirtilmedi"}</small></div><span className="crm-status-pill">{item.status || "Durum yok"}</span></li>
+              <li key={item.id}><span className="crm-recent-mark">{(item.company || "Ş").slice(0, 1).toLocaleUpperCase("tr-TR")}</span><div><strong>{item.company || "Şirket"}</strong><small>{item.position || "Pozisyon belirtilmedi"}</small></div><span className={`crm-status-pill ${statusTone(item.status)}`}>{item.status || "Durum yok"}</span></li>
             ))}</ul> : <p className="crm-empty-inline">İlk başvurunu ekleyerek başlayabilirsin.</p>}
           </section>
 
