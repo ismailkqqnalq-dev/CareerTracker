@@ -40,6 +40,34 @@ RapidOCR's bundled default ONNX model artifacts have their own upstream
 PaddleOCR attribution under Apache-2.0; retain the applicable license and notices
 when redistributing. CareerTracker does not train these models.
 
+## Engine settings
+
+`RapidOCREngine` uses the PP-OCRv6 SMALL detection and recognition models with
+three measured adjustments:
+
+- a 40 px white margin around every image (`EDGE_PADDING_PX`) before recognition,
+- `Global.use_cls: False` (no text-rotation classifier; postings are upright),
+- `Det.limit_type: "max"`, `Det.limit_side_len: 1600` instead of the default
+  `"min"`/736, which upscaled the short side of wide strips into very large inputs.
+
+Measured on Windows (CPU, 8 logical cores) with the synthetic set below (Arial),
+plus one 1080×2340 phone-sized posting screenshot:
+
+| Configuration | CER | Turkish chars | Catalog terms | Strip image | Phone image |
+|---|---:|---:|---:|---:|---:|
+| Previous defaults | 0.036 | 0.57 | 0.887 | 15.4 s | 19.0 s |
+| **Current (margin, no cls, max 1600)** | **0.021** | **0.78** | **0.913** | **2.7 s** | **11.2 s** |
+| Same + MEDIUM det/rec models | 0.013 | 0.92 | 0.927 | 27.4 s | 206 s |
+| Same + Latin PP-OCRv5 rec model | 0.027 | 0.58 | 0.919 | 1.6 s | 13.8 s |
+
+The MEDIUM models are the most accurate but about 18× slower on a phone
+screenshot, which does not fit the 30-second inference limit; the Latin model
+loses Turkish characters. A tightly cropped strip without the margin lost 74% of
+its characters (CER 0.736 → 0.014 with the margin). White padding was also checked
+on a dark-mode image and did not reduce accuracy. A remaining known limitation:
+a line-initial "İ" is usually read as "i". These are synthetic measurements, not
+accuracy on real user screenshots.
+
 ## Service contract
 
 `extract_text(data: bytes, engine=...)` accepts bytes only. No filename or path

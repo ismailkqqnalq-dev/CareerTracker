@@ -154,8 +154,33 @@ def test_engine_initializes_lazily_and_once(monkeypatch):
         "Rec.ocr_version": "ppocrv6-enum",
         "Rec.model_type": "small-enum",
         "Rec.lang_type": "tr",
+        "Global.use_cls": False,
+        "Det.limit_type": "max",
+        "Det.limit_side_len": 1600,
     }
     assert ocr_engine.get_default_engine() is ocr_engine.get_default_engine()
+
+
+def test_engine_adds_white_margin_before_recognition(monkeypatch):
+    seen = []
+    def factory(**kwargs):
+        def runtime(image):
+            seen.append(image)
+            return SimpleNamespace(txts=["Python"])
+        return runtime
+    monkeypatch.setattr(
+        ocr_engine,
+        "_load_rapidocr",
+        lambda: (factory, SimpleNamespace(SMALL="small"), SimpleNamespace(PPOCRV6="v6")),
+    )
+    black = Image.new("RGB", (30, 10), "black")
+    assert RapidOCREngine().recognize(black) == "Python"
+    margin = ocr_engine.EDGE_PADDING_PX
+    padded = seen[0]
+    assert padded.size == (30 + 2 * margin, 10 + 2 * margin)
+    assert padded.getpixel((0, 0)) == (255, 255, 255)
+    assert padded.getpixel((margin, margin)) == (0, 0, 0)
+    assert black.size == (30, 10)
 
 
 def test_missing_optional_engine_is_explicit(monkeypatch):
