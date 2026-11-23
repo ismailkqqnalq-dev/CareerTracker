@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { OPPORTUNITY_STATUSES, displayDate, safeHttpUrl, today } from "./crmUtils.js";
+import { OPPORTUNITY_STATUSES, displayDate, safeHttpUrl, statusTone, today } from "./crmUtils.js";
 import EmailUpdatePanel from "./EmailUpdatePanel.jsx";
 
 function timelineOf(detail) {
@@ -157,7 +157,7 @@ export default function OpportunityDetail({ api, token, opportunityId, onBack })
           </p>
         </div>
         <select
-          className="crm-status-pill crm-status-select"
+          className={`crm-status-pill crm-status-select ${statusTone(opportunity.status)}`}
           aria-label="Başvuru durumu"
           value={opportunity.status || ""}
           disabled={busy}

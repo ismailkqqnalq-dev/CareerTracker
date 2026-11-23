@@ -3,6 +3,20 @@
 // Genel bakıştaki görüşme/teklif sayıları bu adlarla hesaplanır; serbest yazım sayıları bozabiliyordu.
 export const OPPORTUNITY_STATUSES = ["Başvuruldu", "Ön görüşme", "Teknik mülakat", "Son mülakat", "Teklif", "Reddedildi"];
 
+// Durum rozetinin rengi: süreçte, görüşmede, olumlu veya kapanmış.
+const STATUS_TONES = {
+  "Başvuruldu": "tone-applied",
+  "Ön görüşme": "tone-interview",
+  "Teknik mülakat": "tone-interview",
+  "Son mülakat": "tone-interview",
+  "Teklif": "tone-offer",
+  "Reddedildi": "tone-closed",
+};
+
+export function statusTone(status) {
+  return STATUS_TONES[status] ?? "tone-other";
+}
+
 export const today = () => {
   const date = new Date();
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);

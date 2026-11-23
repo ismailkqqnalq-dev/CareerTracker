@@ -35,6 +35,24 @@ function setSessionHint(active) {
 }
 const OCR_IMAGE_TYPES = new Set(["image/png", "image/jpeg"]);
 
+// [görünüm, başlık, simge, mobil alt çubukta mı]
+const NAV_GROUPS = [
+  { label: "ÇALIŞMA ALANI", items: [
+    ["overview", "Genel bakış", "⌂", true],
+    ["opportunities", "Başvurular", "▣", true],
+    ["contacts", "Kişiler", "♧", false],
+    ["tasks", "Görevler", "✓", true],
+    ["activities", "Aktiviteler", "◷", false],
+    ["assistant", "Asistan", "❝", true],
+  ] },
+  { label: "BECERİ VE ANALİZ", items: [
+    ["suggestions", "Beceri önerileri", "✧", false],
+    ["profile", "Profil ve eşleşme", "◎", false],
+    ["analytics", "Başvuru analizi", "▤", false],
+  ] },
+  { label: "HESAP", items: [["account", "Hesap ayarları", "⚙", false]] },
+];
+
 function errorMessage(error, context = "İstek") {
   if (context === "Kayıt" && error.errorCode === "registration_disabled") {
     return "Kayıtlar şu anda kapalı.";
@@ -202,6 +220,7 @@ function App() {
   const [ocrResult, setOcrResult] = useState(null);
   const [extractingText, setExtractingText] = useState(false);
   const [activeView, setActiveView] = useState("overview");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [resetToken, setResetToken] = useState(readResetTokenFromUrl);
 
   useEffect(() => {
@@ -224,6 +243,13 @@ function App() {
   const applyToken = useCallback((value) => {
     sessionStorage.setItem(TOKEN_KEY, value);
     setToken(value);
+  }, []);
+
+  const selectView = useCallback((view) => {
+    setActiveView(view);
+    setMenuOpen(false);
+    // Uzun bir sayfanın altındayken bölüm değişirse yeni bölüm baştan görünsün.
+    document.documentElement.scrollTop = 0;
   }, []);
 
   const api = useMemo(() => createApiClient({ onUnauthorized: logout, onTokenRefreshed: applyToken }), [logout, applyToken]);
@@ -499,18 +525,18 @@ function App() {
 
       <main className="page-content">
         <div className="app-workspace-layout">
-          <nav className="app-section-nav" aria-label="CareerTracker bölümleri">
+          <nav className={`app-section-nav${menuOpen ? " is-open" : ""}`} aria-label="CareerTracker bölümleri">
             <p className="nav-group-label">ÇALIŞMA ALANI</p>
-            {[["overview", "Genel bakış"], ["opportunities", "Başvurular"], ["contacts", "Kişiler"], ["tasks", "Görevler"], ["activities", "Aktiviteler"]].map(([view, label]) => (
-              <button key={view} type="button" aria-current={activeView === view ? "page" : undefined} onClick={() => setActiveView(view)}><span className="nav-icon" aria-hidden="true">{({ overview: "⌂", opportunities: "▣", contacts: "♧", tasks: "✓", activities: "◷" })[view]}</span>{label}</button>
+            {NAV_GROUPS.map(({ label, items }, index) => (
+              <div key={label} className="nav-group">
+                {index > 0 && <p className="nav-group-label nav-group-secondary">{label}</p>}
+                {items.map(([view, title, icon, primary]) => (
+                  <button key={view} type="button" className={primary ? "nav-primary" : undefined} aria-current={activeView === view ? "page" : undefined} onClick={() => selectView(view)}><span className="nav-icon" aria-hidden="true">{icon}</span>{title}</button>
+                ))}
+              </div>
             ))}
-            <button type="button" aria-current={activeView === "assistant" ? "page" : undefined} onClick={() => setActiveView("assistant")}><span className="nav-icon" aria-hidden="true">❝</span>Asistan</button>
-            <p className="nav-group-label nav-group-secondary">BECERİ VE ANALİZ</p>
-            <button type="button" aria-current={activeView === "suggestions" ? "page" : undefined} onClick={() => setActiveView("suggestions")}><span className="nav-icon" aria-hidden="true">✧</span>Beceri önerileri</button>
-            <button type="button" aria-current={activeView === "profile" ? "page" : undefined} onClick={() => setActiveView("profile")}><span className="nav-icon" aria-hidden="true">◎</span>Profil ve eşleşme</button>
-            <button type="button" aria-current={activeView === "analytics" ? "page" : undefined} onClick={() => setActiveView("analytics")}><span className="nav-icon" aria-hidden="true">▤</span>Başvuru analizi</button>
-            <p className="nav-group-label nav-group-secondary">HESAP</p>
-            <button type="button" aria-current={activeView === "account" ? "page" : undefined} onClick={() => setActiveView("account")}><span className="nav-icon" aria-hidden="true">⚙</span>Hesap ayarları</button>
+            {/* Yalnızca mobilde görünür: alt çubukta yer almayan bölümleri açar. */}
+            <button type="button" className="nav-more" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><span className="nav-icon" aria-hidden="true">{menuOpen ? "✕" : "☰"}</span>{menuOpen ? "Kapat" : "Menü"}</button>
           </nav>
 
           <div className="app-main-view">
