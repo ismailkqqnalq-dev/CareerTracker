@@ -50,6 +50,8 @@ class RateLimitSettings:
     login_ip_per_minute: int
     login_ip_email_per_minute: int
     register_ip_per_hour: int
+    password_reset_ip_per_hour: int
+    password_reset_email_per_hour: int
     ocr_per_user_per_minute: int
     job_analysis_per_user_per_minute: int
     semantic_candidates_per_user_per_minute: int
@@ -92,6 +94,12 @@ def get_rate_limit_settings() -> RateLimitSettings:
         ),
         register_ip_per_hour=positive_int_env(
             "RATE_LIMIT_REGISTER_IP_PER_HOUR", 5
+        ),
+        password_reset_ip_per_hour=positive_int_env(
+            "RATE_LIMIT_PASSWORD_RESET_IP_PER_HOUR", 10
+        ),
+        password_reset_email_per_hour=positive_int_env(
+            "RATE_LIMIT_PASSWORD_RESET_EMAIL_PER_HOUR", 3
         ),
         ocr_per_user_per_minute=positive_int_env(
             "RATE_LIMIT_OCR_PER_USER_PER_MINUTE", 10

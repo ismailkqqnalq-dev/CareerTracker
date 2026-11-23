@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.security import validate_security_configuration
+from app.services.mailer import validate_mail_configuration
 from app.rate_limits import validate_rate_limit_configuration
 from app.record_limits import validate_record_limit_configuration
 from app.request_limits import RequestBodySizeLimitMiddleware
@@ -27,6 +28,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     validate_security_configuration()
     validate_rate_limit_configuration()
     validate_record_limit_configuration()
+    validate_mail_configuration()
     yield
 
 

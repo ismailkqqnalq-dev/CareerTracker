@@ -33,6 +33,15 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set a strong JWT signing key}
       DATABASE_URL: ${DATABASE_URL:?Set the PostgreSQL URL for host db with a URL-encoded password}
       TRUSTED_PROXY_IPS: 172.30.40.10/32
+      # Şifremi unuttum: SMTP ayarlanmazsa özellik kapalı kalır (503).
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-disabled}
+      PUBLIC_APP_URL: https://${SITE_DOMAIN:?Set the public DNS hostname}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     networks: [edge, data]
     depends_on:
       db:

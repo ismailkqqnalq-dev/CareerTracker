@@ -35,6 +35,15 @@ class ChangePasswordRequest(BaseModel):
     new_password: Password
 
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: Annotated[str, StringConstraints(min_length=20, max_length=128)]
+    new_password: Password
+
+
 class UserResponse(BaseModel):
     id: int
     email: EmailStr

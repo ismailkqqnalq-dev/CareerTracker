@@ -8,6 +8,7 @@ import CrmWorkspace, { VIEW_DESCRIPTIONS, VIEW_TITLES } from "./CrmWorkspace.jsx
 import AccountPanel from "./AccountPanel.jsx";
 import AssistantPanel from "./AssistantPanel.jsx";
 import EmailForwardingPanel from "./EmailForwardingPanel.jsx";
+import { ForgotPasswordForm, ResetPasswordForm, clearResetTokenFromUrl, readResetTokenFromUrl } from "./PasswordReset.jsx";
 
 const authApi = createApiClient();
 const TOKEN_KEY = "careertracker_token";
@@ -75,8 +76,9 @@ function errorMessage(error, context = "İstek") {
   return `${context} tamamlanamadı. Lütfen tekrar dene.`;
 }
 
-function AuthScreen({ onAuthenticated }) {
-  const [mode, setMode] = useState("login");
+function AuthScreen({ onAuthenticated, resetToken = null, onResetHandled }) {
+  const [mode, setMode] = useState(resetToken ? "reset" : "login");
+  const [notice, setNotice] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -108,6 +110,31 @@ function AuthScreen({ onAuthenticated }) {
     }
   }
 
+  function showLogin(message = "") {
+    setMode("login");
+    setError("");
+    setNotice(message);
+  }
+
+  if (mode === "forgot" || mode === "reset") {
+    return (
+      <main className="auth-layout">
+        <section className="auth-card">
+          <Brand />
+          {mode === "forgot" ? (
+            <ForgotPasswordForm initialEmail={email} onBack={() => showLogin()} />
+          ) : (
+            <ResetPasswordForm
+              token={resetToken}
+              onDone={() => { onResetHandled?.(); showLogin("Şifren güncellendi. Yeni şifrenle giriş yapabilirsin."); }}
+              onRequestNewLink={() => { onResetHandled?.(); setMode("forgot"); }}
+            />
+          )}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="auth-layout">
       <section className="auth-card">
@@ -121,10 +148,16 @@ function AuthScreen({ onAuthenticated }) {
           <label htmlFor="password">Şifre</label>
           <input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} maxLength={128} required aria-describedby={mode === "register" ? "password-hint" : undefined} value={password} onChange={(e) => setPassword(e.target.value)} />
           {mode === "register" && <small id="password-hint" className="muted">En az 8 karakter.</small>}
+          {mode === "login" && (
+            <button type="button" className="text-button forgot-link" onClick={() => { setMode("forgot"); setError(""); setNotice(""); }}>
+              Şifremi unuttum
+            </button>
+          )}
           <label className="remember-me" htmlFor="remember-me">
             <input id="remember-me" type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
             Beni hatırla (30 gün açık kalır; ortak bilgisayarda işaretleme)
           </label>
+          {notice && <p className="notice" role="status">{notice}</p>}
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="button button-primary full-width" disabled={busy}>
             {busy ? "İşleniyor…" : mode === "login" ? "Giriş yap" : "Kayıt ol"}
@@ -132,7 +165,7 @@ function AuthScreen({ onAuthenticated }) {
         </form>
         <p className="auth-switch">
           {mode === "login" ? "Hesabın yok mu?" : "Zaten hesabın var mı?"}{" "}
-          <button className="text-button" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
+          <button className="text-button" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); setNotice(""); }}>
             {mode === "login" ? "Kayıt ol" : "Giriş yap"}
           </button>
         </p>
@@ -169,6 +202,11 @@ function App() {
   const [ocrResult, setOcrResult] = useState(null);
   const [extractingText, setExtractingText] = useState(false);
   const [activeView, setActiveView] = useState("overview");
+  const [resetToken, setResetToken] = useState(readResetTokenFromUrl);
+
+  useEffect(() => {
+    clearResetTokenFromUrl();
+  }, []);
 
   const logout = useCallback(() => {
     sessionStorage.removeItem(TOKEN_KEY);
@@ -443,6 +481,10 @@ function App() {
     setNotice("Çıkarılan metin ilan analizi alanına aktarıldı.");
   }
 
+  if (resetToken) {
+    // Sıfırlama bağlantısı açık bir oturumdan önce gelir; şifre değişince tüm oturumlar kapanır.
+    return <AuthScreen onAuthenticated={applyToken} resetToken={resetToken} onResetHandled={() => { logout(); setResetToken(null); }} />;
+  }
   if (!token && restoring) {
     return <main className="auth-layout"><p className="muted" role="status">Oturumun açılıyor…</p></main>;
   }
