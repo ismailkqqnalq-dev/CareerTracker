@@ -13,7 +13,7 @@ class ActivityCreate(BaseModel):
     contact_id: int | None = None
     activity_type: ActivityType
     dates: date
-    notes: Notes
+    notes: Notes | None = None
 
 
 class ActivityResponse(BaseModel):

@@ -30,8 +30,8 @@ def get_contact_by_id(db, contact_id, user_id):
     return cp.get_contact_by_id(db, contact_id, user_id=user_id)
 
 
-def get_all_contacts(db, user_id, limit=50, offset=0):
-    return cp.get_all_contacts(db, user_id=user_id, limit=limit, offset=offset)
+def get_all_contacts(db, user_id, limit=50, offset=0, newest_first=False):
+    return cp.get_all_contacts(db, user_id=user_id, limit=limit, offset=offset, newest_first=newest_first)
 
 
 def update_contact(db, contact_id, contact_data, user_id):

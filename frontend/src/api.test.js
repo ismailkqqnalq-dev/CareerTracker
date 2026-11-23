@@ -27,6 +27,20 @@ describe("createApiClient", () => {
       .toEqual(["0", "2"]);
   });
 
+  it("asks for the newest records first only when requested", async () => {
+    const fetchMock = vi.fn(async () => ({ ...response(200, []), headers: { get: () => "0" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const api = createApiClient();
+
+    await api.requestPage("/opportunities?q=alfa", { token: "test", newestFirst: true });
+    await api.requestPage("/opportunities", { token: "test" });
+
+    const [newest, oldest] = fetchMock.mock.calls.map(([url]) => new URL(url, "http://localhost").searchParams);
+    expect(newest.get("order")).toBe("newest");
+    expect(newest.get("q")).toBe("alfa");
+    expect(oldest.has("order")).toBe(false);
+  });
+
   it("exposes error_code without using detail as a decision value", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
       response(409, {

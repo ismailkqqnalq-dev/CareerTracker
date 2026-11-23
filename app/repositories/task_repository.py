@@ -12,12 +12,13 @@ def create_task(db, task_data, user_id):
     return task
 
 
-def get_all_tasks(db, user_id, limit=50, offset=0):
+def get_all_tasks(db, user_id, limit=50, offset=0, newest_first=False):
     return paginate_query(
         db.query(Task).filter(Task.user_id == user_id),
         order_by=Task.id,
         limit=limit,
         offset=offset,
+        newest_first=newest_first,
     )
 
 

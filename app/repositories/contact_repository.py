@@ -12,12 +12,13 @@ def create_contact(db, contact_data, user_id):
     return contact
 
 
-def get_all_contacts(db, user_id, limit=50, offset=0):
+def get_all_contacts(db, user_id, limit=50, offset=0, newest_first=False):
     return paginate_query(
         db.query(Contact).filter(Contact.user_id == user_id),
         order_by=Contact.id,
         limit=limit,
         offset=offset,
+        newest_first=newest_first,
     )
 
 
