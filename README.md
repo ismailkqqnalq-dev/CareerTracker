@@ -60,6 +60,7 @@ Kimlik doğrulaması gereken endpoint'lerde `Authorization: Bearer <token>` gön
 | Oturum | `GET /auth/me` | Evet | Oturum açmış kullanıcıyı döndürür |
 | Hesap | `POST /auth/me/password` | Evet | `current_password` doğrulanırsa parolayı `new_password` ile değiştirir; `204`, yanlış parolada `403 password_confirmation_failed` |
 | Hesap | `DELETE /auth/me` | Evet | Mevcut parolayı yeniden doğrular, hesabı ve kişisel kayıtlarını siler |
+| Hesap | `GET /auth/me/export` | Evet | Kullanıcının tüm kayıtlarını tek bir JSON dosyası olarak indirir (şifre özeti ve oturum token'ları hariç) |
 | Skill kataloğu | `GET /skills` | Opsiyonel | Ortak katalogu; oturum varsa kullanıcının kendi skill'lerini de listeler |
 | Skill kataloğu | `POST /skills` | Evet | Yalnızca giriş yapan kullanıcıya özel skill oluşturur |
 | Skill çözümleme | `GET /skills/resolve?name=...` | Opsiyonel | Görünür skill'i ad veya alias ile bulur |
@@ -284,6 +285,14 @@ kataloğu ve diğer kullanıcıların kayıtları korunur. Silinen hesabın JWT'
 hesap bulunamadığı için sonraki istekte geçersiz olur. Yanlış parola
 `403 password_confirmation_failed` döndürür. İşlem geri alınamaz; arayüzde
 "Hesap ayarları" ekranından şifre onayı ve ek bir onay penceresiyle yapılır.
+
+`GET /auth/me/export` (arayüzde "Hesap ayarları" → "Verilerimi indir") hesabın
+tüm kayıtlarını tek bir JSON belgesinde verir: fırsatlar ve becerileri, aktiviteler,
+kişiler, görevler, kişisel beceriler ve takma adlar, beceri önerileri, e-posta
+yönlendirme adresi ve önerileri, oturum listesi. Bu, KVKK'daki erişim hakkını
+karşılamaya yöneliktir. Sütunlar model tanımından okunur; şifre özeti ve oturum
+token özetleri belgeye girmez. Kullanıcıya ait veri tutan her tablonun dışa
+aktarmada yer aldığı bir testle denetlenir. Yanıt `Cache-Control: no-store` ile döner.
 
 `POST /auth/me/password` mevcut parolayı doğrulayıp yenisini kaydeder ve diğer
 cihazlardaki tüm oturumları kapatır; şifreyi değiştiren tarayıcının oturumu aynı

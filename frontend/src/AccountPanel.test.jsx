@@ -54,6 +54,38 @@ describe("change password", () => {
   });
 });
 
+describe("data export", () => {
+  it("downloads the export as a dated JSON file", async () => {
+    const exported = { format_version: 1, exported_at: "2026-11-23T10:00:00+00:00", opportunities: [] };
+    const api = { request: vi.fn(async () => exported) };
+    URL.createObjectURL = vi.fn(() => "blob:export");
+    URL.revokeObjectURL = vi.fn();
+    const clicks = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function click() {
+      clicks.push({ href: this.href, download: this.download });
+    });
+    render(<AccountPanel api={api} token="test-token" onAccountDeleted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Verilerimi indir" }));
+
+    await waitFor(() => expect(clicks).toEqual([{ href: "blob:export", download: "careertracker-verilerim-2026-11-23.json" }]));
+    expect(api.request).toHaveBeenCalledWith("/auth/me/export", { token: "test-token" });
+    const blob = URL.createObjectURL.mock.calls[0][0];
+    expect(JSON.parse(await blob.text())).toEqual(exported);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:export");
+  });
+
+  it("shows an error when the export fails", async () => {
+    const api = { request: vi.fn().mockRejectedValue(apiError(500)) };
+    render(<AccountPanel api={api} token="test-token" onAccountDeleted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Verilerimi indir" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Veriler indirilemedi. Lütfen tekrar dene.");
+    expect(screen.getByRole("button", { name: "Verilerimi indir" }).disabled).toBe(false);
+  });
+});
+
 describe("delete account", () => {
   it("deletes the account after confirmation and signs the user out", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
