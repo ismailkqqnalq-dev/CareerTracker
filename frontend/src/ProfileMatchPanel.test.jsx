@@ -145,3 +145,64 @@ describe("removing an opportunity skill", () => {
     expect(screen.queryByRole("button", { name: "Python gereksinimini kaldır" })).toBeNull();
   });
 });
+
+describe("empty skill catalog", () => {
+  it("explains why there is nothing to add instead of showing a silent empty list", async () => {
+    const api = createApi();
+    render(<ProfileMatchPanel api={api} token="test-token" skills={[]} />);
+
+    expect(await screen.findByText(/Beceri kataloğu henüz yüklenmemiş/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Profile ekle" }).disabled).toBe(true);
+  });
+
+  it("does not show the note when the catalog has skills", async () => {
+    render(<ProfileMatchPanel {...props(createApi())} />);
+
+    await screen.findByText("Python");
+    expect(screen.queryByText(/Beceri kataloğu henüz yüklenmemiş/)).toBeNull();
+  });
+});
+
+describe("profile skill search", () => {
+  const catalog = [
+    { id: 1, name: "Python", category: "language" },
+    { id: 2, name: "PostgreSQL", category: "database" },
+    { id: 3, name: "C", category: "language" },
+    { id: 4, name: "CSS", category: "language" },
+  ];
+
+  it("filters the list while typing and preselects the best match", async () => {
+    const api = createApi();
+    render(<ProfileMatchPanel api={api} token="test-token" skills={catalog} />);
+    await screen.findByText("Python");
+
+    fireEvent.change(screen.getByLabelText("Beceri ara"), { target: { value: "postg" } });
+
+    const select = screen.getByLabelText("Yeni profil becerisi");
+    expect(select.value).toBe("2");
+    expect([...select.options].map((option) => option.textContent)).toEqual(["Beceri seç", "PostgreSQL"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Profile ekle" }));
+    await waitFor(() => expect(api.request).toHaveBeenCalledWith("/users/me/skills", expect.objectContaining({ method: "POST" })));
+    expect(screen.getByLabelText("Beceri ara").value).toBe("");
+  });
+
+  it("prefers an exact name over a longer one", async () => {
+    render(<ProfileMatchPanel api={createApi()} token="test-token" skills={catalog} />);
+    await screen.findByText("Python");
+
+    fireEvent.change(screen.getByLabelText("Beceri ara"), { target: { value: "c" } });
+
+    expect(screen.getByLabelText("Yeni profil becerisi").value).toBe("3");
+  });
+
+  it("says when nothing matches and keeps the add button disabled", async () => {
+    render(<ProfileMatchPanel api={createApi()} token="test-token" skills={catalog} />);
+    await screen.findByText("Python");
+
+    fireEvent.change(screen.getByLabelText("Beceri ara"), { target: { value: "cobol" } });
+
+    expect(screen.getByRole("option", { name: "Eşleşen beceri yok" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Profile ekle" }).disabled).toBe(true);
+  });
+});
