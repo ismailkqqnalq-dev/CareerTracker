@@ -11,6 +11,7 @@ export default function ProfileMatchPanel({ api, token, skills }) {
   const [profileSkills, setProfileSkills] = useState([]);
   const [opportunities, setOpportunities] = useState([]);
   const [selectedSkillId, setSelectedSkillId] = useState("");
+  const [skillQuery, setSkillQuery] = useState("");
   const [newLevel, setNewLevel] = useState("beginner");
   const [newYears, setNewYears] = useState("0");
   const [drafts, setDrafts] = useState({});
@@ -91,6 +92,7 @@ export default function ProfileMatchPanel({ api, token, skills }) {
         },
       }));
       setSelectedSkillId("");
+      setSkillQuery("");
       setNewLevel("beginner");
       setNewYears("0");
       setNotice("Beceri profiline eklendi.");
@@ -209,6 +211,23 @@ export default function ProfileMatchPanel({ api, token, skills }) {
     }
   }
 
+  // Katalogda yüzlerce beceri var; arama listeyi süzer ve ilk eşleşmeyi seçer.
+  const addableSkills = skills.filter((skill) => !profileSkills.some((item) => item.skill_id === skill.id));
+  const normalizedQuery = skillQuery.trim().toLocaleLowerCase("tr-TR");
+  const visibleSkills = normalizedQuery
+    ? addableSkills.filter((skill) => skill.name.toLocaleLowerCase("tr-TR").includes(normalizedQuery))
+    : addableSkills;
+
+  function searchSkills(value) {
+    setSkillQuery(value);
+    const query = value.trim().toLocaleLowerCase("tr-TR");
+    if (!query) return;
+    const matches = addableSkills.filter((skill) => skill.name.toLocaleLowerCase("tr-TR").includes(query));
+    // Tam eşleşme öne alınır: "c" yazınca "C" seçilsin, "CSS" değil.
+    const best = matches.find((skill) => skill.name.toLocaleLowerCase("tr-TR") === query) ?? matches[0];
+    setSelectedSkillId(best ? String(best.id) : "");
+  }
+
   return (
     <div className="profile-match-layout">
       {error && <p className="form-error" role="alert">{error}</p>}
@@ -220,21 +239,34 @@ export default function ProfileMatchPanel({ api, token, skills }) {
           <p className="muted">Becerilerini ve deneyim düzeyini kişisel profiline ekle.</p>
         </div>
         <form className="profile-skill-form" onSubmit={addProfileSkill}>
-          <label htmlFor="profile-skill">Yeni profil becerisi</label>
-          <select id="profile-skill" required value={selectedSkillId} onChange={(event) => setSelectedSkillId(event.target.value)}>
-            <option value="">Beceri seç</option>
-            {skills.filter((skill) => !profileSkills.some((item) => item.skill_id === skill.id)).map((skill) => (
-              <option key={skill.id} value={skill.id}>{skill.name}</option>
-            ))}
-          </select>
-          <label htmlFor="new-profile-level">Yetkinlik seviyesi</label>
-          <select id="new-profile-level" value={newLevel} onChange={(event) => setNewLevel(event.target.value)}>
-            {PROFICIENCY_LEVELS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-          <label htmlFor="new-profile-years">Yıl deneyim</label>
-          <input id="new-profile-years" type="number" min="0" step="0.5" value={newYears} onChange={(event) => setNewYears(event.target.value)} />
+          <div className="profile-skill-field">
+            <label htmlFor="profile-skill-search">Beceri ara</label>
+            <input id="profile-skill-search" type="search" placeholder="Örn. Python, React, SQL" autoComplete="off" value={skillQuery} onChange={(event) => searchSkills(event.target.value)} />
+          </div>
+          <div className="profile-skill-field">
+            <label htmlFor="profile-skill">Yeni profil becerisi</label>
+            <select id="profile-skill" required value={selectedSkillId} onChange={(event) => setSelectedSkillId(event.target.value)}>
+              <option value="">{normalizedQuery && !visibleSkills.length ? "Eşleşen beceri yok" : "Beceri seç"}</option>
+              {visibleSkills.map((skill) => (
+                <option key={skill.id} value={skill.id}>{skill.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="profile-skill-field">
+            <label htmlFor="new-profile-level">Yetkinlik seviyesi</label>
+            <select id="new-profile-level" value={newLevel} onChange={(event) => setNewLevel(event.target.value)}>
+              {PROFICIENCY_LEVELS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </div>
+          <div className="profile-skill-field">
+            <label htmlFor="new-profile-years">Yıl deneyim</label>
+            <input id="new-profile-years" type="number" min="0" step="0.5" value={newYears} onChange={(event) => setNewYears(event.target.value)} />
+          </div>
           <button className="button button-primary" disabled={busy || !selectedSkillId}>Profile ekle</button>
         </form>
+        {skills.length === 0 && (
+          <p className="form-error" role="status">Beceri kataloğu henüz yüklenmemiş, bu yüzden seçilecek beceri yok. Biraz sonra sayfayı yenile; sorun sürerse bize bildir.</p>
+        )}
 
         {loading ? <p>Profil becerileri yükleniyor…</p> : profileSkills.length === 0 ? (
           <p className="profile-empty">Henüz profil becerisi eklemedin.</p>

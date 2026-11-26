@@ -136,3 +136,5 @@
 .crm-more-fields summary span{color:var(--muted);font-weight:500}
 .crm-more-fields>.crm-form{margin-top:6px}
 .crm-card-heading .text-button{white-space:nowrap}
+.profile-skill-field{display:grid;gap:6px;min-width:0}
+@media(min-width:761px){.profile-skill-form{grid-template-columns:minmax(150px,1.3fr) minmax(170px,1.5fr) minmax(120px,1fr) minmax(90px,.6fr) auto}}
