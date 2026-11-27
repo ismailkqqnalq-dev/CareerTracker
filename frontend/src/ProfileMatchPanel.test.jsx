@@ -80,8 +80,8 @@ describe("profile skills and opportunity matching", () => {
     const api = createApi();
     render(<ProfileMatchPanel {...props(api)} />);
 
-    await screen.findByText("Python");
-    fireEvent.change(screen.getByLabelText("Python yetkinlik seviyesi"), { target: { value: "advanced" } });
+    // "Python" seçme listesinde yüklemeden önce de görünür; profil satırını bekle.
+    fireEvent.change(await screen.findByLabelText("Python yetkinlik seviyesi"), { target: { value: "advanced" } });
     fireEvent.change(screen.getByLabelText("Python yıl deneyimi"), { target: { value: "4" } });
     fireEvent.click(screen.getByRole("button", { name: "Python kaydet" }));
 
@@ -204,5 +204,35 @@ describe("profile skill search", () => {
 
     expect(screen.getByRole("option", { name: "Eşleşen beceri yok" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Profile ekle" }).disabled).toBe(true);
+  });
+});
+
+describe("required skill search", () => {
+  it("finds a catalog skill by typing and adds it to the opportunity", async () => {
+    const api = createApi();
+    render(<ProfileMatchPanel {...props(api)} />);
+    await screen.findByLabelText("Python yetkinlik seviyesi");
+    fireEvent.change(screen.getByLabelText("Fırsat seç"), { target: { value: "17" } });
+    // Python fırsatta zaten gerekli; aramada yalnızca eklenebilecekler kalır.
+    await waitFor(() => expect([...screen.getByLabelText("Fırsat becerisi ekle").options].map((o) => o.textContent))
+      .toEqual(["Katalogdan beceri seç", "PostgreSQL"]));
+
+    fireEvent.change(screen.getByLabelText("Gerekli beceri ara"), { target: { value: "postgre" } });
+
+    expect(screen.getByLabelText("Fırsat becerisi ekle").value).toBe("2");
+    fireEvent.click(screen.getByRole("button", { name: "Gerekli beceri ekle" }));
+    expect(await screen.findByText("Beceri fırsatın gereksinimlerine eklendi.")).toBeTruthy();
+    expect(screen.getByLabelText("Gerekli beceri ara").value).toBe("");
+  });
+
+  it("says when no catalog skill matches", async () => {
+    render(<ProfileMatchPanel {...props(createApi())} />);
+    await screen.findByLabelText("Python yetkinlik seviyesi");
+    fireEvent.change(screen.getByLabelText("Fırsat seç"), { target: { value: "17" } });
+
+    fireEvent.change(screen.getByLabelText("Gerekli beceri ara"), { target: { value: "cobol" } });
+
+    expect(screen.getByLabelText("Fırsat becerisi ekle").value).toBe("");
+    expect(screen.getByRole("option", { name: "Eşleşen beceri yok" })).toBeTruthy();
   });
 });
