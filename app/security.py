@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import os
+import threading
 
 import jwt
 from dotenv import load_dotenv
@@ -9,6 +10,11 @@ from pwdlib import PasswordHash
 load_dotenv()
 
 password_hash = PasswordHash.recommended()
+# Argon2 (varsayılan ayar) her hash için ~64 MB bellek ayırır. Sınır olmazsa eşzamanlı
+# kayıt/giriş istekleri sunucu iş parçacığı sayısı kadar hash'i aynı anda çalıştırıp
+# küçük bir sunucunun belleğini tüketebilir. Hash zaten CPU'ya bağlı; sınır hızı düşürmez.
+MAX_CONCURRENT_PASSWORD_HASHES = 4
+_password_hash_slots = threading.BoundedSemaphore(MAX_CONCURRENT_PASSWORD_HASHES)
 DUMMY_PASSWORD_HASH = password_hash.hash("careertracker-dummy-password")
 
 ALGORITHM = "HS256"
@@ -79,11 +85,13 @@ def validate_security_configuration() -> None:
 
 
 def hash_password(password: str) -> str:
-    return password_hash.hash(password)
+    with _password_hash_slots:
+        return password_hash.hash(password)
 
 
 def verify_password(password: str, hashed_password: str) -> bool:
-    return password_hash.verify(password, hashed_password)
+    with _password_hash_slots:
+        return password_hash.verify(password, hashed_password)
 
 
 def create_access_token(subject: str) -> str:

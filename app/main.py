@@ -1,7 +1,8 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from app.security import validate_security_configuration
 from app.services.mailer import validate_mail_configuration
@@ -38,6 +39,18 @@ app = FastAPI(title="CareerTracker", lifespan=lifespan)
 app.add_middleware(RequestBodySizeLimitMiddleware)
 # Outer user middleware also protects request-size rejection responses.
 app.add_middleware(ResponseSecurityHeadersMiddleware)
+
+
+@app.exception_handler(OverflowError)
+async def value_out_of_range(_: Request, __: OverflowError) -> JSONResponse:
+    # Veritabanı tamsayısına sığmayan bir kimlik ya da takvimin dışına taşan bir tarih
+    # (ör. 9999-12-31 + 7 gün) kullanıcı hatasıdır; 500 yerine 422 dön.
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "A number or date is out of the supported range.", "error_code": "value_out_of_range"},
+    )
+
+
 app.include_router(opportunity_router)
 app.include_router(activity_router)
 app.include_router(task_router)
