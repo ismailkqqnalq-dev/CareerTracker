@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from app.schemas.activities import ActivityResponse
 from app.schemas.contacts import ContactResponse
@@ -9,8 +9,15 @@ from app.schemas.tasks import TaskResponse
 from app.schemas.validators import validate_http_url
 
 
-Company = Annotated[str, StringConstraints(max_length=200)]
-Position = Annotated[str, StringConstraints(max_length=200)]
+def _reject_blank(value: str) -> str:
+    # Metin olduğu gibi saklanır (CSV dışa aktarma kaçışı bunu bekler); yalnızca tamamen boş olan reddedilir.
+    if not value.strip():
+        raise ValueError("Value cannot be blank.")
+    return value
+
+
+Company = Annotated[str, StringConstraints(max_length=200), AfterValidator(_reject_blank)]
+Position = Annotated[str, StringConstraints(max_length=200), AfterValidator(_reject_blank)]
 OpportunityType = Annotated[str, StringConstraints(max_length=50)]
 JobLink = Annotated[str, StringConstraints(max_length=2048)]
 Location = Annotated[str, StringConstraints(max_length=200)]
@@ -87,6 +94,14 @@ class OpportunityUpdate(BaseModel):
     notes: Notes | None = None
     next_action: NextAction | None = None
     last_contact_date: date | None = None
+
+    @field_validator("company", "position")
+    @classmethod
+    def reject_clearing_required_name(cls, value: str | None) -> str:
+        # Alan gönderilmezse dokunulmaz; ama açıkça null gönderip silmek zorunlu adı boşaltır.
+        if value is None:
+            raise ValueError("Company and position cannot be cleared.")
+        return value
 
     @field_validator("job_link")
     @classmethod
