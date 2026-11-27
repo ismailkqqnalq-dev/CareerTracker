@@ -7,6 +7,20 @@ const PROFICIENCY_LEVELS = [
   ["expert", "Uzman"],
 ];
 
+// Katalogda yüzlerce beceri var; arama listeyi süzer, en iyi eşleşme önceden seçilir.
+function filterSkills(list, query) {
+  const normalized = query.trim().toLocaleLowerCase("tr-TR");
+  return normalized ? list.filter((skill) => skill.name.toLocaleLowerCase("tr-TR").includes(normalized)) : list;
+}
+
+function bestSkillMatch(list, query) {
+  const normalized = query.trim().toLocaleLowerCase("tr-TR");
+  if (!normalized) return null;
+  const matches = filterSkills(list, normalized);
+  // Tam eşleşme öne alınır: "c" yazınca "C" seçilsin, "CSS" değil.
+  return matches.find((skill) => skill.name.toLocaleLowerCase("tr-TR") === normalized) ?? matches[0] ?? null;
+}
+
 export default function ProfileMatchPanel({ api, token, skills }) {
   const [profileSkills, setProfileSkills] = useState([]);
   const [opportunities, setOpportunities] = useState([]);
@@ -18,6 +32,7 @@ export default function ProfileMatchPanel({ api, token, skills }) {
   const [selectedOpportunityId, setSelectedOpportunityId] = useState("");
   const [requiredSkills, setRequiredSkills] = useState([]);
   const [selectedRequiredSkillId, setSelectedRequiredSkillId] = useState("");
+  const [requiredQuery, setRequiredQuery] = useState("");
   const [loadingRequiredSkills, setLoadingRequiredSkills] = useState(false);
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -181,6 +196,7 @@ export default function ProfileMatchPanel({ api, token, skills }) {
       });
       setRequiredSkills((current) => current.some((item) => item.id === added.id) ? current : [...current, added]);
       setSelectedRequiredSkillId("");
+      setRequiredQuery("");
       setMatch(null);
       setNotice("Beceri fırsatın gereksinimlerine eklendi.");
     } catch (addError) {
@@ -211,21 +227,23 @@ export default function ProfileMatchPanel({ api, token, skills }) {
     }
   }
 
-  // Katalogda yüzlerce beceri var; arama listeyi süzer ve ilk eşleşmeyi seçer.
   const addableSkills = skills.filter((skill) => !profileSkills.some((item) => item.skill_id === skill.id));
-  const normalizedQuery = skillQuery.trim().toLocaleLowerCase("tr-TR");
-  const visibleSkills = normalizedQuery
-    ? addableSkills.filter((skill) => skill.name.toLocaleLowerCase("tr-TR").includes(normalizedQuery))
-    : addableSkills;
+  const visibleSkills = filterSkills(addableSkills, skillQuery);
+  const addableRequiredSkills = skills.filter((skill) => !requiredSkills.some((required) => required.id === skill.id));
+  const visibleRequiredSkills = filterSkills(addableRequiredSkills, requiredQuery);
 
   function searchSkills(value) {
     setSkillQuery(value);
-    const query = value.trim().toLocaleLowerCase("tr-TR");
-    if (!query) return;
-    const matches = addableSkills.filter((skill) => skill.name.toLocaleLowerCase("tr-TR").includes(query));
-    // Tam eşleşme öne alınır: "c" yazınca "C" seçilsin, "CSS" değil.
-    const best = matches.find((skill) => skill.name.toLocaleLowerCase("tr-TR") === query) ?? matches[0];
+    if (!value.trim()) return;
+    const best = bestSkillMatch(addableSkills, value);
     setSelectedSkillId(best ? String(best.id) : "");
+  }
+
+  function searchRequiredSkills(value) {
+    setRequiredQuery(value);
+    if (!value.trim()) return;
+    const best = bestSkillMatch(addableRequiredSkills, value);
+    setSelectedRequiredSkillId(best ? String(best.id) : "");
   }
 
   return (
@@ -246,7 +264,7 @@ export default function ProfileMatchPanel({ api, token, skills }) {
           <div className="profile-skill-field">
             <label htmlFor="profile-skill">Yeni profil becerisi</label>
             <select id="profile-skill" required value={selectedSkillId} onChange={(event) => setSelectedSkillId(event.target.value)}>
-              <option value="">{normalizedQuery && !visibleSkills.length ? "Eşleşen beceri yok" : "Beceri seç"}</option>
+              <option value="">{skillQuery.trim() && !visibleSkills.length ? "Eşleşen beceri yok" : "Beceri seç"}</option>
               {visibleSkills.map((skill) => (
                 <option key={skill.id} value={skill.id}>{skill.name}</option>
               ))}
@@ -314,10 +332,12 @@ export default function ProfileMatchPanel({ api, token, skills }) {
         {selectedOpportunityId && (
           <>
             <form className="opportunity-skill-form" onSubmit={addOpportunitySkill}>
+              <label htmlFor="required-skill-search">Gerekli beceri ara</label>
+              <input id="required-skill-search" type="search" placeholder="Örn. Docker, SQL" autoComplete="off" value={requiredQuery} onChange={(event) => searchRequiredSkills(event.target.value)} />
               <label htmlFor="required-skill">Fırsat becerisi ekle</label>
               <select id="required-skill" value={selectedRequiredSkillId} onChange={(event) => setSelectedRequiredSkillId(event.target.value)}>
-                <option value="">Katalogdan beceri seç</option>
-                {skills.filter((skill) => !requiredSkills.some((required) => required.id === skill.id)).map((skill) => <option key={skill.id} value={skill.id}>{skill.name}</option>)}
+                <option value="">{requiredQuery.trim() && !visibleRequiredSkills.length ? "Eşleşen beceri yok" : "Katalogdan beceri seç"}</option>
+                {visibleRequiredSkills.map((skill) => <option key={skill.id} value={skill.id}>{skill.name}</option>)}
               </select>
               <button className="button button-quiet" disabled={busy || loadingRequiredSkills || !selectedRequiredSkillId}>Gerekli beceri ekle</button>
             </form>
